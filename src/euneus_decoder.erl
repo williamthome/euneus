@@ -29,12 +29,14 @@ decode(Bin, Opts) ->
 
 decode(Bin, Opts0, Decoded) ->
     Opts = #{
+        null_term => undefined,
         decoders => decoders(Opts0)
     },
     do_decode(Bin, Opts, Decoded).
 
 decoders(Options) ->
     Defaults = #{
+        literal => euneus_literal_decoder,
         object => euneus_object_decoder,
         array => euneus_array_decoder,
         string => euneus_string_decoder,
@@ -63,7 +65,9 @@ do_decode(<<$:, T/binary>>, Opts, Decoded) ->
 do_decode(<<$}, T/binary>>, Opts, Decoded) ->
     {end_object, T, Opts, Decoded};
 do_decode(<<>>, _, Decoded) ->
-    Decoded.
+    Decoded;
+do_decode(T, #{decoders := #{literal := Decoder}} = Opts, []) ->
+    do_decode_1(T, Opts, Decoder).
 
 do_decode_1(T, Opts, Decoder) ->
     {Rest, Term} = Decoder:decode(T, Opts),
@@ -77,6 +81,7 @@ encode_test() ->
     ?assertEqual(<<"foo">>, decode(<<"\"foo\"">>)),
     ?assertEqual(123, decode(<<"123">>)),
     ?assertEqual([<<"foo">>, 123], decode(<<"[\"foo\",123]">>)),
-    ?assertEqual(#{<<"foo">> => 123}, decode(<<"{\"foo\":123}">>)).
+    ?assertEqual(#{<<"foo">> => 123}, decode(<<"{\"foo\":123}">>)),
+    ?assertEqual(undefined, decode(<<"null">>)).
 
 -endif.
