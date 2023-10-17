@@ -1,6 +1,6 @@
 -module(euneus_encoder).
 
--export([ encode/1 ]).
+-export([ encode/1, encode/2 ]).
 
 -callback encode(Term :: term(), Opts :: map()) -> iodata().
 
@@ -15,6 +15,7 @@ encode(Term, Opts0) ->
 
 encoders(Options) ->
     Defaults = #{
+        list => euneus_list_encoder,
         float => euneus_float_encoder,
         integer => euneus_integer_encoder,
         binary => euneus_binary_encoder,
@@ -22,6 +23,8 @@ encoders(Options) ->
     },
     maps:merge(Defaults, maps:get(encoders, Options, #{})).
 
+do_encode(Term, #{encoders := #{list := Encoder}} = Opts) when is_list(Term) ->
+    Encoder:encode(Term, Opts);
 do_encode(Term, #{encoders := #{float := Encoder}} = Opts) when is_float(Term) ->
     Encoder:encode(Term, Opts);
 do_encode(Term, #{encoders := #{integer := Encoder}} = Opts) when is_integer(Term) ->
@@ -40,6 +43,7 @@ encode_test() ->
     ?assertEqual([$", <<"foo">>, $"], encode(foo)),
     ?assertEqual([$", <<"foo">>, $"], encode(<<"foo">>)),
     ?assertEqual(<<"0">>, encode(0)),
-    ?assertEqual(<<"123.456789">>, encode(123.45678900)).
+    ?assertEqual(<<"123.456789">>, encode(123.45678900)),
+    ?assertEqual([$[, [<<"true">>, $,, <<"0">>], $]], encode([true, 0])).
 
 -endif.
