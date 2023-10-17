@@ -6,9 +6,9 @@
 
 -include("euneus_decoder.hrl").
 
-decode(Bin, Opts, Buffer) ->
+decode(Bin, Opts, []) ->
     {Rest, Decoded} = do_decode(Bin, <<>>),
-    euneus_decoder:decode(Rest, Opts, [Decoded | Buffer]).
+    euneus_decoder:decode(Rest, Opts, Decoded).
 
 % @fixme: accepts only valid notation/format.
 do_decode(<<H, T/binary>>, Buffer) when ?is_number(H) ->

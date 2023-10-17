@@ -4,9 +4,9 @@
 
 -export([ decode/3 ]).
 
-decode(Bin, Opts, Buffer) ->
+decode(Bin, Opts, []) ->
     {Rest, Decoded} = do_decode(Bin, Opts, []),
-    euneus_decoder:decode(Rest, Opts, [Decoded | Buffer]).
+    euneus_decoder:decode(Rest, Opts, Decoded).
 
 do_decode(T0, Opts, Buffer) ->
     case euneus_decoder:decode(T0, Opts, []) of

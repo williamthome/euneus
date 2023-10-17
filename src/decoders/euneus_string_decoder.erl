@@ -4,9 +4,9 @@
 
 -export([ decode/3 ]).
 
-decode(Bin, Opts, Buffer) ->
+decode(Bin, Opts, []) ->
     {Rest, Decoded} = do_decode(Bin, <<>>),
-    euneus_decoder:decode(Rest, Opts, [Decoded | Buffer]).
+    euneus_decoder:decode(Rest, Opts, Decoded).
 
 do_decode(<<$\\, $", T/binary>>, Buffer) ->
     do_decode(T, <<Buffer/binary, $\\, $">>);
