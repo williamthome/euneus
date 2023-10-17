@@ -15,11 +15,14 @@ encode(Term, Opts0) ->
 
 encoders(Options) ->
     Defaults = #{
+        integer => euneus_integer_encoder,
         binary => euneus_binary_encoder,
         atom => euneus_atom_encoder
     },
     maps:merge(Defaults, maps:get(encoders, Options, #{})).
 
+do_encode(Term, #{encoders := #{integer := Encoder}} = Opts) when is_integer(Term) ->
+    Encoder:encode(Term, Opts);
 do_encode(Term, #{encoders := #{binary := Encoder}} = Opts) when is_binary(Term) ->
     Encoder:encode(Term, Opts);
 do_encode(Term, #{encoders := #{atom := Encoder}} = Opts) when is_atom(Term) ->
@@ -32,6 +35,7 @@ do_encode(Term, #{encoders := #{atom := Encoder}} = Opts) when is_atom(Term) ->
 encode_test() ->
     ?assertEqual(<<"true">>, encode(true)),
     ?assertEqual([$", <<"foo">>, $"], encode(foo)),
-    ?assertEqual([$", <<"foo">>, $"], encode(<<"foo">>)).
+    ?assertEqual([$", <<"foo">>, $"], encode(<<"foo">>)),
+    ?assertEqual(<<"0">>, encode(0)).
 
 -endif.
