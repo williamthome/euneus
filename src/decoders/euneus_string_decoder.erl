@@ -2,11 +2,10 @@
 
 -behaviour(euneus_decoder).
 
--export([ decode/3 ]).
+-export([ decode/2 ]).
 
-decode(Bin, Opts, []) ->
-    {Rest, Decoded} = do_decode(Bin, <<>>),
-    euneus_decoder:decode(Rest, Opts, Decoded).
+decode(Bin, _Opts) ->
+    do_decode(Bin, <<>>).
 
 do_decode(<<$\\, $", T/binary>>, Buffer) ->
     do_decode(T, <<Buffer/binary, $\\, $">>);

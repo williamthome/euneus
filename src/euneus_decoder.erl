@@ -2,7 +2,22 @@
 
 -export([ decode/1, decode/2, decode/3 ]).
 
--callback decode(Bin :: binary(), Opts :: map(), Buffer :: iolist()) -> iolist().
+-callback decode(Bin, Opts) -> Result
+    when Bin :: binary()
+       , Opts :: map()
+       , Result :: {Rest, Decoded}
+       , Rest :: binary()
+       , Decoded :: decoded()
+       .
+
+-type decoded() :: map()
+                 | list()
+                 | binary()
+                 | number()
+                 | true
+                 | false
+                 | undefined
+                 .
 
 -include("euneus_decoder.hrl").
 
@@ -12,11 +27,11 @@ decode(Bin) ->
 decode(Bin, Opts) ->
     decode(Bin, Opts, []).
 
-decode(Bin, Opts0, Buffer) ->
+decode(Bin, Opts0, Decoded) ->
     Opts = #{
         decoders => decoders(Opts0)
     },
-    do_decode(Bin, Opts, Buffer).
+    do_decode(Bin, Opts, Decoded).
 
 decoders(Options) ->
     Defaults = #{
@@ -27,28 +42,32 @@ decoders(Options) ->
     },
     maps:merge(Defaults, maps:get(decoders, Options, #{})).
 
-do_decode(<<${, T/binary>>, #{decoders := #{object := Decoder}} = Opts, Buffer) ->
-    Decoder:decode(T, Opts, Buffer);
-do_decode(<<$[, T/binary>>, #{decoders := #{array := Decoder}} = Opts, Buffer) ->
-    Decoder:decode(T, Opts, Buffer);
-do_decode(<<$", T/binary>>, #{decoders := #{string := Decoder}} = Opts, Buffer) ->
-    Decoder:decode(T, Opts, Buffer);
-do_decode(<<H, _/binary>> = T, #{decoders := #{number := Decoder}} = Opts, Buffer)
+do_decode(<<${, T/binary>>, #{decoders := #{object := Decoder}} = Opts, []) ->
+    do_decode_1(T, Opts, Decoder);
+do_decode(<<$[, T/binary>>, #{decoders := #{array := Decoder}} = Opts, []) ->
+    do_decode_1(T, Opts, Decoder);
+do_decode(<<$", T/binary>>, #{decoders := #{string := Decoder}} = Opts, []) ->
+    do_decode_1(T, Opts, Decoder);
+do_decode(<<H, _/binary>> = T, #{decoders := #{number := Decoder}} = Opts, [])
   when ?is_number(H) ->
-    Decoder:decode(T, Opts, Buffer);
-do_decode(<<H, T/binary>>, Opts, Buffer)
+    do_decode_1(T, Opts, Decoder);
+do_decode(<<H, T/binary>>, Opts, Decoded)
   when ?is_whitespace(H) ->
-    do_decode(T, Opts, Buffer);
-do_decode(<<$,, T/binary>>, Opts, Buffer) ->
-    {more, T, Opts, Buffer};
-do_decode(<<$], T/binary>>, Opts, Buffer) ->
-    {array_end, T, Opts, Buffer};
-do_decode(<<$:, T/binary>>, Opts, Buffer) ->
-    {object_key, T, Opts, Buffer};
-do_decode(<<$}, T/binary>>, Opts, Buffer) ->
-    {object_end, T, Opts, Buffer};
-do_decode(<<>>, _, Buffer) ->
-    Buffer.
+    do_decode(T, Opts, Decoded);
+do_decode(<<$,, T/binary>>, Opts, Decoded) ->
+    {more, T, Opts, Decoded};
+do_decode(<<$], T/binary>>, Opts, Decoded) ->
+    {array_end, T, Opts, Decoded};
+do_decode(<<$:, T/binary>>, Opts, Decoded) ->
+    {object_key, T, Opts, Decoded};
+do_decode(<<$}, T/binary>>, Opts, Decoded) ->
+    {object_end, T, Opts, Decoded};
+do_decode(<<>>, _, Decoded) ->
+    Decoded.
+
+do_decode_1(T, Opts, Decoder) ->
+    {Rest, Term} = Decoder:decode(T, Opts),
+    do_decode(Rest, Opts, Term).
 
 -ifdef(TEST).
 

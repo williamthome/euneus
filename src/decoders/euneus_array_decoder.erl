@@ -2,11 +2,10 @@
 
 -behaviour(euneus_decoder).
 
--export([ decode/3 ]).
+-export([ decode/2 ]).
 
-decode(Bin, Opts, []) ->
-    {Rest, Decoded} = do_decode(Bin, Opts, []),
-    euneus_decoder:decode(Rest, Opts, Decoded).
+decode(Bin, Opts) ->
+    do_decode(Bin, Opts, []).
 
 do_decode(T, Opts, Buffer) ->
     case euneus_decoder:decode(T, Opts, []) of

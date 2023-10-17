@@ -2,13 +2,12 @@
 
 -behaviour(euneus_decoder).
 
--export([ decode/3 ]).
+-export([ decode/2 ]).
 
 -include("euneus_decoder.hrl").
 
-decode(Bin, Opts, []) ->
-    {Rest, Decoded} = do_decode(Bin, <<>>),
-    euneus_decoder:decode(Rest, Opts, Decoded).
+decode(Bin, _Opts) ->
+    do_decode(Bin, <<>>).
 
 % @fixme: accepts only valid notation/format.
 do_decode(<<H, T/binary>>, Buffer) when ?is_number(H) ->
