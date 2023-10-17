@@ -4,6 +4,8 @@
 
 -callback decode(Bin :: binary(), Opts :: map(), Buffer :: iolist()) -> iolist().
 
+-include("euneus_decoder.hrl").
+
 decode(Bin) ->
     decode(Bin, #{}).
 
@@ -18,11 +20,15 @@ decode(Bin, Opts0, Buffer) ->
 
 decoders(Options) ->
     Defaults = #{
-        string => euneus_string_decoder
+        string => euneus_string_decoder,
+        number => euneus_number_decoder
     },
     maps:merge(Defaults, maps:get(decoders, Options, #{})).
 
 do_decode(<<$", T/binary>>, #{decoders := #{string := Decoder}} = Opts, Buffer) ->
+    Decoder:decode(T, Opts, Buffer);
+do_decode(<<H, _/binary>> = T, #{decoders := #{number := Decoder}} = Opts, Buffer)
+  when ?is_number(H) ->
     Decoder:decode(T, Opts, Buffer);
 do_decode(<<>>, _, Buffer) ->
     lists:reverse(Buffer).
@@ -32,6 +38,7 @@ do_decode(<<>>, _, Buffer) ->
 -include_lib("eunit/include/eunit.hrl").
 
 encode_test() ->
-    ?assertEqual([<<"foo">>], decode(<<"\"foo\"">>)).
+    ?assertEqual([<<"foo">>], decode(<<"\"foo\"">>)),
+    ?assertEqual([123], decode(<<"123">>)).
 
 -endif.

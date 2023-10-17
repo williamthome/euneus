@@ -1,0 +1,1 @@
+-define(is_number(X), X >= $0 andalso X =< $9).
