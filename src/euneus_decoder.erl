@@ -55,13 +55,13 @@ do_decode(<<H, T/binary>>, Opts, Decoded)
   when ?is_whitespace(H) ->
     do_decode(T, Opts, Decoded);
 do_decode(<<$,, T/binary>>, Opts, Decoded) ->
-    {more, T, Opts, Decoded};
+    {value_separator, T, Opts, Decoded};
 do_decode(<<$], T/binary>>, Opts, Decoded) ->
-    {array_end, T, Opts, Decoded};
+    {end_array, T, Opts, Decoded};
 do_decode(<<$:, T/binary>>, Opts, Decoded) ->
-    {object_key, T, Opts, Decoded};
+    {name_separator, T, Opts, Decoded};
 do_decode(<<$}, T/binary>>, Opts, Decoded) ->
-    {object_end, T, Opts, Decoded};
+    {end_object, T, Opts, Decoded};
 do_decode(<<>>, _, Decoded) ->
     Decoded.
 

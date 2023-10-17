@@ -9,8 +9,8 @@ decode(Bin, Opts) ->
 
 do_decode(T, Opts, Buffer) ->
     case euneus_decoder:decode(T, Opts, []) of
-        {more, Rest, _Opts, Term} ->
+        {value_separator, Rest, _Opts, Term} ->
             do_decode(Rest, Opts, [Term | Buffer]);
-        {array_end, Rest, _Opts, Term} ->
+        {end_array, Rest, _Opts, Term} ->
             {Rest, lists:reverse([Term | Buffer])}
     end.
