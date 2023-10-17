@@ -20,12 +20,15 @@ decode(Bin, Opts0, Buffer) ->
 
 decoders(Options) ->
     Defaults = #{
+        object => euneus_object_decoder,
         array => euneus_array_decoder,
         string => euneus_string_decoder,
         number => euneus_number_decoder
     },
     maps:merge(Defaults, maps:get(decoders, Options, #{})).
 
+do_decode(<<${, T/binary>>, #{decoders := #{object := Decoder}} = Opts, Buffer) ->
+    Decoder:decode(T, Opts, Buffer);
 do_decode(<<$[, T/binary>>, #{decoders := #{array := Decoder}} = Opts, Buffer) ->
     Decoder:decode(T, Opts, Buffer);
 do_decode(<<$", T/binary>>, #{decoders := #{string := Decoder}} = Opts, Buffer) ->
@@ -40,6 +43,10 @@ do_decode(<<$,, T/binary>>, Opts, Buffer) ->
     {more, T, Opts, Buffer};
 do_decode(<<$], T/binary>>, Opts, Buffer) ->
     {array_end, T, Opts, Buffer};
+do_decode(<<$:, T/binary>>, Opts, Buffer) ->
+    {object_key, T, Opts, Buffer};
+do_decode(<<$}, T/binary>>, Opts, Buffer) ->
+    {object_end, T, Opts, Buffer};
 do_decode(<<>>, _, Buffer) ->
     lists:reverse(Buffer).
 
@@ -47,9 +54,11 @@ do_decode(<<>>, _, Buffer) ->
 
 -include_lib("eunit/include/eunit.hrl").
 
+% @fixme: output must not be an array.
 encode_test() ->
     ?assertEqual([<<"foo">>], decode(<<"\"foo\"">>)),
     ?assertEqual([123], decode(<<"123">>)),
-    ?assertEqual([[[<<"foo">>], [123]]], decode(<<"[\"foo\",123]">>)).
+    ?assertEqual([[[<<"foo">>], [123]]], decode(<<"[\"foo\",123]">>)),
+    ?assertEqual([#{[<<"foo">>] => [123]}], decode(<<"{\"foo\":123}">>)).
 
 -endif.
