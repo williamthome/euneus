@@ -15,6 +15,7 @@ encode(Term, Opts0) ->
 
 encoders(Options) ->
     Defaults = #{
+        map => euneus_map_encoder,
         list => euneus_list_encoder,
         float => euneus_float_encoder,
         integer => euneus_integer_encoder,
@@ -23,6 +24,8 @@ encoders(Options) ->
     },
     maps:merge(Defaults, maps:get(encoders, Options, #{})).
 
+do_encode(Term, #{encoders := #{map := Encoder}} = Opts) when is_map(Term) ->
+    Encoder:encode(Term, Opts);
 do_encode(Term, #{encoders := #{list := Encoder}} = Opts) when is_list(Term) ->
     Encoder:encode(Term, Opts);
 do_encode(Term, #{encoders := #{float := Encoder}} = Opts) when is_float(Term) ->
@@ -44,6 +47,10 @@ encode_test() ->
     ?assertEqual([$", <<"foo">>, $"], encode(<<"foo">>)),
     ?assertEqual(<<"0">>, encode(0)),
     ?assertEqual(<<"123.456789">>, encode(123.45678900)),
-    ?assertEqual([$[, [<<"true">>, $,, <<"0">>], $]], encode([true, 0])).
+    ?assertEqual([$[, [<<"true">>, $,, <<"0">>], $]], encode([true, 0])),
+    ?assertEqual([${,
+        [[[$", <<"foo">>, $"], $:, [$", <<"bar">>, $"]], $,,
+        [<<"0">>, $:, <<"1">>]],
+    $}], encode(#{foo => bar, 0 => 1})).
 
 -endif.
