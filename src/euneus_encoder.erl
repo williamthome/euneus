@@ -9,9 +9,13 @@ encode(Term) ->
 
 encode(Term, Opts0) ->
     Opts = #{
+        escaper => escaper(Opts0),
         encoders => encoders(Opts0)
     },
     do_encode(Term, Opts).
+
+escaper(Opts) ->
+    maps:get(escaper, Opts, euneus_json_escaper).
 
 encoders(Opts) ->
     Defaults = #{

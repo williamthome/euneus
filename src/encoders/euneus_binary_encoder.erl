@@ -4,4 +4,5 @@
 
 -export([ encode/2 ]).
 
-encode(Bin, _Opts) -> [$", Bin, $"].
+encode(Bin, #{escaper := Escaper}) ->
+    [$", Escaper:escape(Bin), $"].

@@ -4,4 +4,5 @@
 
 -export([ encode/2 ]).
 
-encode(Int, _Opts) -> integer_to_binary(Int).
+encode(Int, _Opts) ->
+    integer_to_binary(Int).

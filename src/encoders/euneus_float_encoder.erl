@@ -4,4 +4,5 @@
 
 -export([ encode/2 ]).
 
-encode(Float, _Opts) -> float_to_binary(Float, [short]).
+encode(Float, _Opts) ->
+    float_to_binary(Float, [short]).

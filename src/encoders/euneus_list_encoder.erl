@@ -4,7 +4,8 @@
 
 -export([ encode/2 ]).
 
-encode([], _Opts) -> <<"[]">>;
+encode([], _Opts) ->
+    <<"[]">>;
 encode(List, Opts) ->
     [$[, lists:join($,, lists:map(fun(Term) ->
         euneus_encoder:encode(Term, Opts)
