@@ -13,7 +13,7 @@ encode(Term, Opts0) ->
     },
     do_encode(Term, Opts).
 
-encoders(Options) ->
+encoders(Opts) ->
     Defaults = #{
         map => euneus_map_encoder,
         list => euneus_list_encoder,
@@ -22,7 +22,7 @@ encoders(Options) ->
         binary => euneus_binary_encoder,
         atom => euneus_atom_encoder
     },
-    maps:merge(Defaults, maps:get(encoders, Options, #{})).
+    maps:merge(Defaults, maps:get(encoders, Opts, #{})).
 
 do_encode(Term, #{encoders := #{map := Encoder}} = Opts) when is_map(Term) ->
     Encoder:encode(Term, Opts);
