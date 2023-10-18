@@ -5,7 +5,22 @@
 -export([ encode/2 ]).
 
 encode(Map, Opts) ->
-    [${, lists:join($,, maps:fold(fun(Key, Val, Acc) ->
-        [ [euneus_encoder:encode(Key, Opts), $:,
-           euneus_encoder:encode(Val, Opts) ] | Acc]
-    end, [], Map)), $}].
+    do_encode(maps:to_list(Map), Opts).
+
+do_encode([{K, V} | T], Opts) ->
+    [
+        ${, euneus_encoder:do_encode(K, Opts),
+        $:, euneus_encoder:do_encode(V, Opts)
+        | do_encode_loop(T, Opts)
+    ];
+do_encode([], _) ->
+    <<"{}">>.
+
+do_encode_loop([], _Opts) ->
+    [$}];
+do_encode_loop([{K, V} | T], Opts) ->
+    [
+        $,, euneus_encoder:do_encode(K, Opts),
+        $:, euneus_encoder:do_encode(V, Opts)
+        | do_encode_loop(T, Opts)
+    ].
