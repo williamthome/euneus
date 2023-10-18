@@ -80,6 +80,8 @@ do_decode_1(T, Opts, Decoder) ->
 encode_test() ->
     ?assertEqual(<<"foo">>, decode(<<"\"foo\"">>)),
     ?assertEqual(123, decode(<<"123">>)),
+    ?assertEqual(1.234, decode(<<"1.234">>)),
+    ?assertEqual(6.02e23, decode(<<"6.02e+23">>)),
     ?assertEqual([<<"foo">>, 123], decode(<<"[\"foo\",123]">>)),
     ?assertEqual(#{<<"foo">> => 123}, decode(<<"{\"foo\":123}">>)),
     ?assertEqual(undefined, decode(<<"null">>)).
