@@ -84,6 +84,7 @@ encode_test() ->
     ?assertEqual(6.02e23, decode(<<"6.02e+23">>)),
     ?assertEqual([<<"foo">>, 123], decode(<<"[\"foo\",123]">>)),
     ?assertEqual(#{<<"foo">> => 123}, decode(<<"{\"foo\":123}">>)),
-    ?assertEqual(undefined, decode(<<"null">>)).
+    ?assertEqual(undefined, decode(<<"null">>)),
+    ?assertEqual(<<"ABC">>, decode(<<"\"\\u0041\\u0042\\u0043\"">>)).
 
 -endif.
