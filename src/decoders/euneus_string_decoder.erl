@@ -5,40 +5,30 @@
 -export([ decode/2 ]).
 
 decode(Bin, _Opts) ->
-    do_decode(Bin, <<>>).
+    do_decode(Bin, 0, 0, Bin, <<>>).
 
-do_decode(<<$\\, T0/binary>>, Buffer0) ->
-    {T, Buffer} = escape(T0, Buffer0),
-    do_decode(T, Buffer);
-do_decode(<<$", T/binary>>, Buffer) ->
-    {T, Buffer};
-do_decode(<<H, T/binary>>, Buffer) ->
-    do_decode(T, <<Buffer/binary, H>>).
+do_decode(<<$\\, T/binary>>, Skip, Len, Input, Buffer) ->
+    escape(T, Skip, Len, Input, Buffer);
+do_decode(<<$", T/binary>>, Skip, Len, Input, Buffer) ->
+    Part = binary_part(Input, Skip, Len),
+    {T, <<Buffer/binary, Part/binary>>};
+do_decode(<<H, T/binary>>, Skip, Len, Input, Buffer)
+  when H > 31, H < 128 ->
+    do_decode(T, Skip, Len+1, Input, Buffer);
+do_decode(<<H, T/binary>>, Skip, Len, Input, Buffer)
+  when H < 2048 ->
+    do_decode(T, Skip, Len+2, Input, Buffer);
+do_decode(<<H, T/binary>>, Skip, Len, Input, Buffer)
+  when H < 65536 ->
+    do_decode(T, Skip, Len+3, Input, Buffer);
+do_decode(<<_, T/binary>>, Skip, Len, Input, Buffer) ->
+    do_decode(T, Skip, Len+4, Input, Buffer).
 
-escape(<<$\", T/binary>>, Buffer) ->
-    {T, <<Buffer/binary, $\">>};
-escape(<<$\\, T/binary>>, Buffer) ->
-    {T, <<Buffer/binary, $\\>>};
-escape(<<$/, T/binary>>, Buffer) ->
-    {T, <<Buffer/binary, $/>>};
-escape(<<$r, T/binary>>, Buffer) ->
-    {T, <<Buffer/binary, $\r>>};
-escape(<<$n, T/binary>>, Buffer) ->
-    {T, <<Buffer/binary, $\n>>};
-escape(<<$b, T/binary>>, Buffer) ->
-    {T, <<Buffer/binary, $\b>>};
-escape(<<$f, T/binary>>, Buffer) ->
-    {T, <<Buffer/binary, $\f>>};
-escape(<<$t, T/binary>>, Buffer) ->
-    {T, <<Buffer/binary, $\t>>};
-escape(<<$u, T/binary>>, Buffer) ->
-    escape_unicode(T, Buffer).
-
-% @todo: adapt code.
-escape_unicode(T0, Buffer) ->
+escape(<<$u, T/binary>>, Skip, _Len, Input, Buffer) ->
     StringDecode = fun(X) -> X end,
-    {T, Escaped} = escapeu(T0, T0, 0, [], StringDecode, []),
-    {T, <<Buffer/binary, (iolist_to_binary(Escaped))/binary>>}.
+    escapeu(T, Input, Skip, [], StringDecode, Buffer);
+escape(<<H, T/binary>>, Skip, Len, Input, Buffer) ->
+    do_decode(T, Skip+1, Len, Input, <<Buffer/binary, H>>).
 
 escape_surrogate(<<92/integer, 117/integer, Int1:16/integer, Int2:16/integer, Rest/bitstring>>,
                 Input, Skip, Stack, StringDecode, Acc, Hi) ->
@@ -67,7 +57,7 @@ escape_surrogate(<<92/integer, 117/integer, Int1:16/integer, Int2:16/integer, Re
             Stack, StringDecode,
             begin
                 Y = X band 3 bsl 8 + Last,
-                [Acc | <<(Hi + Y)/utf8>>]
+                <<Acc/binary, (Hi + Y)/utf8>>
             end,
         0);
 escape_surrogate(<<_Rest/bitstring>>, Input, Skip, _Stack, _StringDecode, _Acc, _Hi) ->
@@ -76,14 +66,14 @@ escape_surrogate(<<_Rest/bitstring>>, Input, Skip, _Stack, _StringDecode, _Acc, 
 escapeu_1(<<_/bitstring>> = Rest, Input, Skip, Stack, StringDecode, Acc, Last, X) ->
     A = 6 bsl 5 + (X bsl 2) + (Last bsr 6),
     B = 2 bsl 6 + Last band 63,
-    C = [Acc, A, B],
+    C = <<Acc/binary, A, B>>,
     string(Rest, Input, Skip + 6, Stack, StringDecode, C, 0).
 
 escapeu_2(<<_/bitstring>> = Rest, Input, Skip, Stack, StringDecode, Acc, Last, X) ->
     A = 14 bsl 4 + (X bsr 4),
     B = 2 bsl 6 + (X band 15 bsl 2) + (Last bsr 6),
     C = 2 bsl 6 + Last band 63,
-    D = [Acc, A, B, C],
+    D = <<Acc/binary, A, B, C>>,
     string(Rest, Input, Skip + 6, Stack, StringDecode, D, 0).
 
 escapeu(<<Int1:16/integer,Int2:16/integer,Rest/bitstring>>, Input, Skip, Stack, StringDecode, Acc) ->
@@ -101,9 +91,9 @@ escapeu(<<Int1:16/integer,Int2:16/integer,Rest/bitstring>>, Input, Skip, Stack, 
                            false ->
                                _@4 = 6 bsl 5 + (_@2 bsl 2) + (_@3 bsr 6),
                                _@5 = 2 bsl 6 + _@3 band 63,
-                               [_@1, _@4, _@5];
+                               <<_@1/binary, _@4, _@5>>;
                            true ->
-                               [_@1, _@3]
+                               <<_@1/binary, _@3>>
                        end
                    end,
                    0);
@@ -783,5 +773,5 @@ throw_error(_Input, Skip) ->
 empty_error(_Input, Skip) ->
     throw({position, Skip}).
 
-string(Data, _Input, _Skip, _Stack, _StringDecode, Acc, _Len) ->
-    {Data, Acc}.
+string(T, Input, Skip, _Stack, _StringDecode, Acc, Len) ->
+    do_decode(T, Skip, Len, Input, Acc).

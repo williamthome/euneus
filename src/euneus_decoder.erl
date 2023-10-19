@@ -1,6 +1,6 @@
 -module(euneus_decoder).
 
--export([ decode/1, decode/2, decode/3 ]).
+-export([ decode/1, decode/2, do_decode/2 ]).
 
 -callback decode(Bin, Opts) -> Result
     when Bin :: binary()
@@ -25,56 +25,40 @@ decode(Bin) ->
     decode(Bin, #{}).
 
 decode(Bin, Opts) ->
-    decode(Bin, Opts, []).
+    element(2, do_decode(Bin, parse_opts(Opts))).
 
-decode(Bin, Opts0, Decoded) ->
-    Opts = #{
-        null_term => undefined,
-        decoders => decoders(Opts0)
-    },
-    do_decode(Bin, Opts, Decoded).
+parse_opts(Opts) ->
+    #{
+        null_term => maps:get(null_term, Opts, undefined),
+        decoders => decoders(Opts)
+    }.
 
-decoders(Options) ->
+decoders(Opts) ->
     Defaults = #{
         object => euneus_object_decoder,
         array => euneus_array_decoder,
         string => euneus_string_decoder,
         number => euneus_number_decoder
     },
-    maps:merge(Defaults, maps:get(decoders, Options, #{})).
+    maps:merge(Defaults, maps:get(decoders, Opts, #{})).
 
-do_decode(<<$", T/binary>>, #{decoders := #{string := Decoder}} = Opts, []) ->
-    do_decode_1(T, Opts, Decoder);
-do_decode(<<H, _/binary>> = T, #{decoders := #{number := Decoder}} = Opts, [])
+do_decode(<<H, T/binary>>, Opts) when ?is_whitespace(H) ->
+    do_decode(T, Opts);
+do_decode(<<$", T/binary>>, #{decoders := #{string := Decoder}} = Opts) ->
+    Decoder:decode(T, Opts);
+do_decode(<<H, _/binary>> = T, #{decoders := #{number := Decoder}} = Opts)
   when ?is_number(H); H =:= $- ->
-    do_decode_1(T, Opts, Decoder);
-do_decode(<<H, T/binary>>, Opts, Decoded)
-  when ?is_whitespace(H) ->
-    do_decode(T, Opts, Decoded);
-do_decode(<<$,, T/binary>>, Opts, Decoded) ->
-    {value_separator, T, Opts, Decoded};
-do_decode(<<"true", T/binary>>, Opts, []) ->
-    do_decode(T, Opts, true);
-do_decode(<<"false", T/binary>>, Opts, []) ->
-    do_decode(T, Opts, false);
-do_decode(<<"null", T/binary>>, Opts, []) ->
-    do_decode(T, Opts, maps:get(null_term, Opts));
-do_decode(<<$[, T/binary>>, #{decoders := #{array := Decoder}} = Opts, []) ->
-    do_decode_1(T, Opts, Decoder);
-do_decode(<<$], T/binary>>, Opts, Decoded) ->
-    {end_array, T, Opts, Decoded};
-do_decode(<<${, T/binary>>, #{decoders := #{object := Decoder}} = Opts, []) ->
-    do_decode_1(T, Opts, Decoder);
-do_decode(<<$:, T/binary>>, Opts, Decoded) ->
-    {name_separator, T, Opts, Decoded};
-do_decode(<<$}, T/binary>>, Opts, Decoded) ->
-    {end_object, T, Opts, Decoded};
-do_decode(<<>>, _, Decoded) ->
-    Decoded.
-
-do_decode_1(T0, Opts, Decoder) ->
-    {T, Decoded} = Decoder:decode(T0, Opts),
-    do_decode(T, Opts, Decoded).
+    Decoder:decode(T, Opts);
+do_decode(<<"true", T/binary>>, _Opts) ->
+    {T, true};
+do_decode(<<"false", T/binary>>, _Opts) ->
+    {T, false};
+do_decode(<<"null", T/binary>>, Opts) ->
+    {T, maps:get(null_term, Opts)};
+do_decode(<<$[, T/binary>>, #{decoders := #{array := Decoder}} = Opts) ->
+    Decoder:decode(T, Opts);
+do_decode(<<${, T/binary>>, #{decoders := #{object := Decoder}} = Opts) ->
+    Decoder:decode(T, Opts).
 
 -ifdef(TEST).
 
