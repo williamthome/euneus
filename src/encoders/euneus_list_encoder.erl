@@ -8,7 +8,7 @@ encode(List, Opts) ->
     do_encode(List, Opts).
 
 do_encode([First | Rest], Opts) ->
-    [$[, First | do_encode_loop(Rest, Opts)];
+    [$[, euneus_encoder:do_encode(First, Opts) | do_encode_loop(Rest, Opts)];
 do_encode([], _Opts) ->
     <<"[]">>.
 
