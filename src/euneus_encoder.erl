@@ -19,12 +19,9 @@ encode_to_binary(Term, Opts) ->
 
 parse_opts(Opts) ->
     #{
-        escaper => escaper(Opts),
+        escaper => maps:get(escaper, Opts, euneus_json_escaper),
         encoders => encoders(Opts)
     }.
-
-escaper(Opts) ->
-    maps:get(escaper, Opts, euneus_json_escaper).
 
 encoders(Opts) ->
     Defaults = #{
