@@ -51,7 +51,7 @@ do_decode(<<$[, T/binary>>, #{decoders := #{array := Decoder}} = Opts, []) ->
 do_decode(<<$", T/binary>>, #{decoders := #{string := Decoder}} = Opts, []) ->
     do_decode_1(T, Opts, Decoder);
 do_decode(<<H, _/binary>> = T, #{decoders := #{number := Decoder}} = Opts, [])
-  when ?is_number(H) ->
+  when ?is_number(H); H =:= $- ->
     do_decode_1(T, Opts, Decoder);
 do_decode(<<H, T/binary>>, Opts, Decoded)
   when ?is_whitespace(H) ->
