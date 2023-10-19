@@ -32,13 +32,13 @@ do_encode(List, Opts) when is_list(List) ->
 do_encode(Map, Opts) when is_map(Map) ->
     encode_map(Opts, Map).
 
-encode_binary(#{binary_encoder := Encoder} = Opts, Bin) ->
-    Encoder(Bin, Opts);
+encode_binary(#{encode_binary := Encode} = Opts, Bin) ->
+    Encode(Bin, Opts);
 encode_binary(Opts, Bin) ->
     [$", escape_binary(Opts, Bin), $"].
 
-encode_atom(#{atom_encoder := Encoder} = Opts, Atom) ->
-    Encoder(Atom, Opts);
+encode_atom(#{encode_atom := Encode} = Opts, Atom) ->
+    Encode(Atom, Opts);
 encode_atom(Opts, Atom) ->
     do_encode_atom(Atom, Opts).
 
@@ -55,18 +55,18 @@ do_encode_atom(null, _Opts) ->
 do_encode_atom(Atom, Opts) ->
     [$", escape_binary(Opts, atom_to_binary(Atom, utf8)), $"].
 
-encode_integer(#{integer_encoder := Encoder} = Opts, Int) ->
-    Encoder(Int, Opts);
+encode_integer(#{encode_integer := Encode} = Opts, Int) ->
+    Encode(Int, Opts);
 encode_integer(_Opts, Int) ->
     integer_to_binary(Int).
 
-encode_float(#{float_encoder := Encoder} = Opts, Float) ->
-    Encoder(Float, Opts);
+encode_float(#{encode_float := Encode} = Opts, Float) ->
+    Encode(Float, Opts);
 encode_float(_Opts, Float) ->
     float_to_binary(Float, [short]).
 
-encode_list(#{list_encoder := Encoder} = Opts, List) ->
-    Encoder(List, Opts);
+encode_list(#{encode_list := Encode} = Opts, List) ->
+    Encode(List, Opts);
 encode_list(Opts, List) ->
     do_encode_list(List, Opts).
 
@@ -80,8 +80,8 @@ do_encode_list_loop([], _Opts) ->
 do_encode_list_loop([First | Rest], Opts) ->
     [$,, do_encode(First, Opts) | do_encode_list_loop(Rest, Opts)].
 
-encode_map(#{map_encoder := Encoder} = Opts, Map) ->
-    Encoder(Map, Opts);
+encode_map(#{encode_map := Encode} = Opts, Map) ->
+    Encode(Map, Opts);
 encode_map(Opts, Map) ->
     do_encode_map(maps:to_list(Map), Opts).
 
@@ -95,8 +95,8 @@ do_encode_map_loop([], _Opts) ->
 do_encode_map_loop([{K, V} | T], Opts) ->
     [$,, do_encode(K, Opts), $:, do_encode(V, Opts) | do_encode_map_loop(T, Opts)].
 
-escape_binary(#{escaper := Escaper}, Bin) ->
-    Escaper(Bin);
+escape_binary(#{escape_binary := Escape}, Bin) ->
+    Escape(Bin);
 escape_binary(_, Bin) ->
     escape_json(Bin).
 
