@@ -14,9 +14,9 @@ do_decode(<<H, T/binary>>, Kind, Buffer) when ?is_number(H) ->
 do_decode(<<$., T/binary>>, _, Buffer) ->
     do_decode(T, float, <<Buffer/binary, $.>>);
 do_decode(<<$+, T/binary>>, Kind, Buffer) ->
-do_decode(T, Kind, <<Buffer/binary, $+>>);
+    do_decode(T, Kind, <<Buffer/binary, $+>>);
 do_decode(<<$-, T/binary>>, Kind, Buffer) ->
-do_decode(T, Kind, <<Buffer/binary, $->>);
+    do_decode(T, Kind, <<Buffer/binary, $->>);
 do_decode(<<$e, T/binary>>, _, Buffer) ->
     do_decode(T, float, <<Buffer/binary, $e>>);
 do_decode(T, integer, Buffer) ->
