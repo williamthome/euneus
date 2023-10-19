@@ -1,6 +1,7 @@
 -module(euneus_encoder).
 
 -export([ encode/1, encode/2, do_encode/2 ]).
+-export([ encode_to_binary/1, encode_to_binary/2 ]).
 
 -callback encode(Term :: term(), Opts :: map()) -> iodata().
 
@@ -9,6 +10,12 @@ encode(Term) ->
 
 encode(Term, Opts) ->
     do_encode(Term, parse_opts(Opts)).
+
+encode_to_binary(Term) ->
+    encode_to_binary(Term, #{}).
+
+encode_to_binary(Term, Opts) ->
+    iolist_to_binary(encode(Term, Opts)).
 
 parse_opts(Opts) ->
     #{
@@ -48,13 +55,12 @@ do_encode(Term, #{encoders := #{map := Encoder}} = Opts) when is_map(Term) ->
 -include_lib("eunit/include/eunit.hrl").
 
 encode_test() ->
-    ?assertEqual(<<"true">>, encode(true)),
-    ?assertEqual([$", <<"foo">>, $"], encode(foo)),
-    ?assertEqual([$", <<"foo">>, $"], encode(<<"foo">>)),
-    ?assertEqual(<<"0">>, encode(0)),
-    ?assertEqual(<<"123.456789">>, encode(123.45678900)),
-    ?assertEqual([$[, <<"true">>, [[$,, <<"0">>]], $]], encode([true, 0])),
-    ?assertEqual( [${, [$", <<"foo">>, $"], $:, [$", <<"bar">>, $"], $}]
-                , encode(#{foo => bar}) ).
+    ?assertEqual(<<"true">>, encode_to_binary(true)),
+    ?assertEqual(<<"\"foo\"">>, encode_to_binary(foo)),
+    ?assertEqual(<<"\"foo\"">>, encode_to_binary(<<"foo">>)),
+    ?assertEqual(<<"0">>, encode_to_binary(0)),
+    ?assertEqual(<<"123.456789">>, encode_to_binary(123.45678900)),
+    ?assertEqual(<<"[true,0]">>, encode_to_binary([true, 0])),
+    ?assertEqual(<<"{\"foo\":\"bar\"}">>, encode_to_binary(#{foo => bar})).
 
 -endif.
