@@ -36,7 +36,6 @@ decode(Bin, Opts0, Decoded) ->
 
 decoders(Options) ->
     Defaults = #{
-        literal => euneus_literal_decoder,
         object => euneus_object_decoder,
         array => euneus_array_decoder,
         string => euneus_string_decoder,
@@ -44,10 +43,6 @@ decoders(Options) ->
     },
     maps:merge(Defaults, maps:get(decoders, Options, #{})).
 
-do_decode(<<${, T/binary>>, #{decoders := #{object := Decoder}} = Opts, []) ->
-    do_decode_1(T, Opts, Decoder);
-do_decode(<<$[, T/binary>>, #{decoders := #{array := Decoder}} = Opts, []) ->
-    do_decode_1(T, Opts, Decoder);
 do_decode(<<$", T/binary>>, #{decoders := #{string := Decoder}} = Opts, []) ->
     do_decode_1(T, Opts, Decoder);
 do_decode(<<H, _/binary>> = T, #{decoders := #{number := Decoder}} = Opts, [])
@@ -58,20 +53,28 @@ do_decode(<<H, T/binary>>, Opts, Decoded)
     do_decode(T, Opts, Decoded);
 do_decode(<<$,, T/binary>>, Opts, Decoded) ->
     {value_separator, T, Opts, Decoded};
+do_decode(<<"true", T/binary>>, Opts, []) ->
+    do_decode(T, Opts, true);
+do_decode(<<"false", T/binary>>, Opts, []) ->
+    do_decode(T, Opts, false);
+do_decode(<<"null", T/binary>>, Opts, []) ->
+    do_decode(T, Opts, maps:get(null_term, Opts));
+do_decode(<<$[, T/binary>>, #{decoders := #{array := Decoder}} = Opts, []) ->
+    do_decode_1(T, Opts, Decoder);
 do_decode(<<$], T/binary>>, Opts, Decoded) ->
     {end_array, T, Opts, Decoded};
+do_decode(<<${, T/binary>>, #{decoders := #{object := Decoder}} = Opts, []) ->
+    do_decode_1(T, Opts, Decoder);
 do_decode(<<$:, T/binary>>, Opts, Decoded) ->
     {name_separator, T, Opts, Decoded};
 do_decode(<<$}, T/binary>>, Opts, Decoded) ->
     {end_object, T, Opts, Decoded};
 do_decode(<<>>, _, Decoded) ->
-    Decoded;
-do_decode(T, #{decoders := #{literal := Decoder}} = Opts, []) ->
-    do_decode_1(T, Opts, Decoder).
+    Decoded.
 
-do_decode_1(T, Opts, Decoder) ->
-    {Rest, Term} = Decoder:decode(T, Opts),
-    do_decode(Rest, Opts, Term).
+do_decode_1(T0, Opts, Decoder) ->
+    {T, Decoded} = Decoder:decode(T0, Opts),
+    do_decode(T, Opts, Decoded).
 
 -ifdef(TEST).
 
