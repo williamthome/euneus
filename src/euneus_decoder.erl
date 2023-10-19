@@ -15,7 +15,7 @@ decode(Data) ->
 
 decode(Data, Opts) when is_binary(Data) andalso is_map(Opts) ->
     try
-        {ok, value(Data, Opts, Data, 0, [?terminate])}
+        {ok, value(Data, parse_opts(Opts), Data, 0, [?terminate])}
     catch
         throw:{position, Position}:_ ->
             case Position == byte_size(Data) of
@@ -29,6 +29,11 @@ decode(Data, Opts) when is_binary(Data) andalso is_map(Opts) ->
         throw:{token, Token, Position}:_ ->
             {error, {unexpected_sequence, Token, Position}}
     end.
+
+parse_opts(Opts) ->
+    #{
+        null_term => maps:get(null_term, Opts, undefined)
+    }.
 
 array(<<H/integer,Rest/bitstring>>, Opts, Input, Skip, Stack, Value)
   when H =:= $\s; H =:= $\t; H =:= $\n; H =:= $\r ->
@@ -577,8 +582,8 @@ value(<<"true",Rest/bitstring>>, Opts, Input, Skip, Stack) ->
     continue(Rest, Opts, Input, Skip + 4, Stack, true);
 value(<<"false",Rest/bitstring>>, Opts, Input, Skip, Stack) ->
     continue(Rest, Opts, Input, Skip + 5, Stack, false);
-value(<<"null",Rest/bitstring>>, Opts, Input, Skip, Stack) ->
-    continue(Rest, Opts, Input, Skip + 4, Stack, null);
+value(<<"null",Rest/bitstring>>, #{null_term := Null} = Opts, Input, Skip, Stack) ->
+    continue(Rest, Opts, Input, Skip + 4, Stack, Null);
 value(<<91/integer,Rest/bitstring>>, Opts, Input, Skip, Stack) ->
     value(Rest, Opts, Input, Skip + 1, [?array, [] | Stack]);
 value(<<93/integer,Rest/bitstring>>, Opts, Input, Skip, Stack) ->
@@ -601,8 +606,7 @@ encode_test() ->
     ?assertEqual({ok, 6.02e23}, decode(<<"6.02e+23">>)),
     ?assertEqual({ok, [<<"foo">>, 123]}, decode(<<"[\"foo\",123]">>)),
     ?assertEqual({ok, #{<<"foo">> => 123}}, decode(<<"{\"foo\":123}">>)),
-    % @todo: null_term option
-    ?assertEqual({ok, null}, decode(<<"null">>)),
+    ?assertEqual({ok, undefined}, decode(<<"null">>)),
     ?assertEqual({ok, <<"ABC">>}, decode(<<"\"\\u0041\\u0042\\u0043\"">>)).
 
 -endif.
