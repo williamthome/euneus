@@ -19,6 +19,8 @@ escape(<<$\", T/binary>>, Buffer) ->
     {T, <<Buffer/binary, $\">>};
 escape(<<$\\, T/binary>>, Buffer) ->
     {T, <<Buffer/binary, $\\>>};
+escape(<<$/, T/binary>>, Buffer) ->
+    {T, <<Buffer/binary, $/>>};
 escape(<<$r, T/binary>>, Buffer) ->
     {T, <<Buffer/binary, $\r>>};
 escape(<<$n, T/binary>>, Buffer) ->
