@@ -10,6 +10,8 @@
 -define(key, 2).
 -define(object, 3).
 
+-define(is_number(X), X >= $0, X =< $9).
+
 decode(Data) ->
     decode(Data, #{}).
 
@@ -64,11 +66,29 @@ value(<<_/integer,Rest/bitstring>>, _Opts, Input, Skip, Stack) ->
 value(<<_/bitstring>>, _Opts, Input, Skip, _Stack) ->
     throw_error(Input, Skip).
 
-string(<<34/integer,Rest/bitstring>>, Opts, Input, Skip, Stack, Len) ->
+string(<< Y4/integer, Y3/integer, Y2/integer, Y1/integer, $-/integer
+        , M2/integer, M1/integer, $-/integer
+        , D2/integer, D1/integer
+        , $T/integer
+        , H2/integer, H1/integer, $:/integer
+        , Min2/integer, Min1/integer, $:/integer
+        , S2/integer, S1/integer, $Z/integer, $"
+        , Rest/bitstring >>, Opts, Input, Skip, Stack, Len)
+  when ?is_number(Y4), ?is_number(Y3), ?is_number(Y2), ?is_number(Y1)
+     , ?is_number(M2), ?is_number(M1)
+     , ?is_number(D2), ?is_number(D1)
+     , ?is_number(H2), ?is_number(H1)
+     , ?is_number(Min2), ?is_number(Min1)
+     , ?is_number(S2), ?is_number(S1) ->
+    Date = {chars_to_integer(Y4, Y3, Y2, Y1), chars_to_integer(M2, M1), chars_to_integer(D2, D1)},
+    Time = {chars_to_integer(H2, H1), chars_to_integer(Min2, Min1), chars_to_integer(S2, S1)},
+    Value = {Date, Time},
+    continue(Rest, Opts, Input, Skip + Len + 1, Stack, Value);
+string(<<$"/integer,Rest/bitstring>>, Opts, Input, Skip, Stack, Len) ->
     String = binary_part(Input, Skip, Len),
     Value = normalize_string(Stack, Opts, String),
     continue(Rest, Opts, Input, Skip + Len + 1, Stack, Value);
-string(<<92/integer,Rest/bitstring>>, Opts, Input, Skip, Stack, Len) ->
+string(<<$\\/integer,Rest/bitstring>>, Opts, Input, Skip, Stack, Len) ->
     Part = binary_part(Input, Skip, Len),
     escape(Rest, Opts, Input, Skip + Len, Stack, Part);
 string(<<H/integer,_Rest/bitstring>>, _Opts, Input, Skip, _Stack, _Len)
@@ -90,11 +110,11 @@ string(<<_/integer,_Rest/bitstring>>, _Opts, Input, Skip, _Stack, _Len) ->
 string(<<_/bitstring>>, _Opts, Input, Skip, _Stack, Len) ->
     empty_error(Input, Skip + Len).
 
-string(<<34/integer,Rest/bitstring>>, Opts, Input, Skip, Stack, Acc, Len) ->
+string(<<$"/integer,Rest/bitstring>>, Opts, Input, Skip, Stack, Acc, Len) ->
     Last = binary_part(Input, Skip, Len),
     String = iolist_to_binary([Acc | Last]),
     continue(Rest, Opts, Input, Skip + Len + 1, Stack, String);
-string(<<92/integer,Rest/bitstring>>, Opts, Input, Skip, Stack, Acc, Len) ->
+string(<<$\\/integer,Rest/bitstring>>, Opts, Input, Skip, Stack, Acc, Len) ->
     Part = binary_part(Input, Skip, Len),
     escape(Rest, Opts, Input, Skip + Len, Stack, [Acc | Part]);
 string(<<H/integer,_/bitstring>>, _Opts, Input, Skip, _Stack, _Acc, _Len)
@@ -115,6 +135,12 @@ string(<<_/integer,_/bitstring>>, _Opts, Input, Skip, _Stack, _Acc, _Len) ->
     throw_error(Input, Skip);
 string(<<_/bitstring>>, _Opts, Input, Skip, _Stack, _Acc, Len) ->
     empty_error(Input, Skip + Len).
+
+chars_to_integer(N2, N1) ->
+    ((N2 - $0) * 10) + (N1 - $0).
+
+chars_to_integer(N4, N3, N2, N1) ->
+    ((N4 - $0) * 1000) + ((N3 - $0) * 100) + ((N2 - $0) * 10) + (N1 - $0).
 
 normalize_string([?key | _], #{handle_key := Handle}, String) ->
     Handle(String);
@@ -600,13 +626,16 @@ try_parse_float(Bin, Token, Skip) ->
 -include_lib("eunit/include/eunit.hrl").
 
 encode_test() ->
-    ?assertEqual({ok, <<"foo">>}, decode(<<"\"foo\"">>)),
-    ?assertEqual({ok, 123}, decode(<<"123">>)),
-    ?assertEqual({ok, 1.234}, decode(<<"1.234">>)),
-    ?assertEqual({ok, 6.02e23}, decode(<<"6.02e+23">>)),
-    ?assertEqual({ok, [<<"foo">>, 123]}, decode(<<"[\"foo\",123]">>)),
-    ?assertEqual({ok, #{<<"foo">> => 123}}, decode(<<"{\"foo\":123}">>)),
-    ?assertEqual({ok, undefined}, decode(<<"null">>)),
-    ?assertEqual({ok, <<"ABC">>}, decode(<<"\"\\u0041\\u0042\\u0043\"">>)).
+    [?assertEqual({ok, Expect}, decode(Input)) || {Expect, Input} <- [
+        {<<"foo">>, <<"\"foo\"">>},
+        {123, <<"123">>},
+        {1.234, <<"1.234">>},
+        {6.02e23, <<"6.02e+23">>},
+        {[<<"foo">>, 123], <<"[\"foo\",123]">>},
+        {#{<<"foo">> => 123}, <<"{\"foo\":123}">>},
+        {undefined, <<"null">>},
+        {<<"ABC">>, <<"\"\\u0041\\u0042\\u0043\"">>},
+        {{{1970,1,1},{0,0,0}}, <<"\"1970-01-01T00:00:00Z\"">>}
+    ]].
 
 -endif.
