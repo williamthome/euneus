@@ -1,11 +1,11 @@
 -module(euneus_encoder).
 
 -compile({inline, [
-    escape_json/4, escape_json_chunk/5,
-    encode_binary/2, encode_atom/2, encode_integer/2, encode_float/2,
-    encode_list/2, encode_map/2, do_encode_atom/2, do_encode/2,
-    escape_byte/1, do_encode_list_loop/2, do_encode_map_loop/2,
-    encode_datetime/2, encode_timestamp/2
+    do_encode/2, encode_binary/2, encode_atom/2, encode_integer/2,
+    encode_float/2, encode_list/2, encode_map/2, encode_datetime/2,
+    encode_timestamp/2, encode_unhandled/2, do_encode_list_loop/2,
+    do_encode_map/2, do_encode_map_loop/2, escape_binary/2,
+    escape_json/4, escape_json_chunk/5, escape_byte/1
 ]}).
 -compile({inline_size, 100}).
 
@@ -17,71 +17,91 @@
 -define(int_range(X, Min, Max), is_integer(X) andalso X >= Min andalso X =< Max).
 
 encode(Term, Opts) ->
-    do_encode(Term, Opts).
+    do_encode(Term, parse_opts(Opts)).
 
-do_encode(Bin, Opts) when is_binary(Bin) ->
-    encode_binary(Opts, Bin);
-do_encode(Atom, Opts) when is_atom(Atom) ->
-    encode_atom(Opts, Atom);
-do_encode(Int, Opts) when is_integer(Int) ->
-    encode_integer(Opts, Int);
-do_encode(Float, Opts) when is_float(Float) ->
-    encode_float(Opts, Float);
-do_encode(List, Opts) when is_list(List) ->
-    encode_list(Opts, List);
-do_encode(Map, Opts) when is_map(Map) ->
-    encode_map(Opts, Map);
-do_encode({{YYYY,MM,DD},{H,M,S}} = DateTime, Opts)
+% The explicit call to encode_*/2 wrapped in a function is required
+% for the inline optimization.
+parse_opts(Opts) ->
+    #{
+        encode_binary => maps:get(encode_binary, Opts, fun (X, O) ->
+            encode_binary(X, O)
+        end),
+        encode_atom => maps:get(encode_atom, Opts, fun (X, O) ->
+            encode_atom(X, O)
+        end),
+        encode_integer => maps:get(encode_integer, Opts, fun (X, O) ->
+            encode_integer(X, O)
+        end),
+        encode_float => maps:get(encode_float, Opts, fun (X, O) ->
+            encode_float(X, O)
+        end),
+        encode_list => maps:get(encode_list, Opts, fun (X, O) ->
+            encode_list(X, O)
+        end),
+        encode_map => maps:get(encode_map, Opts, fun (X, O) ->
+            encode_map(X, O)
+        end),
+        encode_datetime => maps:get(encode_datetime, Opts, fun (X, O) ->
+            encode_datetime(X, O)
+        end),
+        encode_timestamp => maps:get(encode_timestamp, Opts, fun (X, O) ->
+            encode_timestamp(X, O)
+        end),
+        encode_unhandled => maps:get(encode_unhandled, Opts, fun (X, O) ->
+            encode_unhandled(X, O)
+        end),
+        escape_binary => maps:get(escape_binary, Opts, fun (X, _O) ->
+            escape_json(X, [], X, 0)
+        end)
+    }.
+
+do_encode(Bin, #{encode_binary := Encode} = Opts) when is_binary(Bin) ->
+    Encode(Bin, Opts);
+do_encode(Atom, #{encode_atom := Encode} = Opts) when is_atom(Atom) ->
+    Encode(Atom, Opts);
+do_encode(Int, #{encode_integer := Encode} = Opts) when is_integer(Int) ->
+    Encode(Int, Opts);
+do_encode(Float, #{encode_float := Encode} = Opts) when is_float(Float) ->
+    Encode(Float, Opts);
+do_encode(List, #{encode_list := Encode} = Opts) when is_list(List) ->
+    Encode(List, Opts);
+do_encode(Map, #{encode_map := Encode} = Opts) when is_map(Map) ->
+    Encode(Map, Opts);
+do_encode({{YYYY,MM,DD},{H,M,S}} = DateTime, #{encode_datetime := Encode} = Opts)
   when ?int_min(YYYY, 0), ?int_range(MM, 1, 12), ?int_range(DD, 1, 31)
      , ?int_range(H, 0, 23), ?int_range(M, 0, 59), ?int_range(S, 0, 59) ->
-    encode_datetime(Opts, DateTime);
-do_encode({MegaSecs,Secs,MicroSecs} = Timestamp, Opts)
+    Encode(DateTime, Opts);
+do_encode({MegaSecs,Secs,MicroSecs} = Timestamp, #{encode_timestamp := Encode} = Opts)
   when ?int_min(MegaSecs, 0), ?int_min(Secs, 0), ?int_min(MicroSecs, 0) ->
-    encode_timestamp(Opts, Timestamp);
-do_encode(Term, Opts) ->
-    encode_unhandled(Opts, Term).
+    Encode(Timestamp, Opts);
+do_encode(Term, #{encode_unhandled := Encode} = Opts) ->
+    Encode(Term, Opts).
 
-encode_binary(#{encode_binary := Encode} = Opts, Bin) ->
-    Encode(Bin, Opts);
-encode_binary(Opts, Bin) ->
-    [$", escape_binary(Opts, Bin), $"].
+encode_binary(Bin, Opts) ->
+    [$", escape_binary(Bin, Opts), $"].
 
-encode_atom(#{encode_atom := Encode} = Opts, Atom) ->
-    Encode(Atom, Opts);
-encode_atom(Opts, Atom) ->
-    do_encode_atom(Atom, Opts).
-
-do_encode_atom(true, _Opts) ->
+encode_atom(true, _Opts) ->
     <<"true">>;
-do_encode_atom(false, _Opts) ->
+encode_atom(false, _Opts) ->
     <<"false">>;
-do_encode_atom(undefined, _Opts) ->
+encode_atom(undefined, _Opts) ->
     <<"null">>;
-do_encode_atom(nil, _Opts) ->
+encode_atom(nil, _Opts) ->
     <<"null">>;
-do_encode_atom(null, _Opts) ->
+encode_atom(null, _Opts) ->
     <<"null">>;
-do_encode_atom(Atom, Opts) ->
-    [$", escape_binary(Opts, atom_to_binary(Atom, utf8)), $"].
+encode_atom(Atom, Opts) ->
+    [$", escape_binary(atom_to_binary(Atom, utf8), Opts), $"].
 
-encode_integer(#{encode_integer := Encode} = Opts, Int) ->
-    Encode(Int, Opts);
-encode_integer(_Opts, Int) ->
+encode_integer(Int, _Opts) ->
     integer_to_binary(Int).
 
-encode_float(#{encode_float := Encode} = Opts, Float) ->
-    Encode(Float, Opts);
-encode_float(_Opts, Float) ->
+encode_float(Float, _Opts) ->
     float_to_binary(Float, [short]).
 
-encode_list(#{encode_list := Encode} = Opts, List) ->
-    Encode(List, Opts);
-encode_list(Opts, List) ->
-    do_encode_list(List, Opts).
-
-do_encode_list([First | Rest], Opts) ->
+encode_list([First | Rest], Opts) ->
     [$[, do_encode(First, Opts) | do_encode_list_loop(Rest, Opts)];
-do_encode_list([], _Opts) ->
+encode_list([], _Opts) ->
     <<"[]">>.
 
 do_encode_list_loop([], _Opts) ->
@@ -89,9 +109,7 @@ do_encode_list_loop([], _Opts) ->
 do_encode_list_loop([First | Rest], Opts) ->
     [$,, do_encode(First, Opts) | do_encode_list_loop(Rest, Opts)].
 
-encode_map(#{encode_map := Encode} = Opts, Map) ->
-    Encode(Map, Opts);
-encode_map(Opts, Map) ->
+encode_map(Map, Opts) ->
     do_encode_map(maps:to_list(Map), Opts).
 
 do_encode_map([{K, V} | T], Opts) ->
@@ -104,35 +122,27 @@ do_encode_map_loop([], _Opts) ->
 do_encode_map_loop([{K, V} | T], Opts) ->
     [$,, do_encode(K, Opts), $:, do_encode(V, Opts) | do_encode_map_loop(T, Opts)].
 
-encode_datetime(#{encode_datetime := Encode} = Opts, DateTime) ->
-    Encode(DateTime, Opts);
-encode_datetime(Opts, {{YYYY,MM,DD},{H,M,S}}) ->
+encode_datetime({{YYYY,MM,DD},{H,M,S}}, Opts) ->
     DateTime = iolist_to_binary(io_lib:format(
         "~4.10.0B-~2.10.0B-~2.10.0BT~2.10.0B:~2.10.0B:~2.10.0BZ",
         [YYYY,MM,DD,H,M,S])
     ),
-    [$", escape_binary(Opts, DateTime), $"].
+    [$", escape_binary(DateTime, Opts), $"].
 
-encode_timestamp(#{encode_timestamp := Encode} = Opts, Timestamp) ->
-    Encode(Timestamp, Opts);
-encode_timestamp(Opts, {_,_,MicroSecs} = Timestamp) ->
+encode_timestamp({_,_,MicroSecs} = Timestamp, Opts) ->
     MilliSecs = MicroSecs div 1000,
     {{YYYY,MM,DD},{H,M,S}} = calendar:now_to_datetime(Timestamp),
     DateTime = iolist_to_binary(io_lib:format(
         "~4.10.0B-~2.10.0B-~2.10.0BT~2.10.0B:~2.10.0B:~2.10.0B.~3.10.0BZ",
         [YYYY,MM,DD,H,M,S,MilliSecs])
     ),
-    [$", escape_binary(Opts, DateTime), $"].
+    [$", escape_binary(DateTime, Opts), $"].
 
-encode_unhandled(#{encode_unhandled := Encode} = Opts, Term) ->
-    Encode(Term, Opts);
-encode_unhandled(Opts, Term) ->
-    error(unsupported_type, [Opts, Term]).
+encode_unhandled(Term, Opts) ->
+    error(unsupported_type, [Term, Opts]).
 
-escape_binary(#{escape_binary := Escape}, Bin) ->
-    Escape(Bin);
-escape_binary(_, Bin) ->
-    escape_json(Bin, [], Bin, 0).
+escape_binary(Bin, #{escape_binary := Escape} = Opts) ->
+    Escape(Bin, Opts).
 
 escape_json(Bin) ->
     escape_json(Bin, [], Bin, 0).
