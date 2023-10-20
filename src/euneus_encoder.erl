@@ -30,7 +30,15 @@ do_encode(Float, Opts) when is_float(Float) ->
 do_encode(List, Opts) when is_list(List) ->
     encode_list(Opts, List);
 do_encode(Map, Opts) when is_map(Map) ->
-    encode_map(Opts, Map).
+    encode_map(Opts, Map);
+do_encode({{YYYY,MM,DD},{H,M,S}} = DateTime, Opts)
+  when is_integer(YYYY) andalso YYYY >= 0 andalso
+       is_integer(MM) andalso MM >= 1 andalso MM =< 12 andalso
+       is_integer(DD) andalso DD >= 1 andalso DD =< 31 andalso
+       is_integer(H) andalso H >= 0 andalso H < 24 andalso
+       is_integer(M) andalso M >= 0 andalso M < 60 andalso
+       is_integer(S) andalso S >= 0 andalso S < 60 ->
+    encode_datetime(Opts, DateTime).
 
 encode_binary(#{encode_binary := Encode} = Opts, Bin) ->
     Encode(Bin, Opts);
@@ -94,6 +102,15 @@ do_encode_map_loop([], _Opts) ->
     [$}];
 do_encode_map_loop([{K, V} | T], Opts) ->
     [$,, do_encode(K, Opts), $:, do_encode(V, Opts) | do_encode_map_loop(T, Opts)].
+
+encode_datetime(#{encode_datetime := Encode} = Opts, DateTime) ->
+    Encode(DateTime, Opts);
+encode_datetime(Opts, {{YYYY,MM,DD},{H,M,S}}) ->
+    DateTime = iolist_to_binary(io_lib:format(
+        "~4.10.0B-~2.10.0B-~2.10.0BT~2.10.0B:~2.10.0B:~2.10.0BZ",
+        [YYYY,MM,DD,H,M,S])
+    ),
+    [$", escape_binary(Opts, DateTime), $"].
 
 escape_binary(#{escape_binary := Escape}, Bin) ->
     Escape(Bin);
@@ -402,12 +419,15 @@ invalid_byte_error(Byte0, Input) ->
 -include_lib("eunit/include/eunit.hrl").
 
 encode_test() ->
-    ?assertEqual(<<"true">>, encode_to_binary(true)),
-    ?assertEqual(<<"\"foo\"">>, encode_to_binary(foo)),
-    ?assertEqual(<<"\"foo\"">>, encode_to_binary(<<"foo">>)),
-    ?assertEqual(<<"0">>, encode_to_binary(0)),
-    ?assertEqual(<<"123.456789">>, encode_to_binary(123.45678900)),
-    ?assertEqual(<<"[true,0]">>, encode_to_binary([true, 0])),
-    ?assertEqual(<<"{\"foo\":\"bar\"}">>, encode_to_binary(#{foo => bar})).
+    [ ?assertEqual(Expect, encode_to_binary(Input)) || {Expect, Input} <- [
+        {<<"true">>, true},
+        {<<"\"foo\"">>, foo},
+        {<<"\"foo\"">>, <<"foo">>},
+        {<<"0">>, 0},
+        {<<"123.456789">>, 123.45678900},
+        {<<"[true,0]">>, [true, 0]},
+        {<<"{\"foo\":\"bar\"}">>, #{foo => bar}},
+        {<<"\"1970-01-01T00:00:00Z\"">>, {{1970,1,1},{0,0,0}}}
+    ]].
 
 -endif.
