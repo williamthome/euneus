@@ -2,25 +2,15 @@
 
 -compile({inline, [ escape_json/1, escape_html/1, escape_js/1, escape_unicode/1 ]}).
 
--export([ encode/1, encode/2, do_encode/2 ]).
--export([ encode_to_binary/1, encode_to_binary/2 ]).
+-export([ encode/2 ]).
 -export([ escape_byte/1 ]).
 -export([ escape_json/1, escape_html/1, escape_js/1, escape_unicode/1 ]).
 
 -define(int_min(X, Min), is_integer(X) andalso X >= Min).
 -define(int_range(X, Min, Max), is_integer(X) andalso X >= Min andalso X =< Max).
 
-encode(Term) ->
-    encode(Term, #{}).
-
 encode(Term, Opts) ->
     do_encode(Term, Opts).
-
-encode_to_binary(Term) ->
-    encode_to_binary(Term, #{}).
-
-encode_to_binary(Term, Opts) ->
-    iolist_to_binary(encode(Term, Opts)).
 
 -ifdef(EUNEUS_ENABLE_CALENDAR).
 
@@ -459,7 +449,8 @@ invalid_byte_error(Byte0, Input) ->
 -include_lib("eunit/include/eunit.hrl").
 
 encode_test() ->
-    [?assertEqual(Expect, encode_to_binary(Input)) || {Expect, Input} <- [
+    [ ?assertEqual(Expect, iolist_to_binary(encode(Input, #{})))
+      || {Expect, Input} <- [
         {<<"true">>, true},
         {<<"\"foo\"">>, foo},
         {<<"\"foo\"">>, <<"foo">>},

@@ -2,7 +2,7 @@
 
 -compile({inline, [ continue/6, escapeu_1/8, escapeu_2/8, escapeu/6 ]}).
 
--export([ decode/1, decode/2 ]).
+-export([ decode/2 ]).
 
 % We use integers instead of atoms to take advantage of the jump table optimization
 -define(terminate, 0).
@@ -11,9 +11,6 @@
 -define(object, 3).
 
 -define(is_number(X), X >= $0, X =< $9).
-
-decode(Data) ->
-    decode(Data, #{}).
 
 decode(Data, Opts) when is_binary(Data) andalso is_map(Opts) ->
     try
@@ -684,7 +681,8 @@ try_parse_float(Bin, Token, Skip) ->
 -include_lib("eunit/include/eunit.hrl").
 
 encode_test() ->
-    [?assertEqual({ok, Expect}, decode(Input)) || {Expect, Input} <- [
+    [ ?assertEqual({ok, Expect}, decode(Input, #{}))
+      || {Expect, Input} <- [
         {<<"foo">>, <<"\"foo\"">>},
         {123, <<"123">>},
         {1.234, <<"1.234">>},
