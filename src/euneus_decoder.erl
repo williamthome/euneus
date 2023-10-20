@@ -1,11 +1,14 @@
 -module(euneus_decoder).
 
 -compile({inline, [
-    continue/6, escapeu_1/8, escapeu_2/8, escapeu/6, terminate/6,
-    empty_error/2, throw_error/2, throw_error/4, token_error/2,
-    token_error/3, value/5, string/6, string/7, key/5, key/6,
-    try_parse_float/3, normalize_string/3, parse_opts/1,
-    chars_to_integer/2, chars_to_integer/3, chars_to_integer/4
+    parse_opts/1, value/5, string/6, string/7, normalize_string/3,
+    chars_to_integer/2, chars_to_integer/3, chars_to_integer/4, escapeu/6,
+    escapeu_1/8, escapeu_2/8, escape_surrogate/7, escapeu_last/3, key/5,
+    key/6, number/6, number_exp_cont/6, number_exp_cont/7, number_exp_sign/6,
+    number_exp_sign/7, number_exp_copy/6, number_frac/6, number_frac_cont/6,
+    number_minus/5, number_zero/6, try_parse_float/3, object/6, array/6,
+    empty_array/5, continue/6, terminate/6, empty_error/2, throw_error/2,
+    throw_error/4, token_error/2, token_error/3
 ]}).
 -compile({inline_size, 100}).
 
@@ -37,8 +40,14 @@ decode(Data, Opts) when is_binary(Data) andalso is_map(Opts) ->
     end.
 
 parse_opts(Opts) ->
-    Opts#{
-        null_term => maps:get(null_term, Opts, undefined)
+    #{
+        null_term => maps:get(null_term, Opts, undefined),
+        normalize_key => maps:get(normalize_key, Opts, fun(K) ->
+            K
+        end),
+        normalize_string => maps:get(normalize_string, Opts, fun(S) ->
+            S
+        end)
     }.
 
 value(<<H/integer,Rest/bitstring>>, Opts, Input, Skip, Stack)
@@ -158,12 +167,8 @@ string(<<_/bitstring>>, _Opts, Input, Skip, _Stack, _Acc, Len) ->
 
 normalize_string([?key | _], #{normalize_key := Normalize}, String) ->
     Normalize(String);
-normalize_string([?key | _], _Opts, String) ->
-    String;
 normalize_string(_Stack, #{normalize_string := Normalize}, String) ->
-    Normalize(String);
-normalize_string(_Stack, _Opts, String) ->
-    String.
+    Normalize(String).
 
 chars_to_integer(N2, N1) ->
     ((N2 - $0) * 10) + (N1 - $0).
