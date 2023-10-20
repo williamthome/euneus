@@ -670,7 +670,11 @@ encode_test() ->
         { {ok, #{<<"datetime">> => {{1970,1,1},{0,0,0}}}}
         , <<"{\"datetime\": \"1970-01-01T00:00:00Z\"}">>, #{} },
         { {ok, #{<<"timestamp">> => {0,0,0}}}
-        , <<"{\"timestamp\": \"1970-01-01T00:00:00.000Z\"}">>, #{} }
+        , <<"{\"timestamp\": \"1970-01-01T00:00:00.000Z\"}">>, #{} },
+        { {ok, #{foo => 1}}
+        , <<"{\"foo\": \"1\"}">>
+        , #{ normalize_key => fun binary_to_existing_atom/1
+           , normalize_string => fun binary_to_integer/1 } }
     ]].
 
 -endif.
