@@ -66,6 +66,8 @@ value(<<_/integer,Rest/bitstring>>, _Opts, Input, Skip, Stack) ->
 value(<<_/bitstring>>, _Opts, Input, Skip, _Stack) ->
     throw_error(Input, Skip).
 
+-ifdef(EUNEUS_ENABLE_CALENDAR).
+
 string(<<$"/integer,Rest/bitstring>>, Opts, Input, Skip, Stack, Len) ->
     String = binary_part(Input, Skip, Len),
     Value = normalize_string(Stack, Opts, String),
@@ -133,6 +135,45 @@ string(<<_/integer,_Rest/bitstring>>, _Opts, Input, Skip, _Stack, _Len) ->
 string(<<_/bitstring>>, _Opts, Input, Skip, _Stack, Len) ->
     empty_error(Input, Skip + Len).
 
+chars_to_integer(N2, N1) ->
+    ((N2 - $0) * 10) + (N1 - $0).
+
+chars_to_integer(N3, N2, N1) ->
+    ((N3 - $0) * 100) + ((N2 - $0) * 10) + (N1 - $0).
+
+chars_to_integer(N4, N3, N2, N1) ->
+    ((N4 - $0) * 1000) + ((N3 - $0) * 100) + ((N2 - $0) * 10) + (N1 - $0).
+
+-else.
+
+string(<<$"/integer,Rest/bitstring>>, Opts, Input, Skip, Stack, Len) ->
+    String = binary_part(Input, Skip, Len),
+    Value = normalize_string(Stack, Opts, String),
+    continue(Rest, Opts, Input, Skip + Len + 1, Stack, Value);
+string(<<$\\/integer,Rest/bitstring>>, Opts, Input, Skip, Stack, Len) ->
+    Part = binary_part(Input, Skip, Len),
+    escape(Rest, Opts, Input, Skip + Len, Stack, Part);
+string(<<H/integer,_Rest/bitstring>>, _Opts, Input, Skip, _Stack, _Len)
+  when H < 32 ->
+    throw_error(Input, Skip);
+string(<<H/integer,Rest/bitstring>>, Opts, Input, Skip, Stack, Len)
+  when H < 128 ->
+    string(Rest, Opts, Input, Skip, Stack, Len + 1);
+string(<<H/utf8,Rest/bitstring>>, Opts, Input, Skip, Stack, Len)
+  when H < 2048 ->
+    string(Rest, Opts, Input, Skip, Stack, Len + 2);
+string(<<H/utf8,Rest/bitstring>>, Opts, Input, Skip, Stack, Len)
+  when H < 65536 ->
+    string(Rest, Opts, Input, Skip, Stack, Len + 3);
+string(<<_/utf8,Rest/bitstring>>, Opts, Input, Skip, Stack, Len) ->
+    string(Rest, Opts, Input, Skip, Stack, Len + 4);
+string(<<_/integer,_Rest/bitstring>>, _Opts, Input, Skip, _Stack, _Len) ->
+    throw_error(Input, Skip);
+string(<<_/bitstring>>, _Opts, Input, Skip, _Stack, Len) ->
+    empty_error(Input, Skip + Len).
+
+-endif.
+
 string(<<$"/integer,Rest/bitstring>>, Opts, Input, Skip, Stack, Acc, Len) ->
     Last = binary_part(Input, Skip, Len),
     String = iolist_to_binary([Acc | Last]),
@@ -158,15 +199,6 @@ string(<<_/integer,_/bitstring>>, _Opts, Input, Skip, _Stack, _Acc, _Len) ->
     throw_error(Input, Skip);
 string(<<_/bitstring>>, _Opts, Input, Skip, _Stack, _Acc, Len) ->
     empty_error(Input, Skip + Len).
-
-chars_to_integer(N2, N1) ->
-    ((N2 - $0) * 10) + (N1 - $0).
-
-chars_to_integer(N3, N2, N1) ->
-    ((N3 - $0) * 100) + ((N2 - $0) * 10) + (N1 - $0).
-
-chars_to_integer(N4, N3, N2, N1) ->
-    ((N4 - $0) * 1000) + ((N3 - $0) * 100) + ((N2 - $0) * 10) + (N1 - $0).
 
 normalize_string([?key | _], #{handle_key := Handle}, String) ->
     Handle(String);

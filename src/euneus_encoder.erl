@@ -22,6 +22,8 @@ encode_to_binary(Term) ->
 encode_to_binary(Term, Opts) ->
     iolist_to_binary(encode(Term, Opts)).
 
+-ifdef(EUNEUS_ENABLE_CALENDAR).
+
 do_encode(Bin, Opts) when is_binary(Bin) ->
     encode_binary(Opts, Bin);
 do_encode(Atom, Opts) when is_atom(Atom) ->
@@ -45,6 +47,47 @@ do_encode(Term, #{encode_unhandled := Encode} = Opts) ->
     Encode(Term, Opts);
 do_encode(Term , Opts) ->
     error(unsupported_type, [Term, Opts]).
+
+encode_datetime(#{encode_datetime := Encode} = Opts, DateTime) ->
+    Encode(DateTime, Opts);
+encode_datetime(Opts, {{YYYY,MM,DD},{H,M,S}}) ->
+    DateTime = iolist_to_binary(io_lib:format(
+        "~4.10.0B-~2.10.0B-~2.10.0BT~2.10.0B:~2.10.0B:~2.10.0BZ",
+        [YYYY,MM,DD,H,M,S])
+    ),
+    [$", escape_binary(Opts, DateTime), $"].
+
+encode_timestamp(#{encode_timestamp := Encode} = Opts, Timestamp) ->
+    Encode(Timestamp, Opts);
+encode_timestamp(Opts, {_,_,MicroSecs} = Timestamp) ->
+    MilliSecs = MicroSecs div 1000,
+    {{YYYY,MM,DD},{H,M,S}} = calendar:now_to_datetime(Timestamp),
+    DateTime = iolist_to_binary(io_lib:format(
+        "~4.10.0B-~2.10.0B-~2.10.0BT~2.10.0B:~2.10.0B:~2.10.0B.~3.10.0BZ",
+        [YYYY,MM,DD,H,M,S,MilliSecs])
+    ),
+    [$", escape_binary(Opts, DateTime), $"].
+
+-else.
+
+do_encode(Bin, Opts) when is_binary(Bin) ->
+    encode_binary(Opts, Bin);
+do_encode(Atom, Opts) when is_atom(Atom) ->
+    encode_atom(Opts, Atom);
+do_encode(Int, Opts) when is_integer(Int) ->
+    encode_integer(Opts, Int);
+do_encode(Float, Opts) when is_float(Float) ->
+    encode_float(Opts, Float);
+do_encode(List, Opts) when is_list(List) ->
+    encode_list(Opts, List);
+do_encode(Map, Opts) when is_map(Map) ->
+    encode_map(Opts, Map);
+do_encode(Term, #{encode_unhandled := Encode} = Opts) ->
+    Encode(Term, Opts);
+do_encode(Term , Opts) ->
+    error(unsupported_type, [Term, Opts]).
+
+-endif.
 
 encode_binary(#{encode_binary := Encode} = Opts, Bin) ->
     Encode(Bin, Opts);
@@ -108,26 +151,6 @@ do_encode_map_loop([], _Opts) ->
     [$}];
 do_encode_map_loop([{K, V} | T], Opts) ->
     [$,, do_encode(K, Opts), $:, do_encode(V, Opts) | do_encode_map_loop(T, Opts)].
-
-encode_datetime(#{encode_datetime := Encode} = Opts, DateTime) ->
-    Encode(DateTime, Opts);
-encode_datetime(Opts, {{YYYY,MM,DD},{H,M,S}}) ->
-    DateTime = iolist_to_binary(io_lib:format(
-        "~4.10.0B-~2.10.0B-~2.10.0BT~2.10.0B:~2.10.0B:~2.10.0BZ",
-        [YYYY,MM,DD,H,M,S])
-    ),
-    [$", escape_binary(Opts, DateTime), $"].
-
-encode_timestamp(#{encode_timestamp := Encode} = Opts, Timestamp) ->
-    Encode(Timestamp, Opts);
-encode_timestamp(Opts, {_,_,MicroSecs} = Timestamp) ->
-    MilliSecs = MicroSecs div 1000,
-    {{YYYY,MM,DD},{H,M,S}} = calendar:now_to_datetime(Timestamp),
-    DateTime = iolist_to_binary(io_lib:format(
-        "~4.10.0B-~2.10.0B-~2.10.0BT~2.10.0B:~2.10.0B:~2.10.0B.~3.10.0BZ",
-        [YYYY,MM,DD,H,M,S,MilliSecs])
-    ),
-    [$", escape_binary(Opts, DateTime), $"].
 
 escape_binary(#{escape_binary := Escape}, Bin) ->
     Escape(Bin);
