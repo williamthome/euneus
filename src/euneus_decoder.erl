@@ -96,9 +96,8 @@ string(<< Y4/integer, Y3/integer, Y2/integer, Y1/integer, $-/integer
         , H2/integer, H1/integer, $:/integer
         , Min2/integer, Min1/integer, $:/integer
         , S2/integer, S1/integer
-        , Rest0/bitstring >>, Opts, Input, Skip, Stack, Len)
-  when Skip =:= 1, Len =:= 0
-     , ?is_number(Y4), ?is_number(Y3), ?is_number(Y2), ?is_number(Y1)
+        , Rest0/bitstring >>, Opts, Input, Skip, Stack, 0)
+  when ?is_number(Y4), ?is_number(Y3), ?is_number(Y2), ?is_number(Y1)
      , ?is_number(M2), ?is_number(M1)
      , ?is_number(D2), ?is_number(D1)
      , ?is_number(H2), ?is_number(H1)
@@ -660,12 +659,18 @@ encode_test() ->
         {123, <<"123">>},
         {1.234, <<"1.234">>},
         {6.02e23, <<"6.02e+23">>},
-        {[<<"foo">>, 123], <<"[\"foo\",123]">>},
-        {#{<<"foo">> => 123}, <<"{\"foo\":123}">>},
+        { [<<"foo">>, 123, 6.02e+23, true]
+        , <<"[\"foo\",123,6.02e+23,true]">>},
+        { #{<<"foo">> => <<"bar">>, <<"bar">> => <<"baz">>}
+        , <<"{\"foo\": \"bar\", \"bar\": \"baz\"}">>},
+        {true, <<"true">>},
+        {false, <<"false">>},
         {undefined, <<"null">>},
         {<<"ABC">>, <<"\"\\u0041\\u0042\\u0043\"">>},
-        {{{1970,1,1},{0,0,0}}, <<"\"1970-01-01T00:00:00Z\"">>},
-        {{0,0,0}, <<"\"1970-01-01T00:00:00.000Z\"">>}
+        { #{<<"datetime">> => {{1970,1,1},{0,0,0}}}
+        , <<"{\"datetime\": \"1970-01-01T00:00:00Z\"}">> },
+        { #{<<"timestamp">> => {0,0,0}}
+        , <<"{\"timestamp\": \"1970-01-01T00:00:00.000Z\"}">> }
     ]].
 
 -endif.
