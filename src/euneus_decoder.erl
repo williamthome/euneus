@@ -653,24 +653,24 @@ try_parse_float(Bin, Token, Skip) ->
 -include_lib("eunit/include/eunit.hrl").
 
 encode_test() ->
-    [ ?assertEqual({ok, Expect}, decode(Input, #{}))
-      || {Expect, Input} <- [
-        {<<"foo">>, <<"\"foo\"">>},
-        {123, <<"123">>},
-        {1.234, <<"1.234">>},
-        {6.02e23, <<"6.02e+23">>},
-        { [<<"foo">>, 123, 6.02e+23, true]
-        , <<"[\"foo\",123,6.02e+23,true]">>},
-        { #{<<"foo">> => <<"bar">>, <<"bar">> => <<"baz">>}
-        , <<"{\"foo\": \"bar\", \"bar\": \"baz\"}">>},
-        {true, <<"true">>},
-        {false, <<"false">>},
-        {undefined, <<"null">>},
-        {<<"ABC">>, <<"\"\\u0041\\u0042\\u0043\"">>},
-        { #{<<"datetime">> => {{1970,1,1},{0,0,0}}}
-        , <<"{\"datetime\": \"1970-01-01T00:00:00Z\"}">> },
-        { #{<<"timestamp">> => {0,0,0}}
-        , <<"{\"timestamp\": \"1970-01-01T00:00:00.000Z\"}">> }
+    [ ?assertEqual(Expect, decode(Input, Opts))
+      || {Expect, Input, Opts} <- [
+        {{ok, <<"foo">>}, <<"\"foo\"">>, #{}},
+        {{ok, 123}, <<"123">>, #{}},
+        {{ok, 1.234}, <<"1.234">>, #{}},
+        {{ok, 6.02e23}, <<"6.02e+23">>, #{}},
+        { {ok, [<<"foo">>, 123, 6.02e+23, true]}
+        , <<"[\"foo\",123,6.02e+23,true]">>, #{}},
+        { {ok, #{<<"foo">> => <<"bar">>, <<"bar">> => <<"baz">>}}
+        , <<"{\"foo\": \"bar\", \"bar\": \"baz\"}">>, #{}},
+        {{ok, true}, <<"true">>, #{}},
+        {{ok, false}, <<"false">>, #{}},
+        {{ok, undefined}, <<"null">>, #{}},
+        {{ok, <<"ABC">>}, <<"\"\\u0041\\u0042\\u0043\"">>, #{}},
+        { {ok, #{<<"datetime">> => {{1970,1,1},{0,0,0}}}}
+        , <<"{\"datetime\": \"1970-01-01T00:00:00Z\"}">>, #{} },
+        { {ok, #{<<"timestamp">> => {0,0,0}}}
+        , <<"{\"timestamp\": \"1970-01-01T00:00:00.000Z\"}">>, #{} }
     ]].
 
 -endif.

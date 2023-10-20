@@ -446,17 +446,17 @@ invalid_byte_error(Byte0, Input) ->
 -include_lib("eunit/include/eunit.hrl").
 
 encode_test() ->
-    [ ?assertEqual(Expect, iolist_to_binary(encode(Input, #{})))
-      || {Expect, Input} <- [
-        {<<"true">>, true},
-        {<<"\"foo\"">>, foo},
-        {<<"\"foo\"">>, <<"foo">>},
-        {<<"0">>, 0},
-        {<<"123.456789">>, 123.45678900},
-        {<<"[true,0]">>, [true, 0]},
-        {<<"{\"foo\":\"bar\"}">>, #{foo => bar}},
-        {<<"\"1970-01-01T00:00:00Z\"">>, {{1970,1,1},{0,0,0}}},
-        {<<"\"1970-01-01T00:00:00.000Z\"">>, {0,0,0}}
+    [ ?assertEqual(Expect, iolist_to_binary(encode(Input, Opts)))
+      || {Expect, Input, Opts} <- [
+        {<<"true">>, true, #{}},
+        {<<"\"foo\"">>, foo, #{}},
+        {<<"\"foo\"">>, <<"foo">>, #{}},
+        {<<"0">>, 0, #{}},
+        {<<"123.456789">>, 123.45678900, #{}},
+        {<<"[true,0]">>, [true, 0], #{}},
+        {<<"{\"foo\":\"bar\"}">>, #{foo => bar}, #{}},
+        {<<"\"1970-01-01T00:00:00Z\"">>, {{1970,1,1},{0,0,0}}, #{}},
+        {<<"\"1970-01-01T00:00:00.000Z\"">>, {0,0,0}, #{}}
     ]].
 
 -endif.
