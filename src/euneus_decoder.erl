@@ -84,6 +84,29 @@ string(<< Y4/integer, Y3/integer, Y2/integer, Y1/integer, $-/integer
     Time = {chars_to_integer(H2, H1), chars_to_integer(Min2, Min1), chars_to_integer(S2, S1)},
     Value = {Date, Time},
     continue(Rest, Opts, Input, Skip + Len + 1, Stack, Value);
+string(<< Y4/integer, Y3/integer, Y2/integer, Y1/integer, $-/integer
+        , M2/integer, M1/integer, $-/integer
+        , D2/integer, D1/integer
+        , $T/integer
+        , H2/integer, H1/integer, $:/integer
+        , Min2/integer, Min1/integer, $:/integer
+        , S2/integer, S1/integer, $./integer
+        , Mil3/integer, Mil2/integer, Mil1/integer, $Z/integer, $"
+        , Rest/bitstring >>, Opts, Input, Skip, Stack, Len)
+  when ?is_number(Y4), ?is_number(Y3), ?is_number(Y2), ?is_number(Y1)
+     , ?is_number(M2), ?is_number(M1)
+     , ?is_number(D2), ?is_number(D1)
+     , ?is_number(H2), ?is_number(H1)
+     , ?is_number(Min2), ?is_number(Min1)
+     , ?is_number(S2), ?is_number(S1)
+     , ?is_number(Mil3), ?is_number(Mil2), ?is_number(Mil1) ->
+    Date = {chars_to_integer(Y4, Y3, Y2, Y1), chars_to_integer(M2, M1), chars_to_integer(D2, D1)},
+    Time = {chars_to_integer(H2, H1), chars_to_integer(Min2, Min1), chars_to_integer(S2, S1)},
+    DateTime = {Date, Time},
+    MilliSeconds = chars_to_integer(Mil3, Mil2, Mil1),
+    Seconds = calendar:datetime_to_gregorian_seconds(DateTime) - 62167219200,
+    Value = {Seconds div 1000000, Seconds rem 1000000, MilliSeconds * 1000},
+    continue(Rest, Opts, Input, Skip + Len + 1, Stack, Value);
 string(<<$"/integer,Rest/bitstring>>, Opts, Input, Skip, Stack, Len) ->
     String = binary_part(Input, Skip, Len),
     Value = normalize_string(Stack, Opts, String),
@@ -138,6 +161,9 @@ string(<<_/bitstring>>, _Opts, Input, Skip, _Stack, _Acc, Len) ->
 
 chars_to_integer(N2, N1) ->
     ((N2 - $0) * 10) + (N1 - $0).
+
+chars_to_integer(N3, N2, N1) ->
+    ((N3 - $0) * 100) + ((N2 - $0) * 10) + (N1 - $0).
 
 chars_to_integer(N4, N3, N2, N1) ->
     ((N4 - $0) * 1000) + ((N3 - $0) * 100) + ((N2 - $0) * 10) + (N1 - $0).
@@ -635,7 +661,8 @@ encode_test() ->
         {#{<<"foo">> => 123}, <<"{\"foo\":123}">>},
         {undefined, <<"null">>},
         {<<"ABC">>, <<"\"\\u0041\\u0042\\u0043\"">>},
-        {{{1970,1,1},{0,0,0}}, <<"\"1970-01-01T00:00:00Z\"">>}
+        {{{1970,1,1},{0,0,0}}, <<"\"1970-01-01T00:00:00Z\"">>},
+        {{0,0,0}, <<"\"1970-01-01T00:00:00.000Z\"">>}
     ]].
 
 -endif.
