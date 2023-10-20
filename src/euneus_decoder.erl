@@ -4,15 +4,9 @@
     continue/6, escapeu_1/8, escapeu_2/8, escapeu/6, terminate/6,
     empty_error/2, throw_error/2, throw_error/4, token_error/2,
     token_error/3, value/5, string/6, string/7, key/5, key/6,
-    try_parse_float/3, normalize_string/3, parse_opts/1
-]}).
-
--ifdef(EUNEUS_ENABLE_CALENDAR).
--compile({inline, [
+    try_parse_float/3, normalize_string/3, parse_opts/1,
     chars_to_integer/2, chars_to_integer/3, chars_to_integer/4
 ]}).
--endif.
-
 -compile({inline_size, 100}).
 
 -export([ decode/2 ]).
@@ -76,8 +70,6 @@ value(<<_/integer,Rest/bitstring>>, _Opts, Input, Skip, Stack) ->
 value(<<_/bitstring>>, _Opts, Input, Skip, _Stack) ->
     throw_error(Input, Skip).
 
--ifdef(EUNEUS_ENABLE_CALENDAR).
-
 string(<<$"/integer,Rest/bitstring>>, Opts, Input, Skip, Stack, Len) ->
     String = binary_part(Input, Skip, Len),
     Value = normalize_string(Stack, Opts, String),
@@ -94,41 +86,34 @@ string(<< Y4/integer, Y3/integer, Y2/integer, Y1/integer, $-/integer
         , $T/integer
         , H2/integer, H1/integer, $:/integer
         , Min2/integer, Min1/integer, $:/integer
-        , S2/integer, S1/integer, $Z/integer, $"
-        , Rest/bitstring >>, Opts, Input, Skip, Stack, 0)
-  when ?is_number(Y4), ?is_number(Y3), ?is_number(Y2), ?is_number(Y1)
+        , S2/integer, S1/integer
+        , Rest0/bitstring >>, Opts, Input, Skip, Stack, Len)
+  when Skip =:= 1, Len =:= 0
+     , ?is_number(Y4), ?is_number(Y3), ?is_number(Y2), ?is_number(Y1)
      , ?is_number(M2), ?is_number(M1)
      , ?is_number(D2), ?is_number(D1)
      , ?is_number(H2), ?is_number(H1)
      , ?is_number(Min2), ?is_number(Min1)
      , ?is_number(S2), ?is_number(S1) ->
-    Date = {chars_to_integer(Y4, Y3, Y2, Y1), chars_to_integer(M2, M1), chars_to_integer(D2, D1)},
-    Time = {chars_to_integer(H2, H1), chars_to_integer(Min2, Min1), chars_to_integer(S2, S1)},
-    Value = {Date, Time},
-    continue(Rest, Opts, Input, Skip + 21, Stack, Value);
-string(<< Y4/integer, Y3/integer, Y2/integer, Y1/integer, $-/integer
-        , M2/integer, M1/integer, $-/integer
-        , D2/integer, D1/integer
-        , $T/integer
-        , H2/integer, H1/integer, $:/integer
-        , Min2/integer, Min1/integer, $:/integer
-        , S2/integer, S1/integer, $./integer
-        , Mil3/integer, Mil2/integer, Mil1/integer, $Z/integer, $"
-        , Rest/bitstring >>, Opts, Input, Skip, Stack, 0)
-  when ?is_number(Y4), ?is_number(Y3), ?is_number(Y2), ?is_number(Y1)
-     , ?is_number(M2), ?is_number(M1)
-     , ?is_number(D2), ?is_number(D1)
-     , ?is_number(H2), ?is_number(H1)
-     , ?is_number(Min2), ?is_number(Min1)
-     , ?is_number(S2), ?is_number(S1)
-     , ?is_number(Mil3), ?is_number(Mil2), ?is_number(Mil1) ->
-    Date = {chars_to_integer(Y4, Y3, Y2, Y1), chars_to_integer(M2, M1), chars_to_integer(D2, D1)},
-    Time = {chars_to_integer(H2, H1), chars_to_integer(Min2, Min1), chars_to_integer(S2, S1)},
-    DateTime = {Date, Time},
-    MilliSeconds = chars_to_integer(Mil3, Mil2, Mil1),
-    Seconds = calendar:datetime_to_gregorian_seconds(DateTime) - 62167219200,
-    Value = {Seconds div 1000000, Seconds rem 1000000, MilliSeconds * 1000},
-    continue(Rest, Opts, Input, Skip + 25, Stack, Value);
+    case Rest0 of
+        <<$Z/integer, $", Rest/bitstring>> ->
+            Date = {chars_to_integer(Y4, Y3, Y2, Y1), chars_to_integer(M2, M1), chars_to_integer(D2, D1)},
+            Time = {chars_to_integer(H2, H1), chars_to_integer(Min2, Min1), chars_to_integer(S2, S1)},
+            Value = {Date, Time},
+            continue(Rest, Opts, Input, Skip + 21, Stack, Value);
+        << $./integer
+         , Mil3/integer, Mil2/integer, Mil1/integer
+         , $Z/integer, $"
+         , Rest/bitstring >>
+        when ?is_number(Mil3), ?is_number(Mil2), ?is_number(Mil1) ->
+            Date = {chars_to_integer(Y4, Y3, Y2, Y1), chars_to_integer(M2, M1), chars_to_integer(D2, D1)},
+            Time = {chars_to_integer(H2, H1), chars_to_integer(Min2, Min1), chars_to_integer(S2, S1)},
+            DateTime = {Date, Time},
+            MilliSeconds = chars_to_integer(Mil3, Mil2, Mil1),
+            Seconds = calendar:datetime_to_gregorian_seconds(DateTime) - 62167219200,
+            Value = {Seconds div 1000000, Seconds rem 1000000, MilliSeconds * 1000},
+            continue(Rest, Opts, Input, Skip + 25, Stack, Value)
+    end;
 string(<<H/integer,Rest/bitstring>>, Opts, Input, Skip, Stack, Len)
   when H < 128 ->
     string(Rest, Opts, Input, Skip, Stack, Len + 1);
@@ -144,45 +129,6 @@ string(<<_/integer,_Rest/bitstring>>, _Opts, Input, Skip, _Stack, _Len) ->
     throw_error(Input, Skip);
 string(<<_/bitstring>>, _Opts, Input, Skip, _Stack, Len) ->
     empty_error(Input, Skip + Len).
-
-chars_to_integer(N2, N1) ->
-    ((N2 - $0) * 10) + (N1 - $0).
-
-chars_to_integer(N3, N2, N1) ->
-    ((N3 - $0) * 100) + ((N2 - $0) * 10) + (N1 - $0).
-
-chars_to_integer(N4, N3, N2, N1) ->
-    ((N4 - $0) * 1000) + ((N3 - $0) * 100) + ((N2 - $0) * 10) + (N1 - $0).
-
--else.
-
-string(<<$"/integer,Rest/bitstring>>, Opts, Input, Skip, Stack, Len) ->
-    String = binary_part(Input, Skip, Len),
-    Value = normalize_string(Stack, Opts, String),
-    continue(Rest, Opts, Input, Skip + Len + 1, Stack, Value);
-string(<<$\\/integer,Rest/bitstring>>, Opts, Input, Skip, Stack, Len) ->
-    Part = binary_part(Input, Skip, Len),
-    escape(Rest, Opts, Input, Skip + Len, Stack, Part);
-string(<<H/integer,_Rest/bitstring>>, _Opts, Input, Skip, _Stack, _Len)
-  when H < 32 ->
-    throw_error(Input, Skip);
-string(<<H/integer,Rest/bitstring>>, Opts, Input, Skip, Stack, Len)
-  when H < 128 ->
-    string(Rest, Opts, Input, Skip, Stack, Len + 1);
-string(<<H/utf8,Rest/bitstring>>, Opts, Input, Skip, Stack, Len)
-  when H < 2048 ->
-    string(Rest, Opts, Input, Skip, Stack, Len + 2);
-string(<<H/utf8,Rest/bitstring>>, Opts, Input, Skip, Stack, Len)
-  when H < 65536 ->
-    string(Rest, Opts, Input, Skip, Stack, Len + 3);
-string(<<_/utf8,Rest/bitstring>>, Opts, Input, Skip, Stack, Len) ->
-    string(Rest, Opts, Input, Skip, Stack, Len + 4);
-string(<<_/integer,_Rest/bitstring>>, _Opts, Input, Skip, _Stack, _Len) ->
-    throw_error(Input, Skip);
-string(<<_/bitstring>>, _Opts, Input, Skip, _Stack, Len) ->
-    empty_error(Input, Skip + Len).
-
--endif.
 
 string(<<$"/integer,Rest/bitstring>>, Opts, Input, Skip, Stack, Acc, Len) ->
     Last = binary_part(Input, Skip, Len),
@@ -218,6 +164,15 @@ normalize_string(_Stack, #{normalize_string := Normalize}, String) ->
     Normalize(String);
 normalize_string(_Stack, _Opts, String) ->
     String.
+
+chars_to_integer(N2, N1) ->
+    ((N2 - $0) * 10) + (N1 - $0).
+
+chars_to_integer(N3, N2, N1) ->
+    ((N3 - $0) * 100) + ((N2 - $0) * 10) + (N1 - $0).
+
+chars_to_integer(N4, N3, N2, N1) ->
+    ((N4 - $0) * 1000) + ((N3 - $0) * 100) + ((N2 - $0) * 10) + (N1 - $0).
 
 escape(<<$\"/integer,Rest/bitstring>>, Opts, Input, Skip, Stack, Acc) ->
     string(Rest, Opts, Input, Skip + 2, Stack, [Acc, $\"], 0);
