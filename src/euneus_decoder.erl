@@ -43,7 +43,7 @@ decode(Data, Opts) when is_binary(Data) andalso is_map(Opts) ->
     end.
 
 parse_opts(Opts) ->
-    #{
+    Opts#{
         null_term => maps:get(null_term, Opts, undefined)
     }.
 
