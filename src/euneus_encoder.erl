@@ -38,7 +38,12 @@ do_encode({{YYYY,MM,DD},{H,M,S}} = DateTime, Opts)
        is_integer(H) andalso H >= 0 andalso H < 24 andalso
        is_integer(M) andalso M >= 0 andalso M < 60 andalso
        is_integer(S) andalso S >= 0 andalso S < 60 ->
-    encode_datetime(Opts, DateTime).
+    encode_datetime(Opts, DateTime);
+do_encode({MegaSecs,Secs,MicroSecs} = Timestamp, Opts)
+  when is_integer(MegaSecs) andalso MegaSecs >= 0 andalso
+       is_integer(Secs) andalso Secs >= 0 andalso
+       is_integer(MicroSecs) andalso MicroSecs >= 0 ->
+    encode_timestamp(Opts, Timestamp).
 
 encode_binary(#{encode_binary := Encode} = Opts, Bin) ->
     Encode(Bin, Opts);
@@ -109,6 +114,17 @@ encode_datetime(Opts, {{YYYY,MM,DD},{H,M,S}}) ->
     DateTime = iolist_to_binary(io_lib:format(
         "~4.10.0B-~2.10.0B-~2.10.0BT~2.10.0B:~2.10.0B:~2.10.0BZ",
         [YYYY,MM,DD,H,M,S])
+    ),
+    [$", escape_binary(Opts, DateTime), $"].
+
+encode_timestamp(#{encode_timestamp := Encode} = Opts, Timestamp) ->
+    Encode(Timestamp, Opts);
+encode_timestamp(Opts, {_,_,MicroSecs} = Timestamp) ->
+    MilliSecs = MicroSecs div 1000,
+    {{YYYY,MM,DD},{H,M,S}} = calendar:now_to_datetime(Timestamp),
+    DateTime = iolist_to_binary(io_lib:format(
+        "~4.10.0B-~2.10.0B-~2.10.0BT~2.10.0B:~2.10.0B:~2.10.0B.~3.10.0BZ",
+        [YYYY,MM,DD,H,M,S,MilliSecs])
     ),
     [$", escape_binary(Opts, DateTime), $"].
 
@@ -419,7 +435,7 @@ invalid_byte_error(Byte0, Input) ->
 -include_lib("eunit/include/eunit.hrl").
 
 encode_test() ->
-    [ ?assertEqual(Expect, encode_to_binary(Input)) || {Expect, Input} <- [
+    [?assertEqual(Expect, encode_to_binary(Input)) || {Expect, Input} <- [
         {<<"true">>, true},
         {<<"\"foo\"">>, foo},
         {<<"\"foo\"">>, <<"foo">>},
@@ -427,7 +443,8 @@ encode_test() ->
         {<<"123.456789">>, 123.45678900},
         {<<"[true,0]">>, [true, 0]},
         {<<"{\"foo\":\"bar\"}">>, #{foo => bar}},
-        {<<"\"1970-01-01T00:00:00Z\"">>, {{1970,1,1},{0,0,0}}}
+        {<<"\"1970-01-01T00:00:00Z\"">>, {{1970,1,1},{0,0,0}}},
+        {<<"\"1970-01-01T00:00:00.000Z\"">>, {0,0,0}}
     ]].
 
 -endif.
