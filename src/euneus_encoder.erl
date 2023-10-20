@@ -43,7 +43,11 @@ do_encode({MegaSecs,Secs,MicroSecs} = Timestamp, Opts)
   when is_integer(MegaSecs) andalso MegaSecs >= 0 andalso
        is_integer(Secs) andalso Secs >= 0 andalso
        is_integer(MicroSecs) andalso MicroSecs >= 0 ->
-    encode_timestamp(Opts, Timestamp).
+    encode_timestamp(Opts, Timestamp);
+do_encode(Term, #{encode_unhandled := Encode} = Opts) ->
+    Encode(Term, Opts);
+do_encode(Term , Opts) ->
+    error(unsupported_type, [Term, Opts]).
 
 encode_binary(#{encode_binary := Encode} = Opts, Bin) ->
     Encode(Bin, Opts);
