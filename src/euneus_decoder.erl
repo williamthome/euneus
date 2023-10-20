@@ -83,7 +83,7 @@ string(<< Y4/integer, Y3/integer, Y2/integer, Y1/integer, $-/integer
         , H2/integer, H1/integer, $:/integer
         , Min2/integer, Min1/integer, $:/integer
         , S2/integer, S1/integer, $Z/integer, $"
-        , Rest/bitstring >>, Opts, Input, Skip, Stack, Len)
+        , Rest/bitstring >>, Opts, Input, Skip, Stack, 0)
   when ?is_number(Y4), ?is_number(Y3), ?is_number(Y2), ?is_number(Y1)
      , ?is_number(M2), ?is_number(M1)
      , ?is_number(D2), ?is_number(D1)
@@ -93,7 +93,7 @@ string(<< Y4/integer, Y3/integer, Y2/integer, Y1/integer, $-/integer
     Date = {chars_to_integer(Y4, Y3, Y2, Y1), chars_to_integer(M2, M1), chars_to_integer(D2, D1)},
     Time = {chars_to_integer(H2, H1), chars_to_integer(Min2, Min1), chars_to_integer(S2, S1)},
     Value = {Date, Time},
-    continue(Rest, Opts, Input, Skip + Len + 1, Stack, Value);
+    continue(Rest, Opts, Input, Skip + 21, Stack, Value);
 string(<< Y4/integer, Y3/integer, Y2/integer, Y1/integer, $-/integer
         , M2/integer, M1/integer, $-/integer
         , D2/integer, D1/integer
@@ -102,7 +102,7 @@ string(<< Y4/integer, Y3/integer, Y2/integer, Y1/integer, $-/integer
         , Min2/integer, Min1/integer, $:/integer
         , S2/integer, S1/integer, $./integer
         , Mil3/integer, Mil2/integer, Mil1/integer, $Z/integer, $"
-        , Rest/bitstring >>, Opts, Input, Skip, Stack, Len)
+        , Rest/bitstring >>, Opts, Input, Skip, Stack, 0)
   when ?is_number(Y4), ?is_number(Y3), ?is_number(Y2), ?is_number(Y1)
      , ?is_number(M2), ?is_number(M1)
      , ?is_number(D2), ?is_number(D1)
@@ -116,7 +116,7 @@ string(<< Y4/integer, Y3/integer, Y2/integer, Y1/integer, $-/integer
     MilliSeconds = chars_to_integer(Mil3, Mil2, Mil1),
     Seconds = calendar:datetime_to_gregorian_seconds(DateTime) - 62167219200,
     Value = {Seconds div 1000000, Seconds rem 1000000, MilliSeconds * 1000},
-    continue(Rest, Opts, Input, Skip + Len + 1, Stack, Value);
+    continue(Rest, Opts, Input, Skip + 25, Stack, Value);
 string(<<H/integer,Rest/bitstring>>, Opts, Input, Skip, Stack, Len)
   when H < 128 ->
     string(Rest, Opts, Input, Skip, Stack, Len + 1);
