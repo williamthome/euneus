@@ -1,6 +1,19 @@
 -module(euneus_decoder).
 
--compile({inline, [ continue/6, escapeu_1/8, escapeu_2/8, escapeu/6 ]}).
+-compile({inline, [
+    continue/6, escapeu_1/8, escapeu_2/8, escapeu/6, terminate/6,
+    empty_error/2, throw_error/2, throw_error/4, token_error/2,
+    token_error/3, value/5, string/6, string/7, key/5, key/6,
+    try_parse_float/3, normalize_string/3, parse_opts/1
+]}).
+
+-ifdef(EUNEUS_ENABLE_CALENDAR).
+-compile({inline, [
+    chars_to_integer/2, chars_to_integer/3, chars_to_integer/4
+]}).
+-endif.
+
+-compile({inline_size, 100}).
 
 -export([ decode/2 ]).
 

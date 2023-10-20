@@ -1,6 +1,17 @@
 -module(euneus_encoder).
 
--compile({inline, [ escape_json/1, escape_html/1, escape_js/1, escape_unicode/1 ]}).
+-compile({inline, [
+    escape_json/4, escape_json_chunk/5,
+    encode_binary/2, encode_atom/2, encode_integer/2, encode_float/2,
+    encode_list/2, encode_map/2, do_encode_atom/2, do_encode/2,
+    escape_byte/1, do_encode_list_loop/2, do_encode_map_loop/2
+]}).
+
+-ifdef(EUNEUS_ENABLE_CALENDAR).
+-compile({inline, [ encode_datetime/2, encode_timestamp/2 ]}).
+-endif.
+
+-compile({inline_size, 100}).
 
 -export([ encode/2 ]).
 -export([ escape_byte/1 ]).
@@ -145,7 +156,7 @@ do_encode_map_loop([{K, V} | T], Opts) ->
 escape_binary(#{escape_binary := Escape}, Bin) ->
     Escape(Bin);
 escape_binary(_, Bin) ->
-    escape_json(Bin).
+    escape_json(Bin, [], Bin, 0).
 
 escape_json(Bin) ->
     escape_json(Bin, [], Bin, 0).
