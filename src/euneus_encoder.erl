@@ -38,10 +38,8 @@ do_encode({{YYYY,MM,DD},{H,M,S}} = DateTime, Opts)
 do_encode({MegaSecs,Secs,MicroSecs} = Timestamp, Opts)
   when ?int_min(MegaSecs, 0), ?int_min(Secs, 0), ?int_min(MicroSecs, 0) ->
     encode_timestamp(Opts, Timestamp);
-do_encode(Term, #{encode_unhandled := Encode} = Opts) ->
-    Encode(Term, Opts);
-do_encode(Term , Opts) ->
-    error(unsupported_type, [Term, Opts]).
+do_encode(Term, Opts) ->
+    encode_unhandled(Opts, Term).
 
 encode_binary(#{encode_binary := Encode} = Opts, Bin) ->
     Encode(Bin, Opts);
@@ -125,6 +123,11 @@ encode_timestamp(Opts, {_,_,MicroSecs} = Timestamp) ->
         [YYYY,MM,DD,H,M,S,MilliSecs])
     ),
     [$", escape_binary(Opts, DateTime), $"].
+
+encode_unhandled(#{encode_unhandled := Encode} = Opts, Term) ->
+    Encode(Term, Opts);
+encode_unhandled(Opts, Term) ->
+    error(unsupported_type, [Opts, Term]).
 
 escape_binary(#{escape_binary := Escape}, Bin) ->
     Escape(Bin);
