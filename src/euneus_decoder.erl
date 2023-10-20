@@ -66,6 +66,16 @@ value(<<_/integer,Rest/bitstring>>, _Opts, Input, Skip, Stack) ->
 value(<<_/bitstring>>, _Opts, Input, Skip, _Stack) ->
     throw_error(Input, Skip).
 
+string(<<$"/integer,Rest/bitstring>>, Opts, Input, Skip, Stack, Len) ->
+    String = binary_part(Input, Skip, Len),
+    Value = normalize_string(Stack, Opts, String),
+    continue(Rest, Opts, Input, Skip + Len + 1, Stack, Value);
+string(<<$\\/integer,Rest/bitstring>>, Opts, Input, Skip, Stack, Len) ->
+    Part = binary_part(Input, Skip, Len),
+    escape(Rest, Opts, Input, Skip + Len, Stack, Part);
+string(<<H/integer,_Rest/bitstring>>, _Opts, Input, Skip, _Stack, _Len)
+  when H < 32 ->
+    throw_error(Input, Skip);
 string(<< Y4/integer, Y3/integer, Y2/integer, Y1/integer, $-/integer
         , M2/integer, M1/integer, $-/integer
         , D2/integer, D1/integer
@@ -107,16 +117,6 @@ string(<< Y4/integer, Y3/integer, Y2/integer, Y1/integer, $-/integer
     Seconds = calendar:datetime_to_gregorian_seconds(DateTime) - 62167219200,
     Value = {Seconds div 1000000, Seconds rem 1000000, MilliSeconds * 1000},
     continue(Rest, Opts, Input, Skip + Len + 1, Stack, Value);
-string(<<$"/integer,Rest/bitstring>>, Opts, Input, Skip, Stack, Len) ->
-    String = binary_part(Input, Skip, Len),
-    Value = normalize_string(Stack, Opts, String),
-    continue(Rest, Opts, Input, Skip + Len + 1, Stack, Value);
-string(<<$\\/integer,Rest/bitstring>>, Opts, Input, Skip, Stack, Len) ->
-    Part = binary_part(Input, Skip, Len),
-    escape(Rest, Opts, Input, Skip + Len, Stack, Part);
-string(<<H/integer,_Rest/bitstring>>, _Opts, Input, Skip, _Stack, _Len)
-  when H < 32 ->
-    throw_error(Input, Skip);
 string(<<H/integer,Rest/bitstring>>, Opts, Input, Skip, Stack, Len)
   when H < 128 ->
     string(Rest, Opts, Input, Skip, Stack, Len + 1);
