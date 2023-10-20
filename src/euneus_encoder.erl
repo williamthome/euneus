@@ -7,6 +7,9 @@
 -export([ escape_byte/1 ]).
 -export([ escape_json/1, escape_html/1, escape_js/1, escape_unicode/1 ]).
 
+-define(int_min(X, Min), is_integer(X) andalso X >= Min).
+-define(int_range(X, Min, Max), is_integer(X) andalso X >= Min andalso X =< Max).
+
 encode(Term) ->
     encode(Term, #{}).
 
@@ -32,17 +35,11 @@ do_encode(List, Opts) when is_list(List) ->
 do_encode(Map, Opts) when is_map(Map) ->
     encode_map(Opts, Map);
 do_encode({{YYYY,MM,DD},{H,M,S}} = DateTime, Opts)
-  when is_integer(YYYY) andalso YYYY >= 0 andalso
-       is_integer(MM) andalso MM >= 1 andalso MM =< 12 andalso
-       is_integer(DD) andalso DD >= 1 andalso DD =< 31 andalso
-       is_integer(H) andalso H >= 0 andalso H < 24 andalso
-       is_integer(M) andalso M >= 0 andalso M < 60 andalso
-       is_integer(S) andalso S >= 0 andalso S < 60 ->
+  when ?int_min(YYYY, 0), ?int_range(MM, 1, 12), ?int_range(DD, 1, 31)
+     , ?int_range(H, 0, 23), ?int_range(M, 0, 59), ?int_range(S, 0, 59) ->
     encode_datetime(Opts, DateTime);
 do_encode({MegaSecs,Secs,MicroSecs} = Timestamp, Opts)
-  when is_integer(MegaSecs) andalso MegaSecs >= 0 andalso
-       is_integer(Secs) andalso Secs >= 0 andalso
-       is_integer(MicroSecs) andalso MicroSecs >= 0 ->
+  when ?int_min(MegaSecs, 0), ?int_min(Secs, 0), ?int_min(MicroSecs, 0) ->
     encode_timestamp(Opts, Timestamp);
 do_encode(Term, #{encode_unhandled := Encode} = Opts) ->
     Encode(Term, Opts);
