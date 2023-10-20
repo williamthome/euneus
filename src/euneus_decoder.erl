@@ -210,12 +210,12 @@ string(<<_/integer,_/bitstring>>, _Opts, Input, Skip, _Stack, _Acc, _Len) ->
 string(<<_/bitstring>>, _Opts, Input, Skip, _Stack, _Acc, Len) ->
     empty_error(Input, Skip + Len).
 
-normalize_string([?key | _], #{handle_key := Handle}, String) ->
-    Handle(String);
+normalize_string([?key | _], #{normalize_key := Normalize}, String) ->
+    Normalize(String);
 normalize_string([?key | _], _Opts, String) ->
     String;
-normalize_string(_Stack, #{handle_string := Handle}, String) ->
-    Handle(String);
+normalize_string(_Stack, #{normalize_string := Normalize}, String) ->
+    Normalize(String);
 normalize_string(_Stack, _Opts, String) ->
     String.
 
