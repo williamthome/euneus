@@ -14,7 +14,7 @@
 
 -export([ decode/2 ]).
 
-% We use integers instead of atoms to take advantage of the jump table optimization
+% Use integers instead of atoms to take advantage of the jump table optimization.
 -define(terminate, 0).
 -define(array, 1).
 -define(key, 2).
