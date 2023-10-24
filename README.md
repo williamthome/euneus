@@ -36,14 +36,14 @@ Like Thoas, both the parser and generator fully conform to
 
 ### Erlang
 
-```
+```erlang
 % rebar.config
 {deps, [euneus]}
 ```
 
 ### Elixir
 
-```
+```elixir
 # mix.exs
 def deps do
   [{:euneus, "~> 0.1"}]
@@ -109,7 +109,7 @@ end
 
 ### Why not more built-in types?
 
-The goal of `Euneus` is to have built-in types that can be encoded and then decoded to the original value. If you have any type that can be encoded and rolled back, feel free to open an issue to discuss it :)
+The goal of `Euneus` is to have built-in types that can be encoded and then decoded to the original value. If you have any type that can be encoded and rolled back, feel free to open a [new issue](https://github.com/williamthome/euneus/issues/new) to discuss it 😄
 
 ## Differences to Thoas
 
@@ -256,6 +256,8 @@ All the benchmarks compare `Euneus` and `Thoas` using [Benchee](https://github.c
 
 ### Encode
 
+> **Note**
+>
 > `Thoas` does not permit any customization.
 
 <!-- Generated via https://www.tablesgenerator.com/markdown_tables -->
@@ -275,7 +277,7 @@ All the benchmarks compare `Euneus` and `Thoas` using [Benchee](https://github.c
 
 ### Decode
 
-> **Note**:
+> **Note**
 >
 > `Thoas` does not permit any customization and does not decode `ISO 8601` dates to erlang term, but Euneus decodes out of the box, for example, `"1970-01-01T00:00:00Z"` to `{{1970,01,01},{0,0,0}}` :: [calendar:datetime()](https://www.erlang.org/doc/man/calendar.html#data-types) and `"1970-01-01T00:00:00.000Z"` to `{0,0,0}` :: [erlang:timestamp()](https://www.erlang.org/doc/man/os#timestamp-0).
 
@@ -304,10 +306,10 @@ Euneus is the twin brother of [Thoas](https://en.wikipedia.org/wiki/Thoas_(son_o
 
 ## TODO
 
-- [] Improve docs
-- [] All specs
-- [] Embed benchmarks
-- [] Test suites
+- [ ] Improve docs
+- [ ] All specs
+- [ ] Embed benchmarks
+- [ ] Test suites
 
 ## Sponsors
 
@@ -326,7 +328,7 @@ Feel free to [submit an issue on Github](https://github.com/williamthome/euneus/
 
 ### Installation
 
-```shell
+```console
 # Clone this repo
 git clone git@github.com:williamthome/euneus.git
 
