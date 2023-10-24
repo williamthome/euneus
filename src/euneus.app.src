@@ -1,14 +1,16 @@
-{application, euneus,
- [{description, "An OTP library"},
-  {vsn, "0.1.0"},
-  {registered, []},
-  {applications,
-   [kernel,
-    stdlib
-   ]},
-  {env,[]},
-  {modules, []},
-
-  {licenses, ["Apache-2.0"]},
-  {links, []}
+{application, euneus, [
+    {description, "A JSON parser and generator"},
+    {vsn, "0.1.0"},
+    {registered, []},
+    {applications, [
+        kernel,
+        stdlib
+    ]},
+    {env, []},
+    {modules, []},
+    {licenses, ["Apache-2.0"]},
+    {links, [
+        {"GitHub", "https://github.com/williamthome/euneus"},
+        {"Sponsor", "https://github.com/sponsors/williamthome"}
+    ]}
  ]}.
