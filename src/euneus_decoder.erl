@@ -67,6 +67,28 @@ parse_opts(Opts) ->
         null_term => maps:get(null_term, Opts, undefined)
     }.
 
+key(<<H/integer,Rest/bitstring>>, Opts, Input, Skip, Stack)
+  when H =:= $\s; H =:= $\t; H =:= $\n; H =:= $\r ->
+    key(Rest, Opts, Input, Skip + 1, Stack);
+key(<<$"/integer,Rest/bitstring>>, Opts, Input, Skip, Stack) ->
+    string(Rest, Opts, Input, Skip + 1, [?key | Stack], 0);
+key(<<$}/integer,Rest/bitstring>>, Opts, Input, Skip, [[] | Stack]) ->
+    continue(Rest, Opts, Input, Skip + 1, Stack, #{});
+key(<<_/integer,_/bitstring>>, _Opts, Input, Skip, _Stack) ->
+    throw_error(Input, Skip);
+key(<<_/bitstring>>, _Opts, Input, Skip, _Stack) ->
+    empty_error(Input, Skip).
+
+key(<<H/integer,Rest/bitstring>>, Opts, Input, Skip, Stack, Value)
+  when H =:= $\s; H =:= $\t; H =:= $\n; H =:= $\r ->
+    key(Rest, Opts, Input, Skip + 1, Stack, Value);
+key(<<$:/integer,Rest/bitstring>>, Opts, Input, Skip, Stack, Value) ->
+    value(Rest, Opts, Input, Skip + 1, [?object, Value | Stack]);
+key(<<_/integer,_/bitstring>>, _Opts, Input, Skip, _Stack, _Value) ->
+    throw_error(Input, Skip);
+key(<<_/bitstring>>, _Opts, Input, Skip, _Stack, _Value) ->
+    empty_error(Input, Skip).
+
 value(<<H/integer,Rest/bitstring>>, Opts, Input, Skip, Stack)
   when H =:= 32; H =:= 9; H =:= 10; H =:= 13 ->
     value(Rest, Opts, Input, Skip + 1, Stack);
@@ -469,28 +491,6 @@ escapeu_2(<<_/bitstring>> = Rest, Opts, Input, Skip, Stack, Acc, Last, X) ->
     C = 2 bsl 6 + Last band 63,
     D = [Acc, A, B, C],
     string(Rest, Opts, Input, Skip + 6, Stack, D, 0).
-
-key(<<H/integer,Rest/bitstring>>, Opts, Input, Skip, Stack)
-  when H =:= $\s; H =:= $\t; H =:= $\n; H =:= $\r ->
-    key(Rest, Opts, Input, Skip + 1, Stack);
-key(<<$"/integer,Rest/bitstring>>, Opts, Input, Skip, Stack) ->
-    string(Rest, Opts, Input, Skip + 1, [?key | Stack], 0);
-key(<<$}/integer,Rest/bitstring>>, Opts, Input, Skip, [[] | Stack]) ->
-    continue(Rest, Opts, Input, Skip + 1, Stack, #{});
-key(<<_/integer,_/bitstring>>, _Opts, Input, Skip, _Stack) ->
-    throw_error(Input, Skip);
-key(<<_/bitstring>>, _Opts, Input, Skip, _Stack) ->
-    empty_error(Input, Skip).
-
-key(<<H/integer,Rest/bitstring>>, Opts, Input, Skip, Stack, Value)
-  when H =:= $\s; H =:= $\t; H =:= $\n; H =:= $\r ->
-    key(Rest, Opts, Input, Skip + 1, Stack, Value);
-key(<<$:/integer,Rest/bitstring>>, Opts, Input, Skip, Stack, Value) ->
-    value(Rest, Opts, Input, Skip + 1, [?object, Value | Stack]);
-key(<<_/integer,_/bitstring>>, _Opts, Input, Skip, _Stack, _Value) ->
-    throw_error(Input, Skip);
-key(<<_/bitstring>>, _Opts, Input, Skip, _Stack, _Value) ->
-    empty_error(Input, Skip).
 
 number(<<Byte/integer,Rest/bitstring>>, Opts, Input, Skip, Stack, Len)
   when Byte >= $0 andalso Byte =< $9 ->
