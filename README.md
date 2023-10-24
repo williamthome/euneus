@@ -10,6 +10,10 @@ Like Thoas, both the parser and generator fully conform to
 
 ## Table of Contents
 
+- [Installation](#installation)
+    - [Erlang](#erlang)
+    - [Elixir](#elixir)
+- [Basic Usage](#basic-usage)
 - [Data Mapping](#data-mapping)
     - [Why not more built-in types?](#why-not-more-built-in-types)
 - [Differences to Thoas](#differences-to-thoas)
@@ -25,8 +29,61 @@ Like Thoas, both the parser and generator fully conform to
 - [Sponsors](#sponsors)
 - [Contributing](#contributing)
     - [Issues](#issues)
-    - [Installation](#installation)
+    - [Installation](#installation-1)
 - [License](#license)
+
+## Installation
+
+### Erlang
+
+```
+% rebar.config
+{deps, [euneus]}
+```
+
+### Elixir
+
+```
+# mix.exs
+def deps do
+  [{:euneus, "~> 0.1"}]
+end
+```
+
+## Basic Usage
+
+```erlang
+1> JSON = euneus:encode_to_binary(#{name => #{english => <<"Charmander">>, japanese => <<"ヒトカゲ"/utf8>>}, caught_at => erlang:timestamp(), type => [fire], profile => #{height => 0.6, weight => 8}, ability => #{0 => <<"Blaze">>, 1 => undefined}}).
+<<"{\"name\":{\"english\":\"Charmander\",\"japanese\":\"ヒトカゲ\"},\"profile\":{\"height\":0.6,\"weight\":8},\"type\":[\"fire\"],\"caught_at\":\"2023-10-24T05:47:04.939Z\",\"ability\":{\"0\":\"Blaze\",\"1\":null}}">>
+
+2> euneus:decode(JSON).
+{ok,#{<<"ability">> =>
+          #{<<"0">> => <<"Blaze">>,<<"1">> => undefined},
+      <<"caught_at">> => {1698,126333,753000},
+      <<"name">> =>
+          #{<<"english">> => <<"Charmander">>,
+            <<"japanese">> =>
+                <<227,131,146,227,131,136,227,130,171,227,130,178>>},
+      <<"profile">> => #{<<"height">> => 0.6,<<"weight">> => 8},
+      <<"type">> => [<<"fire">>]}}
+
+3> euneus:decode(JSON, #{
+    normalize_key => fun
+        (<<Char>> = Key, _Opts) when Char >= $0, Char =< $9 ->
+            binary_to_integer(Key);
+        (Key, _Opts) ->
+            binary_to_existing_atom(Key)
+    end
+}).
+{ok,#{name =>
+          #{english => <<"Charmander">>,
+            japanese =>
+                <<227,131,146,227,131,136,227,130,171,227,130,178>>},
+      profile => #{height => 0.6,weight => 8},
+      type => [<<"fire">>],
+      caught_at => {1698,126333,753000},
+      ability => #{0 => <<"Blaze">>,1 => undefined}}}
+```
 
 ## Data Mapping
 
