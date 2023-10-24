@@ -1,6 +1,5 @@
 %% @author William Fank Thomé <willilamthome@hotmail.com>
 %% @copyright 2023 William Fank Thomé
-%% @title Euneus
 %% @doc Core module to parse and generate JSON.
 
 %% Copyright 2023 William Fank Thomé
