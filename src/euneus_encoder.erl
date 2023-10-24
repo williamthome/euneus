@@ -85,10 +85,10 @@ parse_opts(Opts) ->
 
 key(Bin, #{encode_binary := Encode} = Opts) when is_binary(Bin) ->
     Encode(Bin, Opts);
-key(Atom, #{encode_atom := Encode} = Opts) when is_atom(Atom) ->
-    Encode(Atom, Opts);
-key(Int, #{encode_integer := Encode} = Opts) when is_integer(Int) ->
-    Encode(Int, Opts).
+key(Atom, #{encode_binary := Encode} = Opts) when is_atom(Atom) ->
+    Encode(atom_to_binary(Atom, utf8), Opts);
+key(Int, #{encode_binary := Encode} = Opts) when is_integer(Int) ->
+    Encode(integer_to_binary(Int), Opts).
 
 value(Bin, #{encode_binary := Encode} = Opts) when is_binary(Bin) ->
     Encode(Bin, Opts);
@@ -492,6 +492,7 @@ encode_test() ->
         {<<"123.456789">>, 123.45678900, #{}},
         {<<"[true,0,null]">>, [true, 0, undefined], #{}},
         {<<"{\"foo\":\"bar\"}">>, #{foo => bar}, #{}},
+        {<<"{\"0\":0}">>, #{0 => 0}, #{}},
         {<<"\"1970-01-01T00:00:00Z\"">>, {{1970,1,1},{0,0,0}}, #{}},
         {<<"\"1970-01-01T00:00:00.000Z\"">>, {0,0,0}, #{}}
     ]].
