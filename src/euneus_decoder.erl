@@ -1,14 +1,19 @@
 -module(euneus_decoder).
 
 -compile({inline, [
-    parse_opts/1, value/5, string/6, string/7, normalize_string/3,
-    chars_to_integer/2, chars_to_integer/3, chars_to_integer/4, escapeu/6,
-    escapeu_1/8, escapeu_2/8, escape_surrogate/7, escapeu_last/3, key/5,
-    key/6, number/6, number_exp_cont/6, number_exp_cont/7, number_exp_sign/6,
-    number_exp_sign/7, number_exp_copy/6, number_frac/6, number_frac_cont/6,
-    number_minus/5, number_zero/6, try_parse_float/3, object/6, array/6,
-    empty_array/5, continue/6, terminate/6, empty_error/2, throw_error/2,
-    throw_error/4, token_error/2, token_error/3
+    % misc
+    parse_opts/1, continue/6, terminate/6,
+    % values
+    string/6, number/6, object/6, array/6, empty_array/5,
+    % numbers
+    number_exp_cont/6, number_exp_sign/6, number_exp_copy/6, number_frac/6,
+    number_frac_cont/6, number_minus/5, number_zero/6, try_parse_float/3,
+    % helpers
+    chars_to_integer/2, chars_to_integer/3, chars_to_integer/4,
+    % escape
+    escapeu/6, escapeu_1/8, escapeu_2/8, escape_surrogate/7, escapeu_last/3,
+    % normalize
+    normalize_string/3, normalize_object/2, normalize_array/2
 ]}).
 -compile({inline_size, 100}).
 
@@ -40,14 +45,8 @@ decode(Data, Opts) when is_binary(Data) andalso is_map(Opts) ->
     end.
 
 parse_opts(Opts) ->
-    #{
-        null_term => maps:get(null_term, Opts, undefined),
-        normalize_key => maps:get(normalize_key, Opts, fun(K) ->
-            K
-        end),
-        normalize_string => maps:get(normalize_string, Opts, fun(S) ->
-            S
-        end)
+    Opts#{
+        null_term => maps:get(null_term, Opts, undefined)
     }.
 
 value(<<H/integer,Rest/bitstring>>, Opts, Input, Skip, Stack)
@@ -164,10 +163,14 @@ string(<<_/integer,_/bitstring>>, _Opts, Input, Skip, _Stack, _Acc, _Len) ->
 string(<<_/bitstring>>, _Opts, Input, Skip, _Stack, _Acc, Len) ->
     empty_error(Input, Skip + Len).
 
-normalize_string([?key | _], #{normalize_key := Normalize}, String) ->
-    Normalize(String);
-normalize_string(_Stack, #{normalize_string := Normalize}, String) ->
-    Normalize(String).
+normalize_string([?key | _], #{normalize_key := Normalize} = Opts, Key) ->
+    Normalize(Key, Opts);
+normalize_string([?key | _], _Opts, Key) ->
+    Key;
+normalize_string(_Stack, #{normalize_value := Normalize} = Opts, String) ->
+    Normalize(String, Opts);
+normalize_string(_Stack, _Opts, Value) ->
+    Value.
 
 chars_to_integer(N2, N1) ->
     ((N2 - $0) * 10) + (N1 - $0).
@@ -580,11 +583,17 @@ object(<<125/integer,Rest/bitstring>>, Opts, Input, Skip, Stack, Value) ->
     Skip2 = Skip + 1,
     [Key, Acc2 | Stack2] = Stack,
     Final = [{Key, Value} | Acc2],
-    continue(Rest, Opts, Input, Skip2, Stack2, maps:from_list(Final));
+    Map = normalize_object(Opts, maps:from_list(Final)),
+    continue(Rest, Opts, Input, Skip2, Stack2, Map);
 object(<<_/integer,_/bitstring>>, _Opts, Input, Skip, _Stack, _Value) ->
     throw_error(Input, Skip);
 object(<<_/bitstring>>, _Opts, Input, Skip, _Stack, _Value) ->
     empty_error(Input, Skip).
+
+normalize_object(#{normalize_object := Normalize} = Opts, Object) ->
+    Normalize(Object, Opts);
+normalize_object(_Opts, Object) ->
+    Object.
 
 array(<<H/integer,Rest/bitstring>>, Opts, Input, Skip, Stack, Value)
   when H =:= $\s; H =:= $\t; H =:= $\n; H =:= $\r ->
@@ -594,12 +603,17 @@ array(<<$,/integer,Rest/bitstring>>, Opts, Input, Skip, Stack, Value) ->
     value(Rest, Opts, Input, Skip + 1, [?array, [Value | Acc] | Stack2]);
 array(<<$]/integer,Rest/bitstring>>, Opts, Input, Skip, Stack, Value) ->
     [Acc | Stack2] = Stack,
-    Value2 = lists:reverse(Acc, [Value]),
-    continue(Rest, Opts, Input, Skip + 1, Stack2, Value2);
+    List = normalize_array(Opts, lists:reverse(Acc, [Value])),
+    continue(Rest, Opts, Input, Skip + 1, Stack2, List);
 array(<<_/integer,_/bitstring>>, _Opts, Input, Skip, _Stack, _Value) ->
     throw_error(Input, Skip);
 array(<<_/bitstring>>, _Opts, Input, Skip, _Stack, _Value) ->
     empty_error(Input, Skip).
+
+normalize_array(#{normalize_array := Normalize} = Opts, Array) ->
+    Normalize(Array, Opts);
+normalize_array(_Opts, Array) ->
+    Array.
 
 empty_array(<<Rest/bitstring>>, Opts, Input, Skip, [?array, [] | Stack]) ->
     continue(Rest, Opts, Input, Skip, Stack, []);
@@ -673,8 +687,8 @@ encode_test() ->
         , <<"{\"timestamp\": \"1970-01-01T00:00:00.000Z\"}">>, #{} },
         { {ok, #{foo => 1}}
         , <<"{\"foo\": \"1\"}">>
-        , #{ normalize_key => fun binary_to_existing_atom/1
-           , normalize_string => fun binary_to_integer/1 } }
+        , #{ normalize_key => fun(K, _) -> binary_to_existing_atom(K) end
+           , normalize_value => fun(V, _) -> binary_to_integer(V) end } }
     ]].
 
 -endif.
