@@ -231,7 +231,9 @@ The motivation for Euneus is [this PR](https://github.com/lpil/thoas/pull/28).
 
 ## Benchmarks
 
-All the benchmarks compare `Euneus` and `Thoas` using [Benchee](https://github.com/bencheeorg/benchee) through a Thoas fork. (There is a todo to embed benchmarks into Euneus)
+All the benchmarks compare `Euneus` and `Thoas` via [Benchee](https://github.com/bencheeorg/benchee) to obtain the results.
+
+Use `$ make bench.encode` or `$ make bench.decode` to run the benchmarks. Edit the scripts in the `./euneus_bench/script` folder if needed.
 
 > **Note**
 >
