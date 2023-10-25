@@ -308,7 +308,7 @@ Euneus is the twin brother of [Thoas](https://en.wikipedia.org/wiki/Thoas_(son_o
 
 - [ ] Improve docs
 - [ ] All specs
-- [ ] Embed benchmarks
+- [X] Embed benchmarks
 - [ ] Test suites
 
 ## Sponsors
