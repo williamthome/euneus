@@ -82,10 +82,10 @@ parse_opts(Opts) ->
         end)
     }.
 
-key(Bin, #{encode_binary := Encode} = Opts) when is_binary(Bin) ->
-    Encode(Bin, Opts);
 key(Atom, #{encode_binary := Encode} = Opts) when is_atom(Atom) ->
     Encode(atom_to_binary(Atom, utf8), Opts);
+key(Bin, #{encode_binary := Encode} = Opts) when is_binary(Bin) ->
+    Encode(Bin, Opts);
 key(Int, #{encode_binary := Encode} = Opts) when is_integer(Int) ->
     Encode(integer_to_binary(Int), Opts).
 
