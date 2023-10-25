@@ -1,21 +1,11 @@
 # EuneusBench
 
-**TODO: Add description**
+An Elixir project to run benchmarks.
 
-## Installation
+## Directory structure
 
-If [available in Hex](https://hex.pm/docs/publish), the package can be installed
-by adding `euneus_bench` to your list of dependencies in `mix.exs`:
+The scripts are in the `./script` folder and the JSON files are in `./priv/data`.
 
-```elixir
-def deps do
-  [
-    {:euneus_bench, "~> 0.1.0"}
-  ]
-end
-```
+## Running the scripts
 
-Documentation can be generated with [ExDoc](https://github.com/elixir-lang/ex_doc)
-and published on [HexDocs](https://hexdocs.pm). Once published, the docs can
-be found at <https://hexdocs.pm/euneus_bench>.
-
+Run the encode benchmark in the command line via `$ mix encode` and decode via `$ mix decode`.
