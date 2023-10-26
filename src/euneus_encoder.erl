@@ -137,27 +137,27 @@ encode_float(Float, _Opts) ->
     float_to_binary(Float, [short]).
 
 encode_list([H | T], Opts) ->
-    [$[, value(H, Opts) | do_encode_list_loop(T, Opts)];
+    [$[, value(H, Opts), do_encode_list_loop(T, Opts)];
 encode_list([], _Opts) ->
     <<"[]">>.
 
 do_encode_list_loop([H | T], Opts) ->
-    [$,, value(H, Opts) | do_encode_list_loop(T, Opts)];
+    [$,, value(H, Opts), do_encode_list_loop(T, Opts)];
 do_encode_list_loop([], _Opts) ->
-    [$]].
+    $].
 
 encode_map(Map, Opts) ->
     do_encode_map(maps:to_list(Map), Opts).
 
 do_encode_map([{K, V} | T], Opts) ->
-    [${, key(K, Opts), $:, value(V, Opts) | do_encode_map_loop(T, Opts)];
+    [${, key(K, Opts), $:, value(V, Opts), do_encode_map_loop(T, Opts)];
 do_encode_map([], _) ->
     <<"{}">>.
 
 do_encode_map_loop([{K, V} | T], Opts) ->
-    [$,, key(K, Opts), $:, value(V, Opts) | do_encode_map_loop(T, Opts)];
+    [$,, key(K, Opts), $:, value(V, Opts), do_encode_map_loop(T, Opts)];
 do_encode_map_loop([], _Opts) ->
-    [$}].
+    $}.
 
 encode_datetime({{YYYY,MM,DD},{H,M,S}}, Opts) ->
     DateTime = iolist_to_binary(io_lib:format(
