@@ -2,7 +2,7 @@
 
 A JSON parser and generator in pure Erlang.
 
-Euneus is a rewrite of [Thoas](thoas).
+Euneus is a rewrite of [Thoas][thoas].
 
 Like Thoas, both the parser and generator fully conform to
 [RFC 8259](https://tools.ietf.org/html/rfc8259) and
@@ -111,7 +111,7 @@ The goal of `Euneus` is to have built-in types that can be encoded and then deco
 
 ## Differences to Thoas
 
-Euneus is based on [Thoas](thoas), so let's discuss the differences.
+Euneus is based on [Thoas][thoas], so let's discuss the differences.
 
 The main difference between `Euneus` to `Thoas` is that Euneus gives more control to encoding or decoding data. All encode functions can be overridden and extended and all decoded data can be overridden and transformed.
 
@@ -298,7 +298,7 @@ Use `$ make bench.encode` or `$ make bench.decode` to run the benchmarks. Edit t
 
 ## Credits
 
-Euneus is a rewrite of Thoas, so all credits go to [Michał Muskała](https://github.com/michalmuskala), [Louis Pilfold](https://github.com/lpil), also both [Jason](jason) and [Thoas](thoas) contributors. Thanks for the hard work!
+Euneus is a rewrite of Thoas, so all credits go to [Michał Muskała](https://github.com/michalmuskala), [Louis Pilfold](https://github.com/lpil), also both [Jason][jason] and [Thoas][thoas] contributors. Thanks for the hard work!
 
 ## Why the name Euneus?
 
@@ -345,7 +345,7 @@ Euneus is released under the [Apache License 2.0](LICENSE.md).
 
 Euneus is based off of [Thoas][thoas], which is also Apache 2.0 licensed.
 
-Some elements have their origins in the [Poison library](poison) and were initially licensed under [CC0-1.0](https://creativecommons.org/publicdomain/zero/1.0/).
+Some elements have their origins in the [Poison library][poison] and were initially licensed under [CC0-1.0](https://creativecommons.org/publicdomain/zero/1.0/).
 
 [jason]: https://github.com/michalmuskala/jason
 [thoas]: https://github.com/lpil/thoas
