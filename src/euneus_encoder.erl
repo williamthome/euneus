@@ -43,8 +43,32 @@
 -export([ escape_binary/2, escape_byte/1 ]).
 -export([ escape_json/1, escape_html/1, escape_js/1, escape_unicode/1 ]).
 
+-export_type([ options/0 ]).
+
 -define(min(X, Min), is_integer(X) andalso X >= Min).
 -define(range(X, Min, Max), is_integer(X) andalso X >= Min andalso X =< Max).
+
+-type encode(Type) :: fun((Type, options()) -> iolist()).
+-type escape(Type) :: fun((Type, options()) -> iolist()).
+
+-type options() :: #{
+    null_terms => list(),
+    encode_binary => encode(binary()),
+    encode_atom => encode(atom()),
+    encode_integer => encode(integer()),
+    encode_float => encode(float()),
+    encode_list => encode(list()),
+    encode_map => encode(map()),
+    encode_datetime => encode(calendar:datetime()),
+    encode_timestamp => encode(erlang:timestamp()),
+    encode_unhandled => encode(term()),
+    escape_binary => escape(binary())
+}.
+
+-spec encode(Term, Opts) -> Return when
+    Term :: term(),
+    Opts :: options(),
+    Return :: iolist().
 
 encode(Term, Opts) ->
     value(Term, parse_opts(Opts)).

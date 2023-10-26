@@ -36,6 +36,8 @@
 
 -export([ decode/2 ]).
 
+-export_type([ options/0 ]).
+
 % Use integers instead of atoms to take advantage of the jump table optimization.
 -define(terminate, 0).
 -define(array, 1).
@@ -44,20 +46,35 @@
 
 -define(is_number(X), X >= $0, X =< $9).
 
-decode(Data, Opts) when is_binary(Data) andalso is_map(Opts) ->
+-type normalize(Type) :: fun((Type, options()) -> term()).
+
+-type options() :: #{
+    null_term => term(),
+    normalize_key => normalize(binary()),
+    normalize_value => normalize(binary()),
+    normalize_array => normalize(list()),
+    normalize_object => normalize(map())
+}.
+
+-spec decode(Bin, Opts) -> Result when
+    Bin :: binary(),
+    Opts :: options(),
+    Result :: term().
+
+decode(Bin, Opts) when is_binary(Bin) andalso is_map(Opts) ->
     try
-        {ok, value(Data, parse_opts(Opts), Data, 0, [?terminate])}
+        {ok, value(Bin, parse_opts(Opts), Bin, 0, [?terminate])}
     catch
-        throw:{position, Position}:_ ->
-            case Position == byte_size(Data) of
+        throw:{position, Position} ->
+            case Position == byte_size(Bin) of
                 true ->
                     {error, unexpected_end_of_input};
                 false ->
-                    Byte = binary:at(Data, Position),
+                    Byte = binary:at(Bin, Position),
                     Hex = integer_to_binary(Byte, 16),
                     {error, {unexpected_byte, <<"0x"/utf8,Hex/binary>>, Position}}
             end;
-        throw:{token, Token, Position}:_ ->
+        throw:{token, Token, Position} ->
             {error, {unexpected_sequence, Token, Position}}
     end.
 

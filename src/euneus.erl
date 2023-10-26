@@ -23,20 +23,47 @@
 -export([ encode_to_binary/1, encode_to_binary/2 ]).
 -export([ decode/1, decode/2 ]).
 
+-spec encode(Term) -> Return when
+    Term :: term(),
+    Return :: iolist().
+
 encode(Term) ->
     encode(Term, #{}).
+
+-spec encode(Term, Opts) -> Return when
+    Term :: term(),
+    Opts :: euneus_encoder:options(),
+    Return :: iolist().
 
 encode(Term, Opts) ->
     euneus_encoder:encode(Term, Opts).
 
+-spec encode_to_binary(Term) -> Return when
+    Term :: term(),
+    Return :: binary().
+
 encode_to_binary(Term) ->
     encode_to_binary(Term, #{}).
+
+-spec encode_to_binary(Term, Opts) -> Return when
+    Term :: term(),
+    Opts :: euneus_encoder:options(),
+    Return :: binary().
 
 encode_to_binary(Term, Opts) ->
     iolist_to_binary(encode(Term, Opts)).
 
+-spec decode(Bin) -> Result when
+    Bin :: binary(),
+    Result :: term().
+
 decode(Bin) ->
     decode(Bin, #{}).
+
+-spec decode(Bin, Opts) -> Result when
+    Bin :: binary(),
+    Opts :: euneus_decoder:options(),
+    Result :: term().
 
 decode(Bin, Opts) ->
     euneus_decoder:decode(Bin, Opts).
