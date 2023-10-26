@@ -178,11 +178,11 @@ string(<<_/bitstring>>, _Opts, Input, Skip, _Stack, Len) ->
 
 string(<<$"/integer,Rest/bitstring>>, Opts, Input, Skip, Stack, Acc, Len) ->
     Last = binary_part(Input, Skip, Len),
-    String = iolist_to_binary([Acc | Last]),
+    String = iolist_to_binary([Acc, Last]),
     continue(Rest, Opts, Input, Skip + Len + 1, Stack, String);
 string(<<$\\/integer,Rest/bitstring>>, Opts, Input, Skip, Stack, Acc, Len) ->
     Part = binary_part(Input, Skip, Len),
-    escape(Rest, Opts, Input, Skip + Len, Stack, [Acc | Part]);
+    escape(Rest, Opts, Input, Skip + Len, Stack, [Acc, Part]);
 string(<<H/integer,_/bitstring>>, _Opts, Input, Skip, _Stack, _Acc, _Len)
   when H < 32 ->
     throw_error(Input, Skip);
@@ -473,7 +473,7 @@ escape_surrogate(<<92/integer, 117/integer, Int1:16/integer, Int2:16/integer, Re
         _ -> token_error(Input, Skip, 12)
     end,
     Y = X band 3 bsl 8 + Last,
-    Acc = [Acc0 | <<(Hi + Y)/utf8>>],
+    Acc = [Acc0, <<(Hi + Y)/utf8>>],
     string(Rest, Opts, Input, Skip + 12, Stack, Acc, 0);
 escape_surrogate(<<_Rest/bitstring>>, _Opts, Input, Skip, _Stack, _Acc, _Hi) ->
     throw_error(Input, Skip + 6).
