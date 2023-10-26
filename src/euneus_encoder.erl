@@ -29,6 +29,10 @@
 ]}).
 -compile({inline_size, 100}).
 
+% By default, encode_unhandled/2 will raise unsupported_type exception,
+% so it is a function without a local return.
+-dialyzer({no_return, [parse_opts/1, encode_unhandled/2]}).
+
 -export([ encode/2 ]).
 -export([
     encode_binary/2, encode_atom/2, encode_integer/2, encode_float/2,
