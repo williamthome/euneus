@@ -17,7 +17,7 @@
 %% limitations under the License.
 -module(euneus).
 
--compile({inline, [ encode/1, encode_to_binary/1, encode_to_binary/2, decode/1 ]}).
+-compile({inline, [ encode/2, encode_to_binary/2, decode/2 ]}).
 
 -export([ encode/1, encode/2 ]).
 -export([ encode_to_binary/1, encode_to_binary/2 ]).
