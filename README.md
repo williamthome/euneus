@@ -171,7 +171,7 @@ EncodeOpts = #{
                     euneus_encoder:escape_binary(IpBin, Opts)
             end;
         (Term, Opts) ->
-            euneus_encoder:unsupported_type_error(Term, Opts)
+            euneus_encoder:throw_unsupported_type_error(Term, Opts)
     end
 },
 Data = #{<<"foo">> => bar, ipv4 => {127, 0, 0, 1}, none => undefined},
