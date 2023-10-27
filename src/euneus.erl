@@ -17,26 +17,58 @@
 %% limitations under the License.
 -module(euneus).
 
--compile({inline, [ encode/1, encode_to_binary/1, encode_to_binary/2, decode/1 ]}).
+-compile({inline, [ encode/2, encode_to_binary/2, decode/2 ]}).
 
 -export([ encode/1, encode/2 ]).
 -export([ encode_to_binary/1, encode_to_binary/2 ]).
 -export([ decode/1, decode/2 ]).
 
-encode(Term) ->
-    encode(Term, #{}).
+-spec encode(Input) -> Return when
+    Input :: euneus_encoder:input(),
+    Return :: euneus_encoder:result().
 
-encode(Term, Opts) ->
-    euneus_encoder:encode(Term, Opts).
+encode(Input) ->
+    encode(Input, #{}).
 
-encode_to_binary(Term) ->
-    encode_to_binary(Term, #{}).
+-spec encode(Input, Opts) -> Return when
+    Input :: euneus_encoder:input(),
+    Opts :: euneus_encoder:options(),
+    Return :: euneus_encoder:result().
 
-encode_to_binary(Term, Opts) ->
-    iolist_to_binary(encode(Term, Opts)).
+encode(Input, Opts) ->
+    euneus_encoder:encode(Input, Opts).
 
-decode(Bin) ->
-    decode(Bin, #{}).
+-spec encode_to_binary(Input) -> Return when
+    Input :: euneus_encoder:input(),
+    Return :: {ok, binary()} | {error, euneus_encoder:error_reason()}.
 
-decode(Bin, Opts) ->
-    euneus_decoder:decode(Bin, Opts).
+encode_to_binary(Input) ->
+    encode_to_binary(Input, #{}).
+
+-spec encode_to_binary(Input, Opts) -> Return when
+    Input :: euneus_encoder:input(),
+    Opts :: euneus_encoder:options(),
+    Return :: {ok, binary()} | {error, euneus_encoder:error_reason()}.
+
+encode_to_binary(Input, Opts) ->
+    case encode(Input, Opts) of
+        {ok, Result} ->
+            {ok, iolist_to_binary(Result)};
+        {error, Reason} ->
+            {error, Reason}
+    end.
+
+-spec decode(Input) -> Result when
+    Input :: euneus_decoder:input(),
+    Result :: euneus_decoder:result().
+
+decode(Input) ->
+    decode(Input, #{}).
+
+-spec decode(Input, Opts) -> Result when
+    Input :: euneus_decoder:input(),
+    Opts :: euneus_decoder:options(),
+    Result :: euneus_decoder:result().
+
+decode(Input, Opts) ->
+    euneus_decoder:decode(Input, Opts).

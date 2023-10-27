@@ -18,8 +18,8 @@ defmodule EuneusBench.Helper do
       memory_time: Map.get(opts, :memory_time, 1),
       inputs: inputs,
       formatters: [
+        Benchee.Formatters.Console,
         {Benchee.Formatters.HTML, file: Path.expand("../tmp/#{label}.html", __DIR__)},
-        Benchee.Formatters.Console
       ]
     )
   end
