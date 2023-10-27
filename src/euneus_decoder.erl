@@ -618,17 +618,13 @@ number_zero(<<Rest/bitstring>>, Opts, Input, Skip, Stack, Len) ->
 object(<<H/integer,Rest/bitstring>>, Opts, Input, Skip, Stack, Value)
   when H =:= 32; H =:= 9; H =:= 10; H =:= 13 ->
     object(Rest, Opts, Input, Skip + 1, Stack, Value);
-object(<<44/integer,Rest/bitstring>>, Opts, Input, Skip, Stack, Value) ->
-    Skip2 = Skip + 1,
-    [Key, Acc | Stack2] = Stack,
-    Acc2 = [{Key, Value} | Acc],
-    key(Rest, Opts, Input, Skip2, [Acc2 | Stack2]);
-object(<<125/integer,Rest/bitstring>>, Opts, Input, Skip, Stack, Value) ->
-    Skip2 = Skip + 1,
-    [Key, Acc2 | Stack2] = Stack,
-    Final = [{Key, Value} | Acc2],
-    Map = normalize_object(Opts, maps:from_list(Final)),
-    continue(Rest, Opts, Input, Skip2, Stack2, Map);
+object(<<44/integer,Rest/bitstring>>, Opts, Input, Skip, [Key, Acc0 | Stack], Value) ->
+    Acc = [{Key, Value} | Acc0],
+    key(Rest, Opts, Input, Skip + 1, [Acc | Stack]);
+object(<<125/integer,Rest/bitstring>>, Opts, Input, Skip, [Key, Acc0 | Stack], Value) ->
+    Acc = [{Key, Value} | Acc0],
+    Map = normalize_object(Opts, maps:from_list(Acc)),
+    continue(Rest, Opts, Input, Skip + 1, Stack, Map);
 object(<<_/integer,_/bitstring>>, _Opts, Input, Skip, _Stack, _Value) ->
     throw_error(Input, Skip);
 object(<<_/bitstring>>, _Opts, Input, Skip, _Stack, _Value) ->
