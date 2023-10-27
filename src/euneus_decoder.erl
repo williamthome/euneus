@@ -655,12 +655,8 @@ normalize_array(#{normalize_array := Normalize} = Opts, Array) ->
 normalize_array(_Opts, Array) ->
     Array.
 
-empty_array(<<Rest/bitstring>>, Opts, Input, Skip, [?array, [] | Stack]) ->
-    continue(Rest, Opts, Input, Skip, Stack, []);
-empty_array(<<_/integer,_/bitstring>>, _Opts, Input, Skip, _Stack) ->
-    throw_error(Input, Skip - 1);
-empty_array(<<_/bitstring>>, _Opts, Input, Skip, _Stack) ->
-    empty_error(Input, Skip).
+empty_array(Rest, Opts, Input, Skip, [?array, [] | Stack]) ->
+    continue(Rest, Opts, Input, Skip, Stack, []).
 
 continue(Rest, Opts, Input, Skip, [?key | Stack], Value) ->
     key(Rest, Opts, Input, Skip, Stack, Value);
