@@ -519,7 +519,7 @@ escapeu_2(<<_/bitstring>> = Rest, Opts, Input, Skip, Stack, Acc, Last, X) ->
     string(Rest, Opts, Input, Skip + 6, Stack, D, 0).
 
 number(<<Byte/integer,Rest/bitstring>>, Opts, Input, Skip, Stack, Len)
-  when Byte >= $0 andalso Byte =< $9 ->
+  when ?is_number(Byte) ->
     number(Rest, Opts, Input, Skip, Stack, Len + 1);
 number(<<$./integer,Rest/bitstring>>, Opts, Input, Skip, Stack, Len) ->
     number_frac(Rest, Opts, Input, Skip, Stack, Len + 1);
@@ -532,7 +532,7 @@ number(<<Rest/bitstring>>, Opts, Input, Skip, Stack, Len) ->
     continue(Rest, Opts, Input, Skip + Len, Stack, Int).
 
 number_exp(<<Byte/integer,Rest/bitstring>>, Opts, Input, Skip, Stack, Len)
-  when Byte >= $0 andalso Byte =< $9 ->
+  when ?is_number(Byte) ->
     number_exp_cont(Rest, Opts, Input, Skip, Stack, Len + 1);
 number_exp(<<Byte/integer,Rest/bitstring>>, Opts, Input, Skip, Stack, Len)
   when Byte =:= $+ orelse Byte =:= $- ->
@@ -541,7 +541,7 @@ number_exp(<<_Rest/bitstring>>, _Opts, Input, Skip, _Stack, Len) ->
     throw_error(Input, Skip + Len).
 
 number_exp_cont(<<Byte/integer,Rest/bitstring>>, Opts, Input, Skip, Stack, Len)
-  when Byte >= $0 andalso Byte =< $9 ->
+  when ?is_number(Byte) ->
     number_exp_cont(Rest, Opts, Input, Skip, Stack, Len + 1);
 number_exp_cont(<<Rest/bitstring>>, Opts, Input, Skip, Stack, Len) ->
     Token = binary_part(Input, Skip, Len),
@@ -549,7 +549,7 @@ number_exp_cont(<<Rest/bitstring>>, Opts, Input, Skip, Stack, Len) ->
     continue(Rest, Opts, Input, Skip + Len, Stack, Float).
 
 number_exp_cont(<<Byte/integer,Rest/bitstring>>, Opts, Input, Skip, Stack, Prefix, Len)
-  when Byte >= $0 andalso Byte =< $9 ->
+  when ?is_number(Byte) ->
     number_exp_cont(Rest, Opts, Input, Skip, Stack, Prefix, Len + 1);
 number_exp_cont(<<Rest/bitstring>>, Opts, Input, Skip, Stack, Prefix, Len) ->
     Suffix = binary_part(Input, Skip, Len),
@@ -562,7 +562,7 @@ number_exp_cont(<<Rest/bitstring>>, Opts, Input, Skip, Stack, Prefix, Len) ->
     continue(Rest, Opts, Input, FinalSkip, Stack, Float).
 
 number_exp_copy(<<Byte/integer,Rest/bitstring>>, Opts, Input, Skip, Stack, Prefix)
-  when Byte >= $0 andalso Byte =< $9 ->
+  when ?is_number(Byte) ->
     number_exp_cont(Rest, Opts, Input, Skip, Stack, Prefix, 1);
 number_exp_copy(<<Byte/integer,Rest/bitstring>>, Opts, Input, Skip, Stack, Prefix)
   when Byte =:= $+ orelse Byte =:= $- ->
@@ -571,25 +571,25 @@ number_exp_copy(<<_Rest/bitstring>>, _Opts, Input, Skip, _Stack, _Prefix) ->
     throw_error(Input, Skip).
 
 number_exp_sign(<<Byte/integer,Rest/bitstring>>, Opts, Input, Skip, Stack, Len)
-  when Byte >= $0 andalso Byte =< $9 ->
+  when ?is_number(Byte) ->
     number_exp_cont(Rest, Opts, Input, Skip, Stack, Len + 1);
 number_exp_sign(<<_Rest/bitstring>>, _Opts, Input, Skip, _Stack, Len) ->
     throw_error(Input, Skip + Len).
 
 number_exp_sign(<<Byte/integer,Rest/bitstring>>, Opts, Input, Skip, Stack, Prefix, Len)
-  when Byte >= $0 andalso Byte =< $9 ->
+  when ?is_number(Byte) ->
     number_exp_cont(Rest, Opts, Input, Skip, Stack, Prefix, Len + 1);
 number_exp_sign(<<_Rest/bitstring>>, _Opts, Input, Skip, _Stack, _Prefix, Len) ->
     throw_error(Input, Skip + Len).
 
 number_frac(<<Byte/integer,Rest/bitstring>>, Opts, Input, Skip, Stack, Len)
-  when Byte >= $0 andalso Byte =< $9 ->
+  when ?is_number(Byte) ->
     number_frac_cont(Rest, Opts, Input, Skip, Stack, Len + 1);
 number_frac(<<_Rest/bitstring>>, _Opts, Input, Skip, _Stack, Len) ->
     throw_error(Input, Skip + Len).
 
 number_frac_cont(<<Byte/integer,Rest/bitstring>>, Opts, Input, Skip, Stack, Len)
-  when Byte >= $0 andalso Byte =< $9 ->
+  when ?is_number(Byte) ->
     number_frac_cont(Rest, Opts, Input, Skip, Stack, Len + 1);
 number_frac_cont(<<E/integer,Rest/bitstring>>, Opts, Input, Skip, Stack, Len)
   when E =:= $e orelse E =:= $E ->
@@ -602,7 +602,7 @@ number_frac_cont(<<Rest/bitstring>>, Opts, Input, Skip, Stack, Len) ->
 number_minus(<<48/integer,Rest/bitstring>>, Opts, Input, Skip, Stack) ->
     number_zero(Rest, Opts, Input, Skip, Stack, 2);
 number_minus(<<Byte/integer,Rest/bitstring>>, Opts, Input, Skip, Stack)
-  when Byte >= $0 andalso Byte =< $9 ->
+  when ?is_number(Byte) ->
     number(Rest, Opts, Input, Skip, Stack, 2);
 number_minus(<<_Rest/bitstring>>, _Opts, Input, Skip, _Stack) ->
     throw_error(Input, Skip + 1).
