@@ -36,7 +36,7 @@
 
 -export([ decode/2 ]).
 
--export_type([ options/0 ]).
+-export_type([ input/0, options/0, result/0, error_reason/0 ]).
 
 % Use integers instead of atoms to take advantage of the jump table optimization.
 -define(terminate, 0).
@@ -46,20 +46,30 @@
 
 -define(is_number(X), X >= $0, X =< $9).
 
--type normalize(Type) :: fun((Type, options()) -> term()).
+-type input() :: binary().
 
 -type options() :: #{
     null_term => term(),
-    normalize_key => normalize(binary()),
-    normalize_value => normalize(binary()),
-    normalize_array => normalize(list()),
-    normalize_object => normalize(map())
+    normalize_key => normalize_fun(Input :: binary()),
+    normalize_value => normalize_fun(Input :: binary()),
+    normalize_array => normalize_fun(Input :: list()),
+    normalize_object => normalize_fun(Input :: map())
 }.
 
+-type position() :: non_neg_integer().
+
+-type error_reason() :: unexpected_end_of_input
+                      | {unexpected_byte, binary(), position()}
+                      | {unexpected_sequence, binary(), position()}.
+
+-type result() :: {ok, term()} | {error, error_reason()}.
+
+-type normalize_fun(Input) :: fun((Input, options()) -> term()).
+
 -spec decode(Bin, Opts) -> Result when
-    Bin :: binary(),
+    Bin :: input(),
     Opts :: options(),
-    Result :: term().
+    Result :: result().
 
 decode(Bin, Opts) when is_binary(Bin) andalso is_map(Opts) ->
     try

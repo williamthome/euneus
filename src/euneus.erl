@@ -23,47 +23,52 @@
 -export([ encode_to_binary/1, encode_to_binary/2 ]).
 -export([ decode/1, decode/2 ]).
 
--spec encode(Term) -> Return when
-    Term :: term(),
-    Return :: iolist().
+-spec encode(Input) -> Return when
+    Input :: euneus_encoder:input(),
+    Return :: euneus_encoder:result().
 
-encode(Term) ->
-    encode(Term, #{}).
+encode(Input) ->
+    encode(Input, #{}).
 
--spec encode(Term, Opts) -> Return when
-    Term :: term(),
+-spec encode(Input, Opts) -> Return when
+    Input :: euneus_encoder:input(),
     Opts :: euneus_encoder:options(),
-    Return :: iolist().
+    Return :: euneus_encoder:result().
 
-encode(Term, Opts) ->
-    euneus_encoder:encode(Term, Opts).
+encode(Input, Opts) ->
+    euneus_encoder:encode(Input, Opts).
 
--spec encode_to_binary(Term) -> Return when
-    Term :: term(),
-    Return :: binary().
+-spec encode_to_binary(Input) -> Return when
+    Input :: euneus_encoder:input(),
+    Return :: {ok, binary()} | {error, euneus_encoder:error_reason()}.
 
-encode_to_binary(Term) ->
-    encode_to_binary(Term, #{}).
+encode_to_binary(Input) ->
+    encode_to_binary(Input, #{}).
 
--spec encode_to_binary(Term, Opts) -> Return when
-    Term :: term(),
+-spec encode_to_binary(Input, Opts) -> Return when
+    Input :: euneus_encoder:input(),
     Opts :: euneus_encoder:options(),
-    Return :: binary().
+    Return :: {ok, binary()} | {error, euneus_encoder:error_reason()}.
 
-encode_to_binary(Term, Opts) ->
-    iolist_to_binary(encode(Term, Opts)).
+encode_to_binary(Input, Opts) ->
+    case encode(Input, Opts) of
+        {ok, Result} ->
+            {ok, iolist_to_binary(Result)};
+        {error, Reason} ->
+            {error, Reason}
+    end.
 
--spec decode(Bin) -> Result when
-    Bin :: binary(),
-    Result :: term().
+-spec decode(Input) -> Result when
+    Input :: euneus_decoder:input(),
+    Result :: euneus_decoder:result().
 
-decode(Bin) ->
-    decode(Bin, #{}).
+decode(Input) ->
+    decode(Input, #{}).
 
--spec decode(Bin, Opts) -> Result when
-    Bin :: binary(),
+-spec decode(Input, Opts) -> Result when
+    Input :: euneus_decoder:input(),
     Opts :: euneus_decoder:options(),
-    Result :: term().
+    Result :: euneus_decoder:result().
 
-decode(Bin, Opts) ->
-    euneus_decoder:decode(Bin, Opts).
+decode(Input, Opts) ->
+    euneus_decoder:decode(Input, Opts).
