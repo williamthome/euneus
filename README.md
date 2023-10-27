@@ -53,8 +53,8 @@ end
 ## Basic Usage
 
 ```erlang
-1> JSON = euneus:encode_to_binary(#{name => #{english => <<"Charmander">>, japanese => <<"ヒトカゲ"/utf8>>}, caught_at => erlang:timestamp(), type => [fire], profile => #{height => 0.6, weight => 8}, ability => #{0 => <<"Blaze">>, 1 => undefined}}).
-<<"{\"name\":{\"english\":\"Charmander\",\"japanese\":\"ヒトカゲ\"},\"profile\":{\"height\":0.6,\"weight\":8},\"type\":[\"fire\"],\"caught_at\":\"2023-10-24T05:47:04.939Z\",\"ability\":{\"0\":\"Blaze\",\"1\":null}}">>
+1> {ok, JSON} = euneus:encode_to_binary(#{name => #{english => <<"Charmander">>, japanese => <<"ヒトカゲ"/utf8>>}, caught_at => erlang:timestamp(), type => [fire], profile => #{height => 0.6, weight => 8}, ability => #{0 => <<"Blaze">>, 1 => undefined}}).
+{ok, <<"{\"name\":{\"english\":\"Charmander\",\"japanese\":\"ヒトカゲ\"},\"profile\":{\"height\":0.6,\"weight\":8},\"type\":[\"fire\"],\"caught_at\":\"2023-10-24T05:47:04.939Z\",\"ability\":{\"0\":\"Blaze\",\"1\":null}}">>}
 
 2> euneus:decode(JSON).
 {ok,#{<<"ability">> =>
@@ -176,7 +176,7 @@ EncodeOpts = #{
 },
 Data = #{<<"foo">> => bar, ipv4 => {127, 0, 0, 1}, none => undefined},
 euneus:encode_to_binary(Data, EncodeOpts).
-%% <<"{\"bar\":\"bar\",\"ipv4\":\"127.0.0.1\",\"none\":null}">>
+%% {ok, <<"{\"bar\":\"bar\",\"ipv4\":\"127.0.0.1\",\"none\":null}">>}
 ```
 
 ### Decode
