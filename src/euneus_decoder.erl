@@ -702,7 +702,7 @@ try_parse_float(Bin, Token, Skip) ->
 
 -include_lib("eunit/include/eunit.hrl").
 
-encode_test() ->
+decode_test() ->
     [ ?assertEqual(Expect, decode(Input, Opts))
       || {Expect, Input, Opts} <- [
         {{ok, <<"foo">>}, <<"\"foo\"">>, #{}},
