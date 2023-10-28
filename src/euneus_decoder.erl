@@ -46,7 +46,7 @@
 
 -define(is_number(X), X >= $0, X =< $9).
 
--type input() :: binary().
+-type input() :: binary() | iolist().
 
 -type options() :: #{
     null_term => term(),
@@ -66,8 +66,8 @@
 
 -type normalize_fun(Input) :: fun((Input, options()) -> term()).
 
--spec decode(Bin, Opts) -> Result when
-    Bin :: input(),
+-spec decode(Input, Opts) -> Result when
+    Input :: input(),
     Opts :: options(),
     Result :: result().
 
@@ -86,6 +86,21 @@ decode(Bin, Opts) when is_binary(Bin) andalso is_map(Opts) ->
             end;
         throw:{token, Token, Position} ->
             {error, {unexpected_sequence, Token, Position}}
+    end;
+decode(MaybeIOList, Opts) ->
+    case attempt_iolist_to_binary(MaybeIOList) of
+        {ok, Bin} ->
+            decode(Bin, Opts);
+        {error, Reason} ->
+            {error, Reason}
+    end.
+
+attempt_iolist_to_binary(IOList) ->
+    try
+        {ok, iolist_to_binary(IOList)}
+    catch
+        error:badarg ->
+            {error, not_an_iodata}
     end.
 
 parse_opts(Opts) ->
@@ -702,7 +717,7 @@ try_parse_float(Bin, Token, Skip) ->
 
 -include_lib("eunit/include/eunit.hrl").
 
-encode_test() ->
+decode_test() ->
     [ ?assertEqual(Expect, decode(Input, Opts))
       || {Expect, Input, Opts} <- [
         {{ok, <<"foo">>}, <<"\"foo\"">>, #{}},
@@ -724,7 +739,8 @@ encode_test() ->
         { {ok, #{foo => 1}}
         , <<"{\"foo\": \"1\"}">>
         , #{ normalize_key => fun(K, _) -> binary_to_existing_atom(K) end
-           , normalize_value => fun(V, _) -> binary_to_integer(V) end } }
+           , normalize_value => fun(V, _) -> binary_to_integer(V) end } },
+        {{error, not_an_iodata}, error, #{}}
     ]].
 
 -endif.
