@@ -50,10 +50,10 @@
 
 -type options() :: #{
     null_term => term(),
-    normalize_key => normalize_fun(Input :: binary()),
-    normalize_value => normalize_fun(Input :: binary()),
-    normalize_array => normalize_fun(Input :: list()),
-    normalize_object => normalize_fun(Input :: map())
+    key_normalizer => normalizer(Input :: binary()),
+    value_normalizer => normalizer(Input :: binary()),
+    array_normalizer => normalizer(Input :: list()),
+    object_normalizer => normalizer(Input :: map())
 }.
 
 -type position() :: non_neg_integer().
@@ -64,7 +64,7 @@
 
 -type result() :: {ok, term()} | {error, error_reason()}.
 
--type normalize_fun(Input) :: fun((Input, options()) -> term()).
+-type normalizer(Input) :: fun((Input, options()) -> term()).
 
 -spec decode(Input, Opts) -> Result when
     Input :: input(),
@@ -244,11 +244,11 @@ string(<<_/integer,_/bitstring>>, _Opts, Input, Skip, _Stack, _Acc, _Len) ->
 string(<<_/bitstring>>, _Opts, Input, Skip, _Stack, _Acc, Len) ->
     empty_error(Input, Skip + Len).
 
-normalize_string([?key | _], #{normalize_key := Normalize} = Opts, Key) ->
+normalize_string([?key | _], #{key_normalizer := Normalize} = Opts, Key) ->
     Normalize(Key, Opts);
 normalize_string([?key | _], _Opts, Key) ->
     Key;
-normalize_string(_Stack, #{normalize_value := Normalize} = Opts, String) ->
+normalize_string(_Stack, #{value_normalizer := Normalize} = Opts, String) ->
     Normalize(String, Opts);
 normalize_string(_Stack, _Opts, Value) ->
     Value.
@@ -645,7 +645,7 @@ object(<<_/integer,_/bitstring>>, _Opts, Input, Skip, _Stack, _Value) ->
 object(<<_/bitstring>>, _Opts, Input, Skip, _Stack, _Value) ->
     empty_error(Input, Skip).
 
-normalize_object(#{normalize_object := Normalize} = Opts, Object) ->
+normalize_object(#{object_normalizer := Normalize} = Opts, Object) ->
     Normalize(Object, Opts);
 normalize_object(_Opts, Object) ->
     Object.
@@ -665,7 +665,7 @@ array(<<_/integer,_/bitstring>>, _Opts, Input, Skip, _Stack, _Value) ->
 array(<<_/bitstring>>, _Opts, Input, Skip, _Stack, _Value) ->
     empty_error(Input, Skip).
 
-normalize_array(#{normalize_array := Normalize} = Opts, Array) ->
+normalize_array(#{array_normalizer := Normalize} = Opts, Array) ->
     Normalize(Array, Opts);
 normalize_array(_Opts, Array) ->
     Array.
@@ -738,8 +738,8 @@ decode_test() ->
         , <<"{\"timestamp\": \"1970-01-01T00:00:00.000Z\"}">>, #{} },
         { {ok, #{foo => 1}}
         , <<"{\"foo\": \"1\"}">>
-        , #{ normalize_key => fun(K, _) -> binary_to_existing_atom(K) end
-           , normalize_value => fun(V, _) -> binary_to_integer(V) end } },
+        , #{ key_normalizer => fun(K, _) -> binary_to_existing_atom(K) end
+           , value_normalizer => fun(V, _) -> binary_to_integer(V) end } },
         {{error, not_an_iodata}, error, #{}}
     ]].
 

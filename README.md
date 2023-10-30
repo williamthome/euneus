@@ -68,7 +68,7 @@ end
       <<"type">> => [<<"fire">>]}}
 
 3> euneus:decode(JSON, #{
-    normalize_key => fun
+    key_normalizer => fun
         (<<Char>> = Key, _Opts) when Char >= $0, Char =< $9 ->
             binary_to_integer(Key);
         (Key, _Opts) ->
@@ -102,8 +102,8 @@ end
 | 123                  	| #{}                                                                                                                                                      	| 123                         	| #{}                                                                                                                      	| 123                  	|
 | 123.45600            	| #{}                                                                                                                                                      	| 123.456                     	| #{}                                                                                                                      	| 123.456              	|
 | [true,0,undefined]   	| #{}                                                                                                                                                      	| [true,0,null]               	| #{null_term => nil}                                                                                                      	| [true,0,nil]         	|
-| #{foo => bar}        	| #{}                                                                                                                                                      	| {"foo":"bar"}               	| #{normalize_key => fun(Key, _Opts) -> binary_to_atom(Key) end}                                                           	| #{foo => <<"bar">>}  	|
-| {myrecord, val}      	| #{encode_unhandled => fun({myrecord, Val}, Opts) -><br>    Encode = maps:get(encode_list, Opts),<br>    Encode([myrecord, #{key => Val}], Opts)<br>end}) 	| ["myrecord", {"key":"val"}] 	| #{normalize_array => fun([<<"myrecord">>, #{<<"key">> := Val}], _Opts) -><br>    {myrecord, binary_to_atom(Val)}<br>end} 	| {myrecord, val}      	|
+| #{foo => bar}        	| #{}                                                                                                                                                      	| {"foo":"bar"}               	| #{key_normalizer => fun(Key, _Opts) -> binary_to_atom(Key) end}                                                           	| #{foo => <<"bar">>}  	|
+| {myrecord, val}      	| #{encode_unhandled => fun({myrecord, Val}, Opts) -><br>    Encode = maps:get(encode_list, Opts),<br>    Encode([myrecord, #{key => Val}], Opts)<br>end}) 	| ["myrecord", {"key":"val"}] 	| #{array_normalizer => fun([<<"myrecord">>, #{<<"key">> := Val}], _Opts) -><br>    {myrecord, binary_to_atom(Val)}<br>end} 	| {myrecord, val}      	|
 
 ### Why not more built-in types?
 
@@ -121,33 +121,33 @@ Available encode options:
 
 ```erlang
 #{
-    %% null_terms defines what terms will be replaced with the null literal (default: ['undefined']).
-    null_terms => nonempty_list(),
+    %% nulls defines what terms will be replaced with the null literal (default: ['undefined']).
+    nulls => nonempty_list(),
     %% encode_binary allow override the binary() encoding.
-    encode_binary => function((binary(), Opts :: map()) -> iolist()),
-    %% encode_atom allow override the atom() encoding.
-    encode_atom => function((atom(), Opts :: map()) -> iolist()),
-    %% encode_integer allow override the integer() encoding.
-    encode_integer => function((integer(), Opts :: map()) -> iolist()),
-    %% encode_float allow override the float() encoding.
-    encode_float => function((float(), Opts :: map()) -> iolist()),
-    %% encode_list allow override the list() encoding.
-    encode_list => function((list(), Opts :: map()) -> iolist()),
-    %% encode_map allow override the map() encoding.
-    encode_map => function((map(), Opts :: map()) -> iolist()),
-    %% encode_datetime allow override the calendar:datetime() encoding.
-    encode_datetime => function((calendar:datetime(), Opts :: map()) -> iolist()),
-    %% encode_timestamp allow override the erlang:timestamp() encoding.
-    encode_timestamp => function((erlang:timestamp(), Opts :: map()) -> iolist()),
-    %% encode_unhandled allow encode any custom term (default: raise unsupported_type error).
-    encode_unhandled => function((term(), Opts :: map()) -> iolist()),
-    %% escape_binary allow override the binary escaping (default: escape_json/1)
+    binary_encoder => function((binary(), Opts :: map()) -> iolist()),
+    %% atom_encoder allow override the atom() encoding.
+    atom_encoder => function((atom(), Opts :: map()) -> iolist()),
+    %% integer_encoder allow override the integer() encoding.
+    integer_encoder => function((integer(), Opts :: map()) -> iolist()),
+    %% float_encoder allow override the float() encoding.
+    float_encoder => function((float(), Opts :: map()) -> iolist()),
+    %% list_encoder allow override the list() encoding.
+    list_encoder => function((list(), Opts :: map()) -> iolist()),
+    %% map_encoder allow override the map() encoding.
+    map_encoder => function((map(), Opts :: map()) -> iolist()),
+    %% datetime_encoder allow override the calendar:datetime() encoding.
+    datetime_encoder => function((calendar:datetime(), Opts :: map()) -> iolist()),
+    %% timestamp_encoder allow override the erlang:timestamp() encoding.
+    timestamp_encoder => function((erlang:timestamp(), Opts :: map()) -> iolist()),
+    %% unhandled_encoder allow encode any custom term (default: raise unsupported_type error).
+    unhandled_encoder => function((term(), Opts :: map()) -> iolist()),
+    %% escaper allow override the binary escaping (default: escape_json/1)
     %% There are 4 built-in functions to escape binaries:
     %%   - escape_json/1;
     %%   - escape_html/1;
     %%   - escape_js/1;
     %%   - escape_unicode/1.
-    escape_binary => function((binary(), Opts :: map()) -> iolist())
+    escaper => function((binary(), Opts :: map()) -> iolist())
 }
 ```
 
@@ -155,13 +155,13 @@ For example:
 
 ```erlang
 EncodeOpts = #{
-    encode_binary => fun
+    binary_encoder => fun
         (<<"foo">>, Opts) ->
             euneus_encoder:escape_binary(<<"bar">>, Opts);
         (Bin, Opts) ->
             euneus_encoder:escape_binary(Bin, Opts)
     end,
-    encode_unhandled => fun
+    unhandled_encoder => fun
         ({_, _, _, _} = Ip, Opts) ->
             case inet:ntoa(Ip) of
                 {error, einval} ->
@@ -187,14 +187,14 @@ Available decode options:
 #{
     %% null_term is the null literal override (default: 'undefined').
     null_term => term(),
-    %% normalize_array allow override any array/list().
-    normalize_array => function((list(), Opts :: map()) -> term()),
-    %% normalize_object allow override any object/map().
-    normalize_object => function((map(), Opts :: map()) -> term()),
-    %% normalize_key allow override the keys from JSON objects.
-    normalize_key => function((binary(), Opts :: map()) -> term()),
-    %% normalize_value allow override any other term, like array item or object value.
-    normalize_value => function((binary(), Opts :: map()) -> term())
+    %% array_normalizer allow override any array/list().
+    array_normalizer => function((list(), Opts :: map()) -> term()),
+    %% object_normalizer allow override any object/map().
+    object_normalizer => function((map(), Opts :: map()) -> term()),
+    %% key_normalizer allow override the keys from JSON objects.
+    key_normalizer => function((binary(), Opts :: map()) -> term()),
+    %% value_normalizer allow override any other term, like array item or object value.
+    value_normalizer => function((binary(), Opts :: map()) -> term())
 }
 ```
 
@@ -203,13 +203,13 @@ For example:
 ```erlang
 DecodeOpts = #{
     null_term => nil,
-    normalize_key => fun
+    key_normalizer => fun
         (<<"bar">>, _Opts) ->
             foo;
         (Key, _Opts) ->
             binary_to_atom(Key)
     end,
-    normalize_value => fun
+    value_normalizer => fun
         (<<"127.0.0.1">>, _Opts) ->
             {127, 0, 0, 1};
         (Value, _Opts) ->

@@ -51,17 +51,17 @@
 -type input() :: term().
 
 -type options() :: #{
-    null_terms => list(),
-    encode_binary => encode_fun(Input :: binary()),
-    encode_atom => encode_fun(Input :: atom()),
-    encode_integer => encode_fun(Input :: integer()),
-    encode_float => encode_fun(Input :: float()),
-    encode_list => encode_fun(Input :: list()),
-    encode_map => encode_fun(Input :: map()),
-    encode_datetime => encode_fun(Input :: calendar:datetime()),
-    encode_timestamp => encode_fun(Input :: erlang:timestamp()),
-    encode_unhandled => encode_fun(Input :: term()),
-    escape_binary => escape_fun(Input :: binary())
+    nulls => list(),
+    binary_encoder => encoder(Input :: binary()),
+    atom_encoder => encoder(Input :: atom()),
+    integer_encoder => encoder(Input :: integer()),
+    float_encoder => encoder(Input :: float()),
+    list_encoder => encoder(Input :: list()),
+    map_encoder => encoder(Input :: map()),
+    datetime_encoder => encoder(Input :: calendar:datetime()),
+    timestamp_encoder => encoder(Input :: erlang:timestamp()),
+    unhandled_encoder => encoder(Input :: term()),
+    escaper => escaper(Input :: binary())
 }.
 
 -type error_reason() :: {unsupported_type, Unsupported :: term()}
@@ -69,8 +69,8 @@
 
 -type result() :: {ok, iolist()} | {error, error_reason()}.
 
--type encode_fun(Input) :: fun((Input, options()) -> iolist()).
--type escape_fun(Input) :: fun((Input, options()) -> iolist()).
+-type encoder(Input) :: fun((Input, options()) -> iolist()).
+-type escaper(Input) :: fun((Input, options()) -> iolist()).
 
 -spec encode(Term, Opts) -> Return when
     Term :: term(),
@@ -92,66 +92,66 @@ encode(Term, Opts) ->
 % for the inline optimization.
 parse_opts(Opts) ->
     #{
-        null_terms => maps:get(null_terms, Opts, [undefined]),
-        encode_binary => maps:get(encode_binary, Opts, fun (X, O) ->
+        nulls => maps:get(nulls, Opts, [undefined]),
+        binary_encoder => maps:get(binary_encoder, Opts, fun (X, O) ->
             encode_binary(X, O)
         end),
-        encode_atom => maps:get(encode_atom, Opts, fun (X, O) ->
+        atom_encoder => maps:get(atom_encoder, Opts, fun (X, O) ->
             encode_atom(X, O)
         end),
-        encode_integer => maps:get(encode_integer, Opts, fun (X, O) ->
+        integer_encoder => maps:get(integer_encoder, Opts, fun (X, O) ->
             encode_integer(X, O)
         end),
-        encode_float => maps:get(encode_float, Opts, fun (X, O) ->
+        float_encoder => maps:get(float_encoder, Opts, fun (X, O) ->
             encode_float(X, O)
         end),
-        encode_list => maps:get(encode_list, Opts, fun (X, O) ->
+        list_encoder => maps:get(list_encoder, Opts, fun (X, O) ->
             encode_list(X, O)
         end),
-        encode_map => maps:get(encode_map, Opts, fun (X, O) ->
+        map_encoder => maps:get(map_encoder, Opts, fun (X, O) ->
             encode_map(X, O)
         end),
-        encode_datetime => maps:get(encode_datetime, Opts, fun (X, O) ->
+        datetime_encoder => maps:get(datetime_encoder, Opts, fun (X, O) ->
             encode_datetime(X, O)
         end),
-        encode_timestamp => maps:get(encode_timestamp, Opts, fun (X, O) ->
+        timestamp_encoder => maps:get(timestamp_encoder, Opts, fun (X, O) ->
             encode_timestamp(X, O)
         end),
-        encode_unhandled => maps:get(encode_unhandled, Opts, fun (X, O) ->
+        unhandled_encoder => maps:get(unhandled_encoder, Opts, fun (X, O) ->
             encode_unhandled(X, O)
         end),
-        escape_binary => maps:get(escape_binary, Opts, fun (X, _O) ->
+        escaper => maps:get(escaper, Opts, fun (X, _O) ->
             [$", escape_json(X), $"]
         end)
     }.
 
-key(Atom, #{encode_binary := Encode} = Opts) when is_atom(Atom) ->
+key(Atom, #{binary_encoder := Encode} = Opts) when is_atom(Atom) ->
     Encode(atom_to_binary(Atom, utf8), Opts);
-key(Bin, #{encode_binary := Encode} = Opts) when is_binary(Bin) ->
+key(Bin, #{binary_encoder := Encode} = Opts) when is_binary(Bin) ->
     Encode(Bin, Opts);
-key(Int, #{encode_binary := Encode} = Opts) when is_integer(Int) ->
+key(Int, #{binary_encoder := Encode} = Opts) when is_integer(Int) ->
     Encode(integer_to_binary(Int), Opts).
 
-value(Bin, #{encode_binary := Encode} = Opts) when is_binary(Bin) ->
+value(Bin, #{binary_encoder := Encode} = Opts) when is_binary(Bin) ->
     Encode(Bin, Opts);
-value(Atom, #{encode_atom := Encode} = Opts) when is_atom(Atom) ->
+value(Atom, #{atom_encoder := Encode} = Opts) when is_atom(Atom) ->
     Encode(Atom, Opts);
-value(Int, #{encode_integer := Encode} = Opts) when is_integer(Int) ->
+value(Int, #{integer_encoder := Encode} = Opts) when is_integer(Int) ->
     Encode(Int, Opts);
-value(Float, #{encode_float := Encode} = Opts) when is_float(Float) ->
+value(Float, #{float_encoder := Encode} = Opts) when is_float(Float) ->
     Encode(Float, Opts);
-value(List, #{encode_list := Encode} = Opts) when is_list(List) ->
+value(List, #{list_encoder := Encode} = Opts) when is_list(List) ->
     Encode(List, Opts);
-value(Map, #{encode_map := Encode} = Opts) when is_map(Map) ->
+value(Map, #{map_encoder := Encode} = Opts) when is_map(Map) ->
     Encode(Map, Opts);
-value({{YYYY,MM,DD},{H,M,S}} = DateTime, #{encode_datetime := Encode} = Opts)
+value({{YYYY,MM,DD},{H,M,S}} = DateTime, #{datetime_encoder := Encode} = Opts)
   when ?min(YYYY, 0), ?range(MM, 1, 12), ?range(DD, 1, 31)
      , ?range(H, 0, 23), ?range(M, 0, 59), ?range(S, 0, 59) ->
     Encode(DateTime, Opts);
-value({MegaSecs,Secs,MicroSecs} = Timestamp, #{encode_timestamp := Encode} = Opts)
+value({MegaSecs,Secs,MicroSecs} = Timestamp, #{timestamp_encoder := Encode} = Opts)
   when ?min(MegaSecs, 0), ?min(Secs, 0), ?min(MicroSecs, 0) ->
     Encode(Timestamp, Opts);
-value(Term, #{encode_unhandled := Encode} = Opts) ->
+value(Term, #{unhandled_encoder := Encode} = Opts) ->
     Encode(Term, Opts).
 
 encode_binary(Bin, Opts) ->
@@ -161,7 +161,7 @@ encode_atom(true, _Opts) ->
     <<"true">>;
 encode_atom(false, _Opts) ->
     <<"false">>;
-encode_atom(Atom, #{null_terms := Nulls} = Opts) ->
+encode_atom(Atom, #{nulls := Nulls} = Opts) ->
     case lists:member(Atom, Nulls) of
         true ->
             <<"null">>;
@@ -217,7 +217,7 @@ encode_timestamp({_,_,MicroSecs} = Timestamp, Opts) ->
 encode_unhandled(Term, _Opts) ->
     throw_unsupported_type_error(Term).
 
-escape_binary(Bin, #{escape_binary := Escape} = Opts) ->
+escape_binary(Bin, #{escaper := Escape} = Opts) ->
     Escape(Bin, Opts).
 
 escape_byte(0) -> <<"\\u0000">>;
