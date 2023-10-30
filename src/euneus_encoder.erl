@@ -25,31 +25,38 @@
     encode_list/2, encode_map/2, encode_datetime/2, encode_timestamp/2,
     encode_unhandled/2,
     % escape
-    escape_json/1
+    escape_json/1,
+    % error
+    handle_error/5
 ]}).
 -compile({inline_size, 100}).
 
 % By default, encode_unhandled/2 will raise unsupported_type exception,
 % so it is a function without a local return.
--dialyzer({no_return, [parse_opts/1, encode_unhandled/2]}).
+-dialyzer({no_return, [ parse_opts/1, encode_unhandled/2 ]}).
 
--export([ encode/2 ]).
 -export([
-    encode_binary/2, encode_atom/2, encode_integer/2, encode_float/2,
-    encode_list/2, encode_map/2, encode_datetime/2, encode_timestamp/2,
-    encode_unhandled/2
+    encode/2, encode_binary/2, encode_atom/2, encode_integer/2,
+    encode_float/2, encode_list/2, encode_map/2, encode_datetime/2,
+    encode_timestamp/2, encode_unhandled/2
 ]).
--export([ throw_unsupported_type_error/1 ]).
--export([ escape_binary/2, escape_byte/1 ]).
--export([ escape_json/1, escape_html/1, escape_js/1, escape_unicode/1 ]).
+-export([
+    escape_binary/2, escape_byte/1, escape_json/1, escape_html/1,
+    escape_js/1, escape_unicode/1
+]).
+-export([
+    throw_unsupported_type_error/1, handle_error/5
+]).
 
--export_type([ input/0, options/0, result/0, error_reason/0 ]).
+-export_type([
+    input/0, options/0, result/0, encoder/1, escaper/1,
+    error_handler/0, error_reason/0
+]).
 
 -define(min(X, Min), is_integer(X) andalso X >= Min).
 -define(range(X, Min, Max), is_integer(X) andalso X >= Min andalso X =< Max).
 
 -type input() :: term().
-
 -type options() :: #{
     nulls => list(),
     binary_encoder => encoder(Input :: binary()),
@@ -61,34 +68,37 @@
     datetime_encoder => encoder(Input :: calendar:datetime()),
     timestamp_encoder => encoder(Input :: erlang:timestamp()),
     unhandled_encoder => encoder(Input :: term()),
-    escaper => escaper(Input :: binary())
+    escaper => escaper(Input :: binary()),
+    error_handler => error_handler()
 }.
-
--type error_reason() :: {unsupported_type, Unsupported :: term()}
-                      | {invalid_byte, Byte :: byte(), Input :: binary()}.
-
 -type result() :: {ok, iolist()} | {error, error_reason()}.
-
 -type encoder(Input) :: fun((Input, options()) -> iolist()).
 -type escaper(Input) :: fun((Input, options()) -> iolist()).
+-type error_class() :: error | exit | throw.
+-type error_reason() :: {unsupported_type, Unsupported :: term()}
+                      | {invalid_byte, Byte :: byte(), Input :: binary()}.
+-type error_stacktrace() :: erlang:stacktrace().
+-type error_handler() :: fun(
+    (error_class(), error_reason(), error_stacktrace(), input(), options()) ->
+        error_stacktrace()
+).
 
 -spec encode(Term, Opts) -> Return when
     Term :: term(),
     Opts :: options(),
     Return :: result().
 
-encode(Term, Opts) ->
+encode(Term, Opts0) ->
+    Opts = parse_opts(Opts0),
     try
-        {ok, value(Term, parse_opts(Opts))}
+        {ok, value(Term, Opts)}
     catch
-        throw:{unsupported_type, Unsupported} ->
-            {error, {unsupported_type, Unsupported}};
-        throw:{invalid_byte, Byte0, Input} ->
-            Byte = <<"0x"/utf8, (integer_to_binary(Byte0, 16))/binary>>,
-            {error, {invalid_byte, Byte, Input}}
+        Class:Reason:Stacktrace ->
+            Handle = maps:get(error_handler, Opts),
+            Handle(Class, Reason, Stacktrace, Term, Opts)
     end.
 
-% The explicit call to encode_*/2 wrapped in a function is required
+% The explicit call of the functions wrapped in a function is required
 % for the inline optimization.
 parse_opts(Opts) ->
     #{
@@ -122,6 +132,9 @@ parse_opts(Opts) ->
         end),
         escaper => maps:get(escaper, Opts, fun (X, _O) ->
             [$", escape_json(X), $"]
+        end),
+        error_handler => maps:get(error_handler, Opts, fun(C, R, S, I, O) ->
+            handle_error(C, R, S, I, O)
         end)
     }.
 
@@ -514,6 +527,16 @@ throw_unsupported_type_error(Term) ->
 
 throw_invalid_byte_error(Byte, Input) ->
     throw({invalid_byte, Byte, Input}).
+
+handle_error(throw, {unsupported_type, Unsupported}, _Stacktrace, _Input, _Opts) ->
+    {error, {unsupported_type, Unsupported}};
+handle_error(throw, {invalid_byte, Byte0, Input}, _Stacktrace, _Input, _Opts) ->
+    Byte = <<"0x"/utf8, (integer_to_binary(Byte0, 16))/binary>>,
+    {error, {invalid_byte, Byte, Input}};
+handle_error(throw, Reason, _Stacktrace, _Input, _Opts) ->
+    {error, Reason};
+handle_error(Class, Reason, Stacktrace, _Input, _Opts) ->
+    erlang:raise(Class, Reason, Stacktrace).
 
 -ifdef(TEST).
 

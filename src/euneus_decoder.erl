@@ -30,13 +30,18 @@
     % escape
     escapeu/6, escapeu_1/8, escapeu_2/8, escape_surrogate/7, escapeu_last/3,
     % normalize
-    normalize_string/3, normalize_object/2, normalize_array/2
+    normalize_string/3, normalize_object/2, normalize_array/2,
+    % error
+    handle_error/5
 ]}).
 -compile({inline_size, 100}).
 
--export([ decode/2 ]).
+-export([ decode/2, handle_error/5 ]).
 
--export_type([ input/0, options/0, result/0, error_reason/0 ]).
+-export_type([
+    input/0, options/0, result/0, normalizer/1, error_reason/0,
+    error_handler/0
+]).
 
 % Use integers instead of atoms to take advantage of the jump table optimization.
 -define(terminate, 0).
@@ -47,45 +52,40 @@
 -define(is_number(X), X >= $0, X =< $9).
 
 -type input() :: binary() | iolist().
-
 -type options() :: #{
     null_term => term(),
     key_normalizer => normalizer(Input :: binary()),
     value_normalizer => normalizer(Input :: binary()),
     array_normalizer => normalizer(Input :: list()),
-    object_normalizer => normalizer(Input :: map())
+    object_normalizer => normalizer(Input :: map()),
+    error_handler => error_handler()
 }.
-
 -type position() :: non_neg_integer().
-
+-type result() :: {ok, term()} | {error, error_reason()}.
+-type normalizer(Input) :: fun((Input, options()) -> term()).
+-type error_class() :: error | exit | throw.
 -type error_reason() :: unexpected_end_of_input
                       | {unexpected_byte, binary(), position()}
                       | {unexpected_sequence, binary(), position()}.
-
--type result() :: {ok, term()} | {error, error_reason()}.
-
--type normalizer(Input) :: fun((Input, options()) -> term()).
+-type error_stacktrace() :: erlang:stacktrace().
+-type error_handler() :: fun(
+    (error_class(), error_reason(), error_stacktrace(), input(), options()) ->
+        error_stacktrace()
+).
 
 -spec decode(Input, Opts) -> Result when
     Input :: input(),
     Opts :: options(),
     Result :: result().
 
-decode(Bin, Opts) when is_binary(Bin) andalso is_map(Opts) ->
+decode(Bin, Opts0) when is_binary(Bin) andalso is_map(Opts0) ->
+    Opts = parse_opts(Opts0),
     try
-        {ok, value(Bin, parse_opts(Opts), Bin, 0, [?terminate])}
+        {ok, value(Bin, Opts, Bin, 0, [?terminate])}
     catch
-        throw:{position, Position} ->
-            case Position == byte_size(Bin) of
-                true ->
-                    {error, unexpected_end_of_input};
-                false ->
-                    Byte = binary:at(Bin, Position),
-                    Hex = integer_to_binary(Byte, 16),
-                    {error, {unexpected_byte, <<"0x"/utf8,Hex/binary>>, Position}}
-            end;
-        throw:{token, Token, Position} ->
-            {error, {unexpected_sequence, Token, Position}}
+        Class:Reason:Stacktrace ->
+            Handle = maps:get(error_handler, Opts),
+            Handle(Class, Reason, Stacktrace, Bin, Opts)
     end;
 decode(MaybeIOList, Opts) ->
     case attempt_iolist_to_binary(MaybeIOList) of
@@ -630,6 +630,14 @@ number_zero(<<E/integer,Rest/bitstring>>, Opts, Input, Skip, Stack, Len)
 number_zero(<<Rest/bitstring>>, Opts, Input, Skip, Stack, Len) ->
     continue(Rest, Opts, Input, Skip + Len, Stack, 0).
 
+try_parse_float(Bin, Token, Skip) ->
+    try
+        binary_to_float(Bin)
+    catch
+        error:badarg:_ ->
+            token_error(Token, Skip)
+    end.
+
 object(<<H/integer,Rest/bitstring>>, Opts, Input, Skip, Stack, Value)
   when H =:= 32; H =:= 9; H =:= 10; H =:= 13 ->
     object(Rest, Opts, Input, Skip + 1, Stack, Value);
@@ -705,13 +713,21 @@ token_error(Token, Position) ->
 token_error(Token, Position, Len) ->
     throw({token, binary_part(Token, Position, Len), Position}).
 
-try_parse_float(Bin, Token, Skip) ->
-    try
-        binary_to_float(Bin)
-    catch
-        error:badarg:_ ->
-            token_error(Token, Skip)
-    end.
+handle_error(throw, {position, Position}, _Stacktrace, Input, _Opts) ->
+    case Position =:= byte_size(Input) of
+        true ->
+            {error, unexpected_end_of_input};
+        false ->
+            Byte = binary:at(Input, Position),
+            Hex = integer_to_binary(Byte, 16),
+            {error, {unexpected_byte, <<"0x"/utf8,Hex/binary>>, Position}}
+    end;
+handle_error(throw, {token, Token, Position}, _Stacktrace, _Input, _Opts) ->
+    {error, {unexpected_sequence, Token, Position}};
+handle_error(throw, Reason, _Stacktrace, _Input, _Opts) ->
+    {error, Reason};
+handle_error(Class, Reason, Stacktrace, _Input, _Opts) ->
+    erlang:raise(Class, Reason, Stacktrace).
 
 -ifdef(TEST).
 
