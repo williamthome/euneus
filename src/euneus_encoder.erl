@@ -25,9 +25,9 @@
     encode_list/2, encode_map/2, encode_datetime/2, encode_timestamp/2,
     encode_unhandled/2,
     % escape
-    escape_json/1,
+    escape_json/1, escape_html/1, escape_js/1, escape_unicode/1,
     % error
-    handle_error/5
+    handle_error/3
 ]}).
 -compile({inline_size, 100}).
 
@@ -41,12 +41,10 @@
     encode_timestamp/2, encode_unhandled/2
 ]).
 -export([
-    escape_binary/2, escape_byte/1, escape_json/1, escape_html/1,
-    escape_js/1, escape_unicode/1
+    escape_binary/2, escape_byte/1, escape_json/1,
+    escape_html/1, escape_js/1, escape_unicode/1
 ]).
--export([
-    throw_unsupported_type_error/1, handle_error/5
-]).
+-export([ throw_unsupported_type_error/1, handle_error/3 ]).
 
 -export_type([
     input/0, options/0, result/0, encoder/1, escaper/1,
@@ -55,6 +53,12 @@
 
 -define(min(X, Min), is_integer(X) andalso X >= Min).
 -define(range(X, Min, Max), is_integer(X) andalso X >= Min andalso X =< Max).
+
+-define(NON_PRINTABLE_LAST, 31).
+-define(ONE_BYTE_LAST, 127).
+-define(TWO_BYTE_LAST, 2_047).
+-define(THREE_BYTE_LAST, 65_535).
+% -define(FOUR_BYTE_LAST, 1_114_111).
 
 -type input() :: term().
 -type options() :: #{
@@ -95,7 +99,7 @@ encode(Term, Opts0) ->
     catch
         Class:Reason:Stacktrace ->
             Handle = maps:get(error_handler, Opts),
-            Handle(Class, Reason, Stacktrace, Term, Opts)
+            Handle(Class, Reason, Stacktrace)
     end.
 
 % The explicit call of the functions wrapped in a function is required
@@ -130,11 +134,21 @@ parse_opts(Opts) ->
         unhandled_encoder => maps:get(unhandled_encoder, Opts, fun (X, O) ->
             encode_unhandled(X, O)
         end),
-        escaper => maps:get(escaper, Opts, fun (X, _O) ->
-            [$", escape_json(X), $"]
-        end),
-        error_handler => maps:get(error_handler, Opts, fun(C, R, S, I, O) ->
-            handle_error(C, R, S, I, O)
+        escaper =>
+            case maps:get(escaper, Opts, json) of
+                json ->
+                    fun(X, _O) -> [$", escape_json(X), $"] end;
+                html ->
+                    fun(X, _O) -> [$", escape_html(X), $"] end;
+                javascript ->
+                    fun(X, _O) -> [$", escape_js(X), $"] end;
+                unicode ->
+                    fun(X, _O) -> [$", escape_unicode(X), $"] end;
+                Fun when is_function(Fun, 2) ->
+                    Fun
+            end,
+        error_handler => maps:get(error_handler, Opts, fun(C, R, S) ->
+            handle_error(C, R, S)
         end)
     }.
 
@@ -143,7 +157,9 @@ key(Atom, #{binary_encoder := Encode} = Opts) when is_atom(Atom) ->
 key(Bin, #{binary_encoder := Encode} = Opts) when is_binary(Bin) ->
     Encode(Bin, Opts);
 key(Int, #{binary_encoder := Encode} = Opts) when is_integer(Int) ->
-    Encode(integer_to_binary(Int), Opts).
+    Encode(integer_to_binary(Int), Opts);
+key(String, #{binary_encoder := Encode} = Opts) when is_list(String) ->
+    Encode(list_to_binary(String), Opts).
 
 value(Bin, #{binary_encoder := Encode} = Opts) when is_binary(Bin) ->
     Encode(Bin, Opts);
@@ -241,12 +257,12 @@ escape_byte(4) -> <<"\\u0004">>;
 escape_byte(5) -> <<"\\u0005">>;
 escape_byte(6) -> <<"\\u0006">>;
 escape_byte(7) -> <<"\\u0007">>;
-escape_byte(8) -> <<"\\b">>;
-escape_byte(9) -> <<"\\t">>;
-escape_byte(10) -> <<"\\n">>;
-escape_byte(11) -> <<"\\u000B">>;
-escape_byte(12) -> <<"\\f">>;
-escape_byte(13) -> <<"\\r">>;
+escape_byte($\b) -> <<"\\b">>;
+escape_byte($\t) -> <<"\\t">>;
+escape_byte($\n) -> <<"\\n">>;
+escape_byte($\v) -> <<"\\u000B">>;
+escape_byte($\f) -> <<"\\f">>;
+escape_byte($\r) -> <<"\\r">>;
 escape_byte(14) -> <<"\\u000E">>;
 escape_byte(15) -> <<"\\u000F">>;
 escape_byte(16) -> <<"\\u0010">>;
@@ -260,209 +276,209 @@ escape_byte(23) -> <<"\\u0017">>;
 escape_byte(24) -> <<"\\u0018">>;
 escape_byte(25) -> <<"\\u0019">>;
 escape_byte(26) -> <<"\\u001A">>;
-escape_byte(27) -> <<"\\u001B">>;
+escape_byte($\e) -> <<"\\u001B">>;
 escape_byte(28) -> <<"\\u001C">>;
 escape_byte(29) -> <<"\\u001D">>;
 escape_byte(30) -> <<"\\u001E">>;
 escape_byte(31) -> <<"\\u001F">>;
-escape_byte(34) -> <<"\\\"">>;
-escape_byte(47) -> <<"\\/">>;
-escape_byte(92) -> <<"\\\\">>;
+escape_byte($\") -> <<"\\\"">>;
+escape_byte($/) -> <<"\\/">>;
+escape_byte($\\) -> <<"\\\\">>;
 escape_byte(Byte) -> throw_invalid_byte_error(Byte, Byte).
 
 escape_json(Bin) ->
     escape_json(Bin, [], Bin, 0).
 
-escape_json(<<Byte/integer, Rest/bitstring>>, Acc0, Input, Skip)
-    when Byte < 32; Byte =:= $\"; Byte =:= $\\ ->
+escape_json(<<Byte/integer, Rest/bitstring>>, Acc0, Input, Pos)
+  when Byte =< ?NON_PRINTABLE_LAST; Byte =:= $\"; Byte =:= $\\ ->
     Acc = [Acc0, escape_byte(Byte)],
-    escape_json(Rest, Acc, Input, Skip+1);
-escape_json(<<Byte/integer, Rest/bitstring>>, Acc, Input, Skip)
-    when Byte < 128 ->
-    escape_json_chunk(Rest, Acc, Input, Skip, 1);
-escape_json(<<Char/utf8, Rest/bitstring>>, Acc, Input, Skip)
-    when Char < 2048 ->
-    escape_json_chunk(Rest, Acc, Input, Skip, 2);
-escape_json(<<Char/utf8, Rest/bitstring>>, Acc, Input, Skip)
-    when Char < 65536 ->
-    escape_json_chunk(Rest, Acc, Input, Skip, 3);
-escape_json(<<_Char/utf8, Rest/bitstring>>, Acc, Input, Skip) ->
-    escape_json_chunk(Rest, Acc, Input, Skip, 4);
-escape_json(<<>>, Acc, _Input, _Skip) ->
+    escape_json(Rest, Acc, Input, Pos+1);
+escape_json(<<Byte/integer, Rest/bitstring>>, Acc, Input, Pos)
+  when Byte =< ?ONE_BYTE_LAST ->
+    escape_json_chunk(Rest, Acc, Input, Pos, 1);
+escape_json(<<Char/utf8, Rest/bitstring>>, Acc, Input, Pos)
+  when Char =< ?TWO_BYTE_LAST ->
+    escape_json_chunk(Rest, Acc, Input, Pos, 2);
+escape_json(<<Char/utf8, Rest/bitstring>>, Acc, Input, Pos)
+  when Char =< ?THREE_BYTE_LAST ->
+    escape_json_chunk(Rest, Acc, Input, Pos, 3);
+escape_json(<<_Char/utf8, Rest/bitstring>>, Acc, Input, Pos) ->
+    escape_json_chunk(Rest, Acc, Input, Pos, 4);
+escape_json(<<>>, Acc, _Input, _Pos) ->
     Acc;
-escape_json(<<Byte/integer, _Rest/bitstring>>, _Acc, Input, _Skip) ->
+escape_json(<<Byte/integer, _Rest/bitstring>>, _Acc, Input, _Pos) ->
     throw_invalid_byte_error(Byte, Input).
 
-escape_json_chunk(<<Byte/integer, Rest/bitstring>>, Acc0, Input, Skip, Len)
-    when Byte < 32; Byte =:= $\"; Byte =:= $\\ ->
-    Part = binary_part(Input, Skip, Len),
+escape_json_chunk(<<Byte/integer, Rest/bitstring>>, Acc0, Input, Pos, Len)
+  when Byte =< ?NON_PRINTABLE_LAST; Byte =:= $\"; Byte =:= $\\ ->
+    Part = binary_part(Input, Pos, Len),
     Acc = [Acc0, Part, escape_byte(Byte)],
-    escape_json(Rest, Acc, Input, Skip+Len+1);
-escape_json_chunk(<<Byte/integer, Rest/bitstring>>, Acc, Input, Skip, Len)
-    when Byte < 128 ->
-    escape_json_chunk(Rest, Acc, Input, Skip, Len+1);
-escape_json_chunk(<<Char/utf8, Rest/bitstring>>, Acc, Input, Skip, Len)
-    when Char < 2048 ->
-    escape_json_chunk(Rest, Acc, Input, Skip, Len+2);
-escape_json_chunk(<<Char/utf8, Rest/bitstring>>, Acc, Input, Skip, Len)
-    when Char < 65536 ->
-    escape_json_chunk(Rest, Acc, Input, Skip, Len+3);
-escape_json_chunk(<<_Char/utf8, Rest/bitstring>>, Acc, Input, Skip, Len) ->
-    escape_json_chunk(Rest, Acc, Input, Skip, Len+4);
-escape_json_chunk(<<>>, [], Input, Skip, Len) ->
-    binary_part(Input, Skip, Len);
-escape_json_chunk(<<>>, Acc, Input, Skip, Len) ->
-    [Acc, binary_part(Input, Skip, Len)];
-escape_json_chunk(<<Byte/integer, _Rest/bitstring>>, _Acc, Input, _Skip, _Len) ->
+    escape_json(Rest, Acc, Input, Pos+Len+1);
+escape_json_chunk(<<Byte/integer, Rest/bitstring>>, Acc, Input, Pos, Len)
+  when Byte =< ?ONE_BYTE_LAST ->
+    escape_json_chunk(Rest, Acc, Input, Pos, Len+1);
+escape_json_chunk(<<Char/utf8, Rest/bitstring>>, Acc, Input, Pos, Len)
+  when Char =< ?TWO_BYTE_LAST ->
+    escape_json_chunk(Rest, Acc, Input, Pos, Len+2);
+escape_json_chunk(<<Char/utf8, Rest/bitstring>>, Acc, Input, Pos, Len)
+  when Char =< ?THREE_BYTE_LAST ->
+    escape_json_chunk(Rest, Acc, Input, Pos, Len+3);
+escape_json_chunk(<<_Char/utf8, Rest/bitstring>>, Acc, Input, Pos, Len) ->
+    escape_json_chunk(Rest, Acc, Input, Pos, Len+4);
+escape_json_chunk(<<>>, [], Input, Pos, Len) ->
+    binary_part(Input, Pos, Len);
+escape_json_chunk(<<>>, Acc, Input, Pos, Len) ->
+    [Acc, binary_part(Input, Pos, Len)];
+escape_json_chunk(<<Byte/integer, _Rest/bitstring>>, _Acc, Input, _Pos, _Len) ->
     throw_invalid_byte_error(Byte, Input).
 
 escape_html(Bin) ->
     escape_html(Bin, [], Bin, 0).
 
-escape_html(<<Byte/integer, Rest/bitstring>>, Acc0, Input, Skip)
-    when Byte < 33; Byte =:= $\"; Byte =:= $/; Byte =:= $\\ ->
+escape_html(<<Byte/integer, Rest/bitstring>>, Acc0, Input, Pos)
+  when Byte < 33; Byte =:= $\"; Byte =:= $/; Byte =:= $\\ ->
     Acc = [Acc0, escape_byte(Byte)],
-    escape_html(Rest, Acc, Input, Skip+1);
-escape_html(<<Byte/integer, Rest/bitstring>>, Acc, Input, Skip)
-    when Byte < 128 ->
-    escape_html_chunk(Rest, Acc, Input, Skip, 1);
-escape_html(<<Char/utf8, Rest/bitstring>>, Acc, Input, Skip)
-    when Char < 2048 ->
-    escape_html_chunk(Rest, Acc, Input, Skip, 2);
-escape_html(<<8232/utf8, Rest/bitstring>>, Acc0, Input, Skip) ->
+    escape_html(Rest, Acc, Input, Pos+1);
+escape_html(<<Byte/integer, Rest/bitstring>>, Acc, Input, Pos)
+  when Byte =< ?ONE_BYTE_LAST ->
+    escape_html_chunk(Rest, Acc, Input, Pos, 1);
+escape_html(<<Char/utf8, Rest/bitstring>>, Acc, Input, Pos)
+  when Char =< ?TWO_BYTE_LAST ->
+    escape_html_chunk(Rest, Acc, Input, Pos, 2);
+escape_html(<<8232/utf8, Rest/bitstring>>, Acc0, Input, Pos) ->
     Acc = [Acc0, <<"\\u2028">>],
-    escape_html(Rest, Acc, Input, Skip+3);
-escape_html(<<8233/utf8, Rest/bitstring>>, Acc0, Input, Skip) ->
+    escape_html(Rest, Acc, Input, Pos+3);
+escape_html(<<8233/utf8, Rest/bitstring>>, Acc0, Input, Pos) ->
     Acc = [Acc0, <<"\\u2029">>],
-    escape_html(Rest, Acc, Input, Skip+3);
-escape_html(<<Char/utf8, Rest/bitstring>>, Acc, Input, Skip)
-    when Char < 65536 ->
-    escape_html_chunk(Rest, Acc, Input, Skip, 3);
-escape_html(<<_Char/utf8, Rest/bitstring>>, Acc, Input, Skip) ->
-    escape_html_chunk(Rest, Acc, Input, Skip, 4);
-escape_html(<<>>, Acc, _Input, _Skip) ->
+    escape_html(Rest, Acc, Input, Pos+3);
+escape_html(<<Char/utf8, Rest/bitstring>>, Acc, Input, Pos)
+  when Char =< ?THREE_BYTE_LAST ->
+    escape_html_chunk(Rest, Acc, Input, Pos, 3);
+escape_html(<<_Char/utf8, Rest/bitstring>>, Acc, Input, Pos) ->
+    escape_html_chunk(Rest, Acc, Input, Pos, 4);
+escape_html(<<>>, Acc, _Input, _Pos) ->
     Acc;
-escape_html(<<Byte/integer, _Rest/bitstring>>, _Acc, Input, _Skip) ->
+escape_html(<<Byte/integer, _Rest/bitstring>>, _Acc, Input, _Pos) ->
     throw_invalid_byte_error(Byte, Input).
 
-escape_html_chunk(<<Byte/integer, Rest/bitstring>>, Acc, Input, Skip, Len)
-    when Byte < 33; Byte =:= $\"; Byte =:= $/; Byte =:= $\\ ->
-    Part = binary_part(Input, Skip, Len),
+escape_html_chunk(<<Byte/integer, Rest/bitstring>>, Acc, Input, Pos, Len)
+  when Byte < 32; Byte =:= $\"; Byte =:= $/; Byte =:= $\\ ->
+    Part = binary_part(Input, Pos, Len),
     Acc2 = [Acc, Part, escape_byte(Byte)],
-    escape_html(Rest, Acc2, Input, Skip+Len+1);
-escape_html_chunk(<<Byte/integer, Rest/bitstring>>, Acc, Input, Skip, Len)
-    when Byte < 128 ->
-    escape_html_chunk(Rest, Acc, Input, Skip, Len+1);
-escape_html_chunk(<<Char/utf8, Rest/bitstring>>, Acc, Input, Skip, Len)
-    when Char < 2048 ->
-    escape_html_chunk(Rest, Acc, Input, Skip, Len+2);
-escape_html_chunk(<<8232/utf8, Rest/bitstring>>, Acc, Input, Skip, Len) ->
-    Part = binary_part(Input, Skip, Len),
+    escape_html(Rest, Acc2, Input, Pos+Len+1);
+escape_html_chunk(<<Byte/integer, Rest/bitstring>>, Acc, Input, Pos, Len)
+  when Byte =< ?ONE_BYTE_LAST ->
+    escape_html_chunk(Rest, Acc, Input, Pos, Len+1);
+escape_html_chunk(<<Char/utf8, Rest/bitstring>>, Acc, Input, Pos, Len)
+  when Char =< ?TWO_BYTE_LAST ->
+    escape_html_chunk(Rest, Acc, Input, Pos, Len+2);
+escape_html_chunk(<<8232/utf8, Rest/bitstring>>, Acc, Input, Pos, Len) ->
+    Part = binary_part(Input, Pos, Len),
     Acc2 = [Acc, Part, <<"\\u2028">>],
-    escape_html(Rest, Acc2, Input, Skip+Len+3);
-escape_html_chunk(<<8233/utf8, Rest/bitstring>>, Acc, Input, Skip, Len) ->
-    Part = binary_part(Input, Skip, Len),
+    escape_html(Rest, Acc2, Input, Pos+Len+3);
+escape_html_chunk(<<8233/utf8, Rest/bitstring>>, Acc, Input, Pos, Len) ->
+    Part = binary_part(Input, Pos, Len),
     Acc2 = [Acc, Part, <<"\\u2029">>],
-    escape_html(Rest, Acc2, Input, Skip+Len+3);
-escape_html_chunk(<<Char/utf8, Rest/bitstring>>, Acc, Input, Skip, Len)
-    when Char < 65536 ->
-    escape_html_chunk(Rest, Acc, Input, Skip, Len+3);
-escape_html_chunk(<<_Char/utf8, Rest/bitstring>>, Acc, Input, Skip, Len) ->
-    escape_html_chunk(Rest, Acc, Input, Skip, Len+4);
-escape_html_chunk(<<>>, [], Input, Skip, Len) ->
-    binary_part(Input, Skip, Len);
-escape_html_chunk(<<>>, Acc, Input, Skip, Len) ->
-    [Acc, binary_part(Input, Skip, Len)];
-escape_html_chunk(<<Byte/integer, _Rest/bitstring>>, _Acc, Input, _Skip, _Len) ->
+    escape_html(Rest, Acc2, Input, Pos+Len+3);
+escape_html_chunk(<<Char/utf8, Rest/bitstring>>, Acc, Input, Pos, Len)
+  when Char =< ?THREE_BYTE_LAST ->
+    escape_html_chunk(Rest, Acc, Input, Pos, Len+3);
+escape_html_chunk(<<_Char/utf8, Rest/bitstring>>, Acc, Input, Pos, Len) ->
+    escape_html_chunk(Rest, Acc, Input, Pos, Len+4);
+escape_html_chunk(<<>>, [], Input, Pos, Len) ->
+    binary_part(Input, Pos, Len);
+escape_html_chunk(<<>>, Acc, Input, Pos, Len) ->
+    [Acc, binary_part(Input, Pos, Len)];
+escape_html_chunk(<<Byte/integer, _Rest/bitstring>>, _Acc, Input, _Pos, _Len) ->
     throw_invalid_byte_error(Byte, Input).
 
 escape_js(Bin) ->
     escape_js(Bin, [], Bin, 0).
 
-escape_js(<<Byte/integer, Rest/bitstring>>, Acc0, Input, Skip)
-    when Byte < 32; Byte =:= $\"; Byte =:= $\\ ->
+escape_js(<<Byte/integer, Rest/bitstring>>, Acc0, Input, Pos)
+  when Byte =< ?NON_PRINTABLE_LAST; Byte =:= $\"; Byte =:= $\\ ->
     Acc = [Acc0, escape_byte(Byte)],
-    escape_js(Rest, Acc, Input, Skip+1);
-escape_js(<<Byte/integer, Rest/bitstring>>, Acc, Input, Skip)
-    when Byte < 128 ->
-    escape_js_chunk(Rest, Acc, Input, Skip, 1);
-escape_js(<<Char/utf8, Rest/bitstring>>, Acc, Input, Skip)
-    when Char < 2048 ->
-    escape_js_chunk(Rest, Acc, Input, Skip, 2);
-escape_js(<<8232/utf8, Rest/bitstring>>, Acc0, Input, Skip) ->
+    escape_js(Rest, Acc, Input, Pos+1);
+escape_js(<<Byte/integer, Rest/bitstring>>, Acc, Input, Pos)
+  when Byte =< ?ONE_BYTE_LAST ->
+    escape_js_chunk(Rest, Acc, Input, Pos, 1);
+escape_js(<<Char/utf8, Rest/bitstring>>, Acc, Input, Pos)
+  when Char =< ?TWO_BYTE_LAST ->
+    escape_js_chunk(Rest, Acc, Input, Pos, 2);
+escape_js(<<8232/utf8, Rest/bitstring>>, Acc0, Input, Pos) ->
     Acc = [Acc0, <<"\\u2028">>],
-    escape_js(Rest, Acc, Input, Skip+3);
-escape_js(<<8233/utf8, Rest/bitstring>>, Acc0, Input, Skip) ->
+    escape_js(Rest, Acc, Input, Pos+3);
+escape_js(<<8233/utf8, Rest/bitstring>>, Acc0, Input, Pos) ->
     Acc = [Acc0, <<"\\u2029">>],
-    escape_js(Rest, Acc, Input, Skip+3);
-escape_js(<<Char/utf8, Rest/bitstring>>, Acc, Input, Skip)
-    when Char < 65536 ->
-    escape_js_chunk(Rest, Acc, Input, Skip, 3);
-escape_js(<<_Char/utf8, Rest/bitstring>>, Acc, Input, Skip) ->
-    escape_js_chunk(Rest, Acc, Input, Skip, 4);
-escape_js(<<>>, Acc, _Input, _Skip) ->
+    escape_js(Rest, Acc, Input, Pos+3);
+escape_js(<<Char/utf8, Rest/bitstring>>, Acc, Input, Pos)
+  when Char =< ?THREE_BYTE_LAST ->
+    escape_js_chunk(Rest, Acc, Input, Pos, 3);
+escape_js(<<_Char/utf8, Rest/bitstring>>, Acc, Input, Pos) ->
+    escape_js_chunk(Rest, Acc, Input, Pos, 4);
+escape_js(<<>>, Acc, _Input, _Pos) ->
     Acc;
-escape_js(<<Byte/integer, _Rest/bitstring>>, _Acc, Input, _Skip) ->
+escape_js(<<Byte/integer, _Rest/bitstring>>, _Acc, Input, _Pos) ->
     throw_invalid_byte_error(Byte, Input).
 
-escape_js_chunk(<<Byte/integer, Rest/bitstring>>, Acc0, Input, Skip, Len)
-    when Byte < 32; Byte =:= $\"; Byte =:= $\\ ->
-    Part = binary_part(Input, Skip, Len),
+escape_js_chunk(<<Byte/integer, Rest/bitstring>>, Acc0, Input, Pos, Len)
+  when Byte =< ?NON_PRINTABLE_LAST; Byte =:= $\"; Byte =:= $\\ ->
+    Part = binary_part(Input, Pos, Len),
     Acc = [Acc0, Part, escape_byte(Byte)],
-    escape_js(Rest, Acc, Input, Skip+Len+1);
-escape_js_chunk(<<Byte/integer, Rest/bitstring>>, Acc, Input, Skip, Len)
-    when Byte < 128 ->
-    escape_js_chunk(Rest, Acc, Input, Skip, Len+1);
-escape_js_chunk(<<Char/utf8, Rest/bitstring>>, Acc, Input, Skip, Len)
-    when Char < 2048 ->
-    escape_js_chunk(Rest, Acc, Input, Skip, Len+2);
-escape_js_chunk(<<8232/utf8, Rest/bitstring>>, Acc0, Input, Skip, Len) ->
-    Part = binary_part(Input, Skip, Len),
+    escape_js(Rest, Acc, Input, Pos+Len+1);
+escape_js_chunk(<<Byte/integer, Rest/bitstring>>, Acc, Input, Pos, Len)
+  when Byte =< ?ONE_BYTE_LAST ->
+    escape_js_chunk(Rest, Acc, Input, Pos, Len+1);
+escape_js_chunk(<<Char/utf8, Rest/bitstring>>, Acc, Input, Pos, Len)
+  when Char =< ?TWO_BYTE_LAST ->
+    escape_js_chunk(Rest, Acc, Input, Pos, Len+2);
+escape_js_chunk(<<8232/utf8, Rest/bitstring>>, Acc0, Input, Pos, Len) ->
+    Part = binary_part(Input, Pos, Len),
     Acc = [Acc0, Part, <<"\\u2028">>],
-    escape_js(Rest, Acc, Input, Skip+Len+3);
-escape_js_chunk(<<8233/utf8, Rest/bitstring>>, Acc0, Input, Skip, Len) ->
-    Part = binary_part(Input, Skip, Len),
+    escape_js(Rest, Acc, Input, Pos+Len+3);
+escape_js_chunk(<<8233/utf8, Rest/bitstring>>, Acc0, Input, Pos, Len) ->
+    Part = binary_part(Input, Pos, Len),
     Acc = [Acc0, Part, <<"\\u2029">>],
-    escape_js(Rest, Acc, Input, Skip+Len+3);
-escape_js_chunk(<<Char/utf8, Rest/bitstring>>, Acc, Input, Skip, Len)
-    when Char < 65536 ->
-    escape_js_chunk(Rest, Acc, Input, Skip, Len+3);
-escape_js_chunk(<<_Char/utf8, Rest/bitstring>>, Acc, Input, Skip, Len) ->
-    escape_js_chunk(Rest, Acc, Input, Skip, Len+4);
-escape_js_chunk(<<>>, [], Input, Skip, Len) ->
-    binary_part(Input, Skip, Len);
-escape_js_chunk(<<>>, Acc, Input, Skip, Len) ->
-    [Acc, binary_part(Input, Skip, Len)];
-escape_js_chunk(<<Byte/integer, _Rest/bitstring>>, _Acc, Input, _Skip, _Len) ->
+    escape_js(Rest, Acc, Input, Pos+Len+3);
+escape_js_chunk(<<Char/utf8, Rest/bitstring>>, Acc, Input, Pos, Len)
+  when Char =< ?THREE_BYTE_LAST ->
+    escape_js_chunk(Rest, Acc, Input, Pos, Len+3);
+escape_js_chunk(<<_Char/utf8, Rest/bitstring>>, Acc, Input, Pos, Len) ->
+    escape_js_chunk(Rest, Acc, Input, Pos, Len+4);
+escape_js_chunk(<<>>, [], Input, Pos, Len) ->
+    binary_part(Input, Pos, Len);
+escape_js_chunk(<<>>, Acc, Input, Pos, Len) ->
+    [Acc, binary_part(Input, Pos, Len)];
+escape_js_chunk(<<Byte/integer, _Rest/bitstring>>, _Acc, Input, _Pos, _Len) ->
     throw_invalid_byte_error(Byte, Input).
 
 escape_unicode(Bin) ->
     escape_unicode(Bin, [], Bin, 0).
 
-escape_unicode(<<Byte/integer, Rest/bitstring>>, Acc0, Input, Skip)
-  when Byte < 32; Byte =:= $\"; Byte =:= $\\ ->
+escape_unicode(<<Byte/integer, Rest/bitstring>>, Acc0, Input, Pos)
+  when Byte =< ?NON_PRINTABLE_LAST; Byte =:= $\"; Byte =:= $\\ ->
     Acc = [Acc0, escape_byte(Byte)],
-    escape_unicode(Rest, Acc, Input, Skip+1);
-escape_unicode(<<Byte/integer, Rest/bitstring>>, Acc, Input, Skip)
-  when Byte < 128 ->
-    escape_unicode_chunk(Rest, Acc, Input, Skip, 1);
-escape_unicode(<<Char/utf8, Rest/bitstring>>, Acc0, Input, Skip)
+    escape_unicode(Rest, Acc, Input, Pos+1);
+escape_unicode(<<Byte/integer, Rest/bitstring>>, Acc, Input, Pos)
+  when Byte =< ?ONE_BYTE_LAST ->
+    escape_unicode_chunk(Rest, Acc, Input, Pos, 1);
+escape_unicode(<<Char/utf8, Rest/bitstring>>, Acc0, Input, Pos)
   when Char < 256 ->
     Acc = [Acc0, <<"\\u00">>, integer_to_binary(Char, 16)],
-    escape_unicode(Rest, Acc, Input, Skip+2);
-escape_unicode(<<Char/utf8, Rest/bitstring>>, Acc0, Input, Skip)
-  when Char < 2048 ->
+    escape_unicode(Rest, Acc, Input, Pos+2);
+escape_unicode(<<Char/utf8, Rest/bitstring>>, Acc0, Input, Pos)
+  when Char =< ?TWO_BYTE_LAST ->
     Acc = [Acc0, <<"\\u0">>, integer_to_binary(Char, 16)],
-    escape_unicode(Rest, Acc, Input, Skip+2);
-escape_unicode(<<Char/utf8, Rest/bitstring>>, Acc0, Input, Skip)
+    escape_unicode(Rest, Acc, Input, Pos+2);
+escape_unicode(<<Char/utf8, Rest/bitstring>>, Acc0, Input, Pos)
   when Char < 4096 ->
     Acc = [Acc0, <<"\\u0">>, integer_to_binary(Char, 16)],
-    escape_unicode(Rest, Acc, Input, Skip+3);
-escape_unicode(<<Char/utf8, Rest/bitstring>>, Acc0, Input, Skip)
-  when Char < 65536 ->
+    escape_unicode(Rest, Acc, Input, Pos+3);
+escape_unicode(<<Char/utf8, Rest/bitstring>>, Acc0, Input, Pos)
+  when Char =< ?THREE_BYTE_LAST ->
     Acc = [Acc0, <<"\\u">>, integer_to_binary(Char, 16)],
-    escape_unicode(Rest, Acc, Input, Skip+3);
-escape_unicode(<<Char0/utf8, Rest/bitstring>>, Acc0, Input, Skip) ->
+    escape_unicode(Rest, Acc, Input, Pos+3);
+escape_unicode(<<Char0/utf8, Rest/bitstring>>, Acc0, Input, Pos) ->
     Char = Char0 - 65536,
     Acc = [ Acc0
           , <<"\\uD">>
@@ -470,43 +486,43 @@ escape_unicode(<<Char0/utf8, Rest/bitstring>>, Acc0, Input, Skip) ->
           , <<"\\uD">>
           , integer_to_binary(3072 bor Char band 1023, 16)
           ],
-    escape_unicode(Rest, Acc, Input, Skip+4);
-escape_unicode(<<>>, Acc, _Input, _Skip) ->
+    escape_unicode(Rest, Acc, Input, Pos+4);
+escape_unicode(<<>>, Acc, _Input, _Pos) ->
     Acc;
-escape_unicode(<<Byte/integer, _Rest/bitstring>>, _Acc, Input, _Skip) ->
+escape_unicode(<<Byte/integer, _Rest/bitstring>>, _Acc, Input, _Pos) ->
     throw_invalid_byte_error(Byte, Input).
 
-escape_unicode_chunk(<<Byte/integer, Rest/bitstring>>, Acc0, Input, Skip, Len)
-  when Byte < 32; Byte =:= $\"; Byte =:= $\\ ->
-    Part = binary_part(Input, Skip, Len),
+escape_unicode_chunk(<<Byte/integer, Rest/bitstring>>, Acc0, Input, Pos, Len)
+  when Byte =< ?NON_PRINTABLE_LAST; Byte =:= $\"; Byte =:= $\\ ->
+    Part = binary_part(Input, Pos, Len),
     Acc = [Acc0, Part, escape_byte(Byte)],
-    escape_unicode(Rest, Acc, Input, Skip+Len+1);
-escape_unicode_chunk(<<Byte/integer, Rest/bitstring>>, Acc, Input, Skip, Len)
-  when Byte < 128 ->
-    escape_unicode_chunk(Rest, Acc, Input, Skip, Len+1);
-escape_unicode_chunk(<<Char/utf8, Rest/bitstring>>, Acc0, Input, Skip, Len)
+    escape_unicode(Rest, Acc, Input, Pos+Len+1);
+escape_unicode_chunk(<<Byte/integer, Rest/bitstring>>, Acc, Input, Pos, Len)
+  when Byte =< ?ONE_BYTE_LAST ->
+    escape_unicode_chunk(Rest, Acc, Input, Pos, Len+1);
+escape_unicode_chunk(<<Char/utf8, Rest/bitstring>>, Acc0, Input, Pos, Len)
   when Char < 256 ->
-    Part = binary_part(Input, Skip, Len),
+    Part = binary_part(Input, Pos, Len),
     Acc = [Acc0, Part, <<"\\u00">>, integer_to_binary(Char, 16)],
-    escape_unicode(Rest, Acc, Input, Skip+Len+2);
-escape_unicode_chunk(<<Char/utf8, Rest/bitstring>>, Acc0, Input, Skip, Len)
-  when Char < 2048 ->
-    Part = binary_part(Input, Skip, Len),
+    escape_unicode(Rest, Acc, Input, Pos+Len+2);
+escape_unicode_chunk(<<Char/utf8, Rest/bitstring>>, Acc0, Input, Pos, Len)
+  when Char =< ?TWO_BYTE_LAST ->
+    Part = binary_part(Input, Pos, Len),
     Acc = [Acc0, Part, <<"\\u0">>, integer_to_binary(Char, 16)],
-    escape_unicode(Rest, Acc, Input, Skip+Len+2);
-escape_unicode_chunk(<<Char/utf8, Rest/bitstring>>, Acc0, Input, Skip, Len)
+    escape_unicode(Rest, Acc, Input, Pos+Len+2);
+escape_unicode_chunk(<<Char/utf8, Rest/bitstring>>, Acc0, Input, Pos, Len)
   when Char < 4096 ->
-    Part = binary_part(Input, Skip, Len),
+    Part = binary_part(Input, Pos, Len),
     Acc = [Acc0, Part, <<"\\u0">>, integer_to_binary(Char, 16)],
-    escape_unicode(Rest, Acc, Input, Skip+Len+3);
-escape_unicode_chunk(<<Char/utf8, Rest/bitstring>>, Acc0, Input, Skip, Len)
-  when Char < 65536 ->
-    Part = binary_part(Input, Skip, Len),
+    escape_unicode(Rest, Acc, Input, Pos+Len+3);
+escape_unicode_chunk(<<Char/utf8, Rest/bitstring>>, Acc0, Input, Pos, Len)
+  when Char =< ?THREE_BYTE_LAST ->
+    Part = binary_part(Input, Pos, Len),
     Acc = [Acc0, Part, <<"\\u">>, integer_to_binary(Char, 16)],
-    escape_unicode(Rest, Acc, Input, Skip+Len+3);
-escape_unicode_chunk(<<Char0/utf8, Rest/bitstring>>, Acc0, Input, Skip, Len) ->
+    escape_unicode(Rest, Acc, Input, Pos+Len+3);
+escape_unicode_chunk(<<Char0/utf8, Rest/bitstring>>, Acc0, Input, Pos, Len) ->
     Char = Char0 - 65536,
-    Part = binary_part(Input, Skip, Len),
+    Part = binary_part(Input, Pos, Len),
     Acc = [ Acc0
           , Part
           , <<"\\uD">>
@@ -514,12 +530,12 @@ escape_unicode_chunk(<<Char0/utf8, Rest/bitstring>>, Acc0, Input, Skip, Len) ->
           , <<"\\uD">>
           , integer_to_binary(3072 bor Char band 1023, 16)
           ],
-    escape_unicode(Rest, Acc, Input, Skip+Len+4);
-escape_unicode_chunk(<<>>, [], Input, Skip, Len) ->
-    binary_part(Input, Skip, Len);
-escape_unicode_chunk(<<>>, Acc, Input, Skip, Len) ->
-    [Acc, binary_part(Input, Skip, Len)];
-escape_unicode_chunk(<<Byte/integer, _Rest/bitstring>>, _Acc, Input, _Skip, _Len) ->
+    escape_unicode(Rest, Acc, Input, Pos+Len+4);
+escape_unicode_chunk(<<>>, [], Input, Pos, Len) ->
+    binary_part(Input, Pos, Len);
+escape_unicode_chunk(<<>>, Acc, Input, Pos, Len) ->
+    [Acc, binary_part(Input, Pos, Len)];
+escape_unicode_chunk(<<Byte/integer, _Rest/bitstring>>, _Acc, Input, _Pos, _Len) ->
     throw_invalid_byte_error(Byte, Input).
 
 throw_unsupported_type_error(Term) ->
@@ -528,14 +544,14 @@ throw_unsupported_type_error(Term) ->
 throw_invalid_byte_error(Byte, Input) ->
     throw({invalid_byte, Byte, Input}).
 
-handle_error(throw, {unsupported_type, Unsupported}, _Stacktrace, _Input, _Opts) ->
+handle_error(throw, {unsupported_type, Unsupported}, _Stacktrace) ->
     {error, {unsupported_type, Unsupported}};
-handle_error(throw, {invalid_byte, Byte0, Input}, _Stacktrace, _Input, _Opts) ->
+handle_error(throw, {invalid_byte, Byte0, Input}, _Stacktrace) ->
     Byte = <<"0x"/utf8, (integer_to_binary(Byte0, 16))/binary>>,
     {error, {invalid_byte, Byte, Input}};
-handle_error(throw, Reason, _Stacktrace, _Input, _Opts) ->
+handle_error(throw, Reason, _Stacktrace) ->
     {error, Reason};
-handle_error(Class, Reason, Stacktrace, _Input, _Opts) ->
+handle_error(Class, Reason, Stacktrace) ->
     erlang:raise(Class, Reason, Stacktrace).
 
 -ifdef(TEST).

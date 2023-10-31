@@ -24,19 +24,19 @@
     string/6, number/6, object/6, array/6, empty_array/5,
     % numbers
     number_exp_cont/6, number_exp_sign/6, number_exp_copy/6, number_frac/6,
-    number_frac_cont/6, number_minus/5, number_zero/6, try_parse_float/3,
+    number_frac_cont/6, number_minus/5, number_zero/6, try_parse_float/7,
     % helpers
     chars_to_integer/2, chars_to_integer/3, chars_to_integer/4,
     % escape
-    escapeu/6, escapeu_1/8, escapeu_2/8, escape_surrogate/7, escapeu_last/3,
+    escapeu/6, escapeu_1/8, escapeu_2/8, escape_surrogate/7, escapeu_last/6,
     % normalize
     normalize_string/3, normalize_object/2, normalize_array/2,
     % error
-    handle_error/5
+    handle_error/3
 ]}).
 -compile({inline_size, 100}).
 
--export([ decode/2, handle_error/5 ]).
+-export([ decode/2, handle_error/3 ]).
 
 -export_type([
     input/0, options/0, result/0, normalizer/1, error_reason/0,
@@ -51,14 +51,22 @@
 
 -define(is_number(X), X >= $0, X =< $9).
 
+-define(NON_PRINTABLE_LAST, 31).
+-define(ONE_BYTE_LAST, 127).
+-define(TWO_BYTE_LAST, 2_047).
+-define(THREE_BYTE_LAST, 65_535).
+% -define(FOUR_BYTE_LAST, 1_114_111).
+
 -type input() :: binary() | iolist().
 -type options() :: #{
     null_term => term(),
-    key_normalizer => normalizer(Input :: binary()),
-    value_normalizer => normalizer(Input :: binary()),
-    array_normalizer => normalizer(Input :: list()),
-    object_normalizer => normalizer(Input :: map()),
+    keys => normalizer(Input :: binary()),
+    values => normalizer(Input :: binary()),
+    arrays => normalizer(Input :: list()),
+    objects => normalizer(Input :: map()),
     error_handler => error_handler()
+    % @todo add the possibility to resume after an error.
+    % resumer => fun(() -> result())
 }.
 -type position() :: non_neg_integer().
 -type result() :: {ok, term()} | {error, error_reason()}.
@@ -69,7 +77,7 @@
                       | {unexpected_sequence, binary(), position()}.
 -type error_stacktrace() :: erlang:stacktrace().
 -type error_handler() :: fun(
-    (error_class(), error_reason(), error_stacktrace(), input(), options()) ->
+    (error_class(), error_reason(), error_stacktrace()) ->
         error_stacktrace()
 ).
 
@@ -85,7 +93,7 @@ decode(Bin, Opts0) when is_binary(Bin) andalso is_map(Opts0) ->
     catch
         Class:Reason:Stacktrace ->
             Handle = maps:get(error_handler, Opts),
-            Handle(Class, Reason, Stacktrace, Bin, Opts)
+            Handle(Class, Reason, Stacktrace)
     end;
 decode(MaybeIOList, Opts) ->
     case attempt_iolist_to_binary(MaybeIOList) of
@@ -104,71 +112,94 @@ attempt_iolist_to_binary(IOList) ->
     end.
 
 parse_opts(Opts) ->
-    Opts#{
-        null_term => maps:get(null_term, Opts, undefined)
-    }.
+    OptionalKeys = [
+        keys,
+        values,
+        arrays,
+        objects
+    ],
+    Optionals = maps:map(fun
+        (_, Fun) when is_function(Fun, 2) ->
+            Fun;
+        (K, copy) when K =:= keys; K =:= values ->
+            fun(X, _O) -> binary:copy(X) end;
+        (K, to_atom) when K =:= keys; K =:= values ->
+            fun(X, _O) -> binary_to_atom(X) end;
+        (K, to_existing_atom) when K =:= keys; K =:= values ->
+            fun(X, _O) -> binary_to_existing_atom(X) end;
+        (K, to_integer) when K =:= keys; K =:= values ->
+            fun(X, _O) -> binary_to_integer(X) end
+    end, maps:with(OptionalKeys, Opts)),
+    Required = #{
+        null_term => maps:get(null_term, Opts, undefined),
+        error_handler => maps:get(error_handler, Opts, fun(C, R, S) ->
+            handle_error(C, R, S)
+        end)
+    },
+    maps:merge(Required, Optionals).
 
-key(<<H/integer,Rest/bitstring>>, Opts, Input, Skip, Stack)
+
+key(<<H/integer,Rest/bitstring>>, Opts, Input, Pos, Buffer)
   when H =:= $\s; H =:= $\t; H =:= $\n; H =:= $\r ->
-    key(Rest, Opts, Input, Skip + 1, Stack);
-key(<<$"/integer,Rest/bitstring>>, Opts, Input, Skip, Stack) ->
-    string(Rest, Opts, Input, Skip + 1, [?key | Stack], 0);
-key(<<$}/integer,Rest/bitstring>>, Opts, Input, Skip, [[] | Stack]) ->
-    continue(Rest, Opts, Input, Skip + 1, Stack, #{});
-key(<<_/integer,_/bitstring>>, _Opts, Input, Skip, _Stack) ->
-    throw_error(Input, Skip);
-key(<<_/bitstring>>, _Opts, Input, Skip, _Stack) ->
-    empty_error(Input, Skip).
+    key(Rest, Opts, Input, Pos + 1, Buffer);
+key(<<$"/integer,Rest/bitstring>>, Opts, Input, Pos, Buffer) ->
+    string(Rest, Opts, Input, Pos + 1, [?key | Buffer], 0);
+key(<<$}/integer,Rest/bitstring>>, Opts, Input, Pos, [[] | Buffer]) ->
+    continue(Rest, Opts, Input, Pos + 1, Buffer, #{});
+key(<<_/integer,_/bitstring>> = Rest, Opts, Input, Pos, Buffer) ->
+    throw_error(Rest, Opts, Input, Pos, Buffer);
+key(<<_/bitstring>>, _Opts, _Input, _Pos, _Buffer) ->
+    eof_error().
 
-key(<<H/integer,Rest/bitstring>>, Opts, Input, Skip, Stack, Value)
+key(<<H/integer,Rest/bitstring>>, Opts, Input, Pos, Buffer, Value)
   when H =:= $\s; H =:= $\t; H =:= $\n; H =:= $\r ->
-    key(Rest, Opts, Input, Skip + 1, Stack, Value);
-key(<<$:/integer,Rest/bitstring>>, Opts, Input, Skip, Stack, Value) ->
-    value(Rest, Opts, Input, Skip + 1, [?object, Value | Stack]);
-key(<<_/integer,_/bitstring>>, _Opts, Input, Skip, _Stack, _Value) ->
-    throw_error(Input, Skip);
-key(<<_/bitstring>>, _Opts, Input, Skip, _Stack, _Value) ->
-    empty_error(Input, Skip).
+    key(Rest, Opts, Input, Pos + 1, Buffer, Value);
+key(<<$:/integer,Rest/bitstring>>, Opts, Input, Pos, Buffer, Value) ->
+    value(Rest, Opts, Input, Pos + 1, [?object, Value | Buffer]);
+key(<<_/integer,_/bitstring>> = Rest, Opts, Input, Pos, Buffer, _Value) ->
+    throw_error(Rest, Opts, Input, Pos, Buffer);
+key(<<>>, _Opts, _Input, _Pos, _Buffer, _Value) ->
+    eof_error().
 
-value(<<H/integer,Rest/bitstring>>, Opts, Input, Skip, Stack)
-  when H =:= 32; H =:= 9; H =:= 10; H =:= 13 ->
-    value(Rest, Opts, Input, Skip + 1, Stack);
-value(<<34/integer,Rest/bitstring>>, Opts, Input, Skip, Stack) ->
-    string(Rest, Opts, Input, Skip + 1, Stack, 0);
-value(<<45/integer,Rest/bitstring>>, Opts, Input, Skip, Stack) ->
-    number_minus(Rest, Opts, Input, Skip, Stack);
-value(<<48/integer,Rest/bitstring>>, Opts, Input, Skip, Stack) ->
-    number_zero(Rest, Opts, Input, Skip, Stack, 1);
-value(<<H/integer,Rest/bitstring>>, Opts, Input, Skip, Stack)
-  when H > 48, H < 58 ->
-    number(Rest, Opts, Input, Skip, Stack, 1);
-value(<<"true",Rest/bitstring>>, Opts, Input, Skip, Stack) ->
-    continue(Rest, Opts, Input, Skip + 4, Stack, true);
-value(<<"false",Rest/bitstring>>, Opts, Input, Skip, Stack) ->
-    continue(Rest, Opts, Input, Skip + 5, Stack, false);
-value(<<"null",Rest/bitstring>>, #{null_term := Null} = Opts, Input, Skip, Stack) ->
-    continue(Rest, Opts, Input, Skip + 4, Stack, Null);
-value(<<123/integer,Rest/bitstring>>, Opts, Input, Skip, Stack) ->
-    key(Rest, Opts, Input, Skip + 1, [[] | Stack]);
-value(<<91/integer,Rest/bitstring>>, Opts, Input, Skip, Stack) ->
-    value(Rest, Opts, Input, Skip + 1, [?array, [] | Stack]);
-value(<<93/integer,Rest/bitstring>>, Opts, Input, Skip, Stack) ->
-    empty_array(Rest, Opts, Input, Skip + 1, Stack);
-value(<<_/integer,Rest/bitstring>>, _Opts, Input, Skip, Stack) ->
-    throw_error(Rest, Input, Skip + 1, Stack);
-value(<<_/bitstring>>, _Opts, Input, Skip, _Stack) ->
-    throw_error(Input, Skip).
+value(<<H/integer,Rest/bitstring>>, Opts, Input, Pos, Buffer)
+  when H =:= $\s; H =:= $\t; H =:= $\n; H =:= $\r ->
+    value(Rest, Opts, Input, Pos + 1, Buffer);
+value(<<$\"/integer,Rest/bitstring>>, Opts, Input, Pos, Buffer) ->
+    string(Rest, Opts, Input, Pos + 1, Buffer, 0);
+value(<<$-/integer,Rest/bitstring>>, Opts, Input, Pos, Buffer) ->
+    number_minus(Rest, Opts, Input, Pos, Buffer);
+value(<<$0/integer,Rest/bitstring>>, Opts, Input, Pos, Buffer) ->
+    number_zero(Rest, Opts, Input, Pos, Buffer, 1);
+value(<<H/integer,Rest/bitstring>>, Opts, Input, Pos, Buffer)
+  when H > $0, H =< $9 ->
+    number(Rest, Opts, Input, Pos, Buffer, 1);
+value(<<"true",Rest/bitstring>>, Opts, Input, Pos, Buffer) ->
+    continue(Rest, Opts, Input, Pos + 4, Buffer, true);
+value(<<"false",Rest/bitstring>>, Opts, Input, Pos, Buffer) ->
+    continue(Rest, Opts, Input, Pos + 5, Buffer, false);
+value(<<"null",Rest/bitstring>>, #{null_term := Null} = Opts, Input, Pos, Buffer) ->
+    continue(Rest, Opts, Input, Pos + 4, Buffer, Null);
+value(<<${/integer,Rest/bitstring>>, Opts, Input, Pos, Buffer) ->
+    key(Rest, Opts, Input, Pos + 1, [[] | Buffer]);
+value(<<$[/integer,Rest/bitstring>>, Opts, Input, Pos, Buffer) ->
+    value(Rest, Opts, Input, Pos + 1, [?array, [] | Buffer]);
+value(<<$]/integer,Rest/bitstring>>, Opts, Input, Pos, Buffer) ->
+    empty_array(Rest, Opts, Input, Pos + 1, Buffer);
+value(<<_/integer,_/bitstring>> = Rest, Opts, Input, Pos, Buffer) ->
+    throw_error(Rest, Opts, Input, Pos, Buffer);
+value(<<_/bitstring>>, _Opts, _Input, _Pos, _Buffer) ->
+    eof_error().
 
-string(<<$"/integer,Rest/bitstring>>, Opts, Input, Skip, Stack, Len) ->
-    String = binary_part(Input, Skip, Len),
-    Value = normalize_string(Stack, Opts, String),
-    continue(Rest, Opts, Input, Skip + Len + 1, Stack, Value);
-string(<<$\\/integer,Rest/bitstring>>, Opts, Input, Skip, Stack, Len) ->
-    Part = binary_part(Input, Skip, Len),
-    escape(Rest, Opts, Input, Skip + Len, Stack, Part);
-string(<<H/integer,_Rest/bitstring>>, _Opts, Input, Skip, _Stack, _Len)
-  when H < 32 ->
-    throw_error(Input, Skip);
+string(<<$"/integer,Rest/bitstring>>, Opts, Input, Pos, Buffer, Len) ->
+    String = binary_part(Input, Pos, Len),
+    Value = normalize_string(Buffer, Opts, String),
+    continue(Rest, Opts, Input, Pos + Len + 1, Buffer, Value);
+string(<<$\\/integer,Rest/bitstring>>, Opts, Input, Pos, Buffer, Len) ->
+    Part = binary_part(Input, Pos, Len),
+    escape(Rest, Opts, Input, Pos + Len, Buffer, Part);
+string(<<H/integer,_/bitstring>> = Rest, Opts, Input, Pos, Buffer, _Len)
+  when H =< ?NON_PRINTABLE_LAST ->
+    throw_error(Rest, Opts, Input, Pos, Buffer);
 string(<< Y4/integer, Y3/integer, Y2/integer, Y1/integer, $-/integer
         , M2/integer, M1/integer, $-/integer
         , D2/integer, D1/integer
@@ -176,7 +207,7 @@ string(<< Y4/integer, Y3/integer, Y2/integer, Y1/integer, $-/integer
         , H2/integer, H1/integer, $:/integer
         , Min2/integer, Min1/integer, $:/integer
         , S2/integer, S1/integer
-        , Rest0/bitstring >>, Opts, Input, Skip, Stack, 0)
+        , Rest0/bitstring >>, Opts, Input, Pos, Buffer, 0)
   when ?is_number(Y4), ?is_number(Y3), ?is_number(Y2), ?is_number(Y1)
      , ?is_number(M2), ?is_number(M1)
      , ?is_number(D2), ?is_number(D1)
@@ -188,7 +219,7 @@ string(<< Y4/integer, Y3/integer, Y2/integer, Y1/integer, $-/integer
             Date = {chars_to_integer(Y4, Y3, Y2, Y1), chars_to_integer(M2, M1), chars_to_integer(D2, D1)},
             Time = {chars_to_integer(H2, H1), chars_to_integer(Min2, Min1), chars_to_integer(S2, S1)},
             Value = {Date, Time},
-            continue(Rest, Opts, Input, Skip + 21, Stack, Value);
+            continue(Rest, Opts, Input, Pos + 21, Buffer, Value);
         << $./integer
          , Mil3/integer, Mil2/integer, Mil1/integer
          , $Z/integer, $"
@@ -200,57 +231,57 @@ string(<< Y4/integer, Y3/integer, Y2/integer, Y1/integer, $-/integer
             MilliSeconds = chars_to_integer(Mil3, Mil2, Mil1),
             Seconds = calendar:datetime_to_gregorian_seconds(DateTime) - 62167219200,
             Value = {Seconds div 1000000, Seconds rem 1000000, MilliSeconds * 1000},
-            continue(Rest, Opts, Input, Skip + 25, Stack, Value)
+            continue(Rest, Opts, Input, Pos + 25, Buffer, Value)
     end;
-string(<<H/integer,Rest/bitstring>>, Opts, Input, Skip, Stack, Len)
-  when H < 128 ->
-    string(Rest, Opts, Input, Skip, Stack, Len + 1);
-string(<<H/utf8,Rest/bitstring>>, Opts, Input, Skip, Stack, Len)
-  when H < 2048 ->
-    string(Rest, Opts, Input, Skip, Stack, Len + 2);
-string(<<H/utf8,Rest/bitstring>>, Opts, Input, Skip, Stack, Len)
-  when H < 65536 ->
-    string(Rest, Opts, Input, Skip, Stack, Len + 3);
-string(<<_/utf8,Rest/bitstring>>, Opts, Input, Skip, Stack, Len) ->
-    string(Rest, Opts, Input, Skip, Stack, Len + 4);
-string(<<_/integer,_Rest/bitstring>>, _Opts, Input, Skip, _Stack, _Len) ->
-    throw_error(Input, Skip);
-string(<<_/bitstring>>, _Opts, Input, Skip, _Stack, Len) ->
-    empty_error(Input, Skip + Len).
+string(<<H/integer,Rest/bitstring>>, Opts, Input, Pos, Buffer, Len)
+  when H =< ?ONE_BYTE_LAST ->
+    string(Rest, Opts, Input, Pos, Buffer, Len + 1);
+string(<<H/utf8,Rest/bitstring>>, Opts, Input, Pos, Buffer, Len)
+  when H =< ?TWO_BYTE_LAST ->
+    string(Rest, Opts, Input, Pos, Buffer, Len + 2);
+string(<<H/utf8,Rest/bitstring>>, Opts, Input, Pos, Buffer, Len)
+  when H =< ?THREE_BYTE_LAST ->
+    string(Rest, Opts, Input, Pos, Buffer, Len + 3);
+string(<<_/utf8,Rest/bitstring>>, Opts, Input, Pos, Buffer, Len) ->
+    string(Rest, Opts, Input, Pos, Buffer, Len + 4);
+string(<<_/integer,_/bitstring>> = Rest, Opts, Input, Pos, Buffer, _Len) ->
+    throw_error(Rest, Opts, Input, Pos, Buffer);
+string(<<_/bitstring>>, _Opts, _Input, _Pos, _Buffer, _Len) ->
+    eof_error().
 
-string(<<$"/integer,Rest/bitstring>>, Opts, Input, Skip, Stack, Acc, Len) ->
-    Last = binary_part(Input, Skip, Len),
+string(<<$"/integer,Rest/bitstring>>, Opts, Input, Pos, Buffer, Acc, Len) ->
+    Last = binary_part(Input, Pos, Len),
     String = iolist_to_binary([Acc, Last]),
-    continue(Rest, Opts, Input, Skip + Len + 1, Stack, String);
-string(<<$\\/integer,Rest/bitstring>>, Opts, Input, Skip, Stack, Acc, Len) ->
-    Part = binary_part(Input, Skip, Len),
-    escape(Rest, Opts, Input, Skip + Len, Stack, [Acc, Part]);
-string(<<H/integer,_/bitstring>>, _Opts, Input, Skip, _Stack, _Acc, _Len)
-  when H < 32 ->
-    throw_error(Input, Skip);
-string(<<H/integer,Rest/bitstring>>, Opts, Input, Skip, Stack, Acc, Len)
-  when H < 128 ->
-    string(Rest, Opts, Input, Skip, Stack, Acc, Len + 1);
-string(<<H/utf8,Rest/bitstring>>, Opts, Input, Skip, Stack, Acc, Len)
-  when H < 2048 ->
-    string(Rest, Opts, Input, Skip, Stack, Acc, Len + 2);
-string(<<H/utf8,Rest/bitstring>>, Opts, Input, Skip, Stack, Acc, Len)
-  when H < 65536 ->
-    string(Rest, Opts, Input, Skip, Stack, Acc, Len + 3);
-string(<<_/utf8,Rest/bitstring>>, Opts, Input, Skip, Stack, Acc, Len) ->
-    string(Rest, Opts, Input, Skip, Stack, Acc, Len + 4);
-string(<<_/integer,_/bitstring>>, _Opts, Input, Skip, _Stack, _Acc, _Len) ->
-    throw_error(Input, Skip);
-string(<<_/bitstring>>, _Opts, Input, Skip, _Stack, _Acc, Len) ->
-    empty_error(Input, Skip + Len).
+    continue(Rest, Opts, Input, Pos + Len + 1, Buffer, String);
+string(<<$\\/integer,Rest/bitstring>>, Opts, Input, Pos, Buffer, Acc, Len) ->
+    Part = binary_part(Input, Pos, Len),
+    escape(Rest, Opts, Input, Pos + Len, Buffer, [Acc, Part]);
+string(<<H/integer,_/bitstring>> = Rest, Opts, Input, Pos, Buffer, _Acc, _Len)
+  when H =< ?NON_PRINTABLE_LAST ->
+    throw_error(Rest, Opts, Input, Pos, Buffer);
+string(<<H/integer,Rest/bitstring>>, Opts, Input, Pos, Buffer, Acc, Len)
+  when H =< ?ONE_BYTE_LAST ->
+    string(Rest, Opts, Input, Pos, Buffer, Acc, Len + 1);
+string(<<H/utf8,Rest/bitstring>>, Opts, Input, Pos, Buffer, Acc, Len)
+  when H =< ?TWO_BYTE_LAST ->
+    string(Rest, Opts, Input, Pos, Buffer, Acc, Len + 2);
+string(<<H/utf8,Rest/bitstring>>, Opts, Input, Pos, Buffer, Acc, Len)
+  when H =< ?THREE_BYTE_LAST ->
+    string(Rest, Opts, Input, Pos, Buffer, Acc, Len + 3);
+string(<<_/utf8,Rest/bitstring>>, Opts, Input, Pos, Buffer, Acc, Len) ->
+    string(Rest, Opts, Input, Pos, Buffer, Acc, Len + 4);
+string(<<_/integer,_/bitstring>> = Rest, Opts, Input, Pos, Buffer, _Acc, _Len) ->
+    throw_error(Rest, Opts, Input, Pos, Buffer);
+string(<<_/bitstring>>, _Opts, _Input, _Pos, _Buffer, _Acc, _Len) ->
+    eof_error().
 
-normalize_string([?key | _], #{key_normalizer := Normalize} = Opts, Key) ->
+normalize_string([?key | _], #{keys := Normalize} = Opts, Key) ->
     Normalize(Key, Opts);
 normalize_string([?key | _], _Opts, Key) ->
     Key;
-normalize_string(_Stack, #{value_normalizer := Normalize} = Opts, String) ->
-    Normalize(String, Opts);
-normalize_string(_Stack, _Opts, Value) ->
+normalize_string(_Buffer, #{values := Normalize} = Opts, Value) ->
+    Normalize(Value, Opts);
+normalize_string(_Buffer, _Opts, Value) ->
     Value.
 
 chars_to_integer(N2, N1) ->
@@ -262,31 +293,31 @@ chars_to_integer(N3, N2, N1) ->
 chars_to_integer(N4, N3, N2, N1) ->
     ((N4 - $0) * 1000) + ((N3 - $0) * 100) + ((N2 - $0) * 10) + (N1 - $0).
 
-escape(<<$\"/integer,Rest/bitstring>>, Opts, Input, Skip, Stack, Acc) ->
-    string(Rest, Opts, Input, Skip + 2, Stack, [Acc, $\"], 0);
-escape(<<$//integer,Rest/bitstring>>, Opts, Input, Skip, Stack, Acc) ->
-    string(Rest, Opts, Input, Skip + 2, Stack, [Acc, $/], 0);
-escape(<<$\\/integer,Rest/bitstring>>, Opts, Input, Skip, Stack, Acc) ->
-    string(Rest, Opts, Input, Skip + 2, Stack, [Acc, $\\], 0);
-escape(<<$b/integer,Rest/bitstring>>, Opts, Input, Skip, Stack, Acc) ->
-    string(Rest, Opts, Input, Skip + 2, Stack, [Acc, $\b], 0);
-escape(<<$f/integer,Rest/bitstring>>, Opts, Input, Skip, Stack, Acc) ->
-    string(Rest, Opts, Input, Skip + 2, Stack, [Acc, $\f], 0);
-escape(<<$n/integer,Rest/bitstring>>, Opts, Input, Skip, Stack, Acc) ->
-    string(Rest, Opts, Input, Skip + 2, Stack, [Acc, $\n], 0);
-escape(<<$r/integer,Rest/bitstring>>, Opts, Input, Skip, Stack, Acc) ->
-    string(Rest, Opts, Input, Skip + 2, Stack, [Acc, $\r], 0);
-escape(<<$t/integer,Rest/bitstring>>, Opts, Input, Skip, Stack, Acc) ->
-    string(Rest, Opts, Input, Skip + 2, Stack, [Acc, $\t], 0);
-escape(<<$u/integer,Rest/bitstring>>, Opts, Input, Skip, Stack, Acc) ->
-    escapeu(Rest, Opts, Input, Skip, Stack, Acc);
-escape(<<_/integer,_/bitstring>>, _Opts, Input, Skip, _Stack, _Acc) ->
-    throw_error(Input, Skip + 1);
-escape(<<_/bitstring>>, _Opts, Input, Skip, _Stack, _Acc) ->
-    empty_error(Input, Skip).
+escape(<<$\"/integer,Rest/bitstring>>, Opts, Input, Pos, Buffer, Acc) ->
+    string(Rest, Opts, Input, Pos + 2, Buffer, [Acc, $\"], 0);
+escape(<<$//integer,Rest/bitstring>>, Opts, Input, Pos, Buffer, Acc) ->
+    string(Rest, Opts, Input, Pos + 2, Buffer, [Acc, $/], 0);
+escape(<<$\\/integer,Rest/bitstring>>, Opts, Input, Pos, Buffer, Acc) ->
+    string(Rest, Opts, Input, Pos + 2, Buffer, [Acc, $\\], 0);
+escape(<<$b/integer,Rest/bitstring>>, Opts, Input, Pos, Buffer, Acc) ->
+    string(Rest, Opts, Input, Pos + 2, Buffer, [Acc, $\b], 0);
+escape(<<$f/integer,Rest/bitstring>>, Opts, Input, Pos, Buffer, Acc) ->
+    string(Rest, Opts, Input, Pos + 2, Buffer, [Acc, $\f], 0);
+escape(<<$n/integer,Rest/bitstring>>, Opts, Input, Pos, Buffer, Acc) ->
+    string(Rest, Opts, Input, Pos + 2, Buffer, [Acc, $\n], 0);
+escape(<<$r/integer,Rest/bitstring>>, Opts, Input, Pos, Buffer, Acc) ->
+    string(Rest, Opts, Input, Pos + 2, Buffer, [Acc, $\r], 0);
+escape(<<$t/integer,Rest/bitstring>>, Opts, Input, Pos, Buffer, Acc) ->
+    string(Rest, Opts, Input, Pos + 2, Buffer, [Acc, $\t], 0);
+escape(<<$u/integer,Rest/bitstring>>, Opts, Input, Pos, Buffer, Acc) ->
+    escapeu(Rest, Opts, Input, Pos, Buffer, Acc);
+escape(<<_/integer,_/bitstring>> = Rest, Opts, Input, Pos, Buffer, _Acc) ->
+    throw_error(Rest, Opts, Input, Pos + 1, Buffer);
+escape(<<_/bitstring>>, _Opts, _Input, _Pos, _Buffer, _Acc) ->
+    eof_error().
 
-escapeu(<<12336:16/integer,Int2:16/integer,Rest/bitstring>>, Opts, Input, Skip, Stack, Acc0) ->
-    Last = escapeu_last(Int2, Input, Skip),
+escapeu(<<12336:16/integer,Int2:16/integer,Rest/bitstring>>, Opts, Input, Pos, Buffer, Acc0) ->
+    Last = escapeu_last(Int2, Rest, Opts, Input, Pos, Buffer),
     _@1 = Acc0,
     _@2 = 0,
     _@3 = Last,
@@ -298,17 +329,17 @@ escapeu(<<12336:16/integer,Int2:16/integer,Rest/bitstring>>, Opts, Input, Skip, 
         true ->
             [_@1, _@3]
     end,
-    string(Rest, Opts, Input, Skip + 6, Stack, Acc, 0);
-escapeu(<<Int1:16/integer,Int2:16/integer,Rest/bitstring>>, Opts, Input, Skip, Stack, Acc)
+    string(Rest, Opts, Input, Pos + 6, Buffer, Acc, 0);
+escapeu(<<Int1:16/integer,Int2:16/integer,Rest/bitstring>>, Opts, Input, Pos, Buffer, Acc)
   when Int1 > 12336, Int1 < 12344 ->
     X = case Int1 of
         12337 -> 1; 12338 -> 2; 12339 -> 3; 12340 -> 4; 12341 -> 5;
         12342 -> 6; 12343 -> 7;
-        _ -> token_error(Input, Skip, 6)
+        _ -> token_error(6, Rest, Opts, Input, Pos, Buffer)
     end,
-    Last = escapeu_last(Int2, Input, Skip),
-    escapeu_1(Rest, Opts, Input, Skip, Stack, Acc, Last, X);
-escapeu(<<Int1:16/integer,Int2:16/integer,Rest/bitstring>>, Opts, Input, Skip, Stack, Acc)
+    Last = escapeu_last(Int2, Rest, Opts, Input, Pos, Buffer),
+    escapeu_1(Rest, Opts, Input, Pos, Buffer, Acc, Last, X);
+escapeu(<<Int1:16/integer,Int2:16/integer,Rest/bitstring>>, Opts, Input, Pos, Buffer, Acc)
   when (Int1 > 12343 andalso Int1 < 17464) orelse (Int1 > 17711 andalso Int1 < 25656) orelse (Int1 > 25903 andalso Int1 < 26215) ->
     X = case Int1 of
         12344 -> 8; 12345 -> 9; 12353 -> 10; 12354 -> 11; 12355 -> 12;
@@ -401,24 +432,24 @@ escapeu(<<Int1:16/integer,Int2:16/integer,Rest/bitstring>>, Opts, Input, Skip, S
         26169 -> 249; 26177 -> 250; 26178 -> 251; 26179 -> 252; 26180 -> 253;
         26181 -> 254; 26182 -> 255; 26209 -> 250; 26210 -> 251; 26211 -> 252;
         26212 -> 253; 26213 -> 254; 26214 -> 255;
-        _ -> token_error(Input, Skip, 6)
+        _ -> token_error(6, Rest, Opts, Input, Pos, Buffer)
     end,
-    Last = escapeu_last(Int2, Input, Skip),
-    escapeu_2(Rest, Opts, Input, Skip, Stack, Acc, Last, X);
-escapeu(<<Int1:16/integer,Int2:16/integer,Rest/bitstring>>, Opts, Input, Skip, Stack, Acc) ->
+    Last = escapeu_last(Int2, Rest, Opts, Input, Pos, Buffer),
+    escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, X);
+escapeu(<<Int1:16/integer,Int2:16/integer,Rest/bitstring>>, Opts, Input, Pos, Buffer, Acc) ->
     X = case Int1 of
         17464 -> 216; 17465 -> 217; 17473 -> 218; 17474 -> 219; 17505 -> 218;
         17506 -> 219; 25656 -> 216; 25657 -> 217; 25665 -> 218; 25666 -> 219;
         25697 -> 218; 25698 -> 219;
-        _ -> token_error(Input, Skip, 6)
+        _ -> token_error(6, Rest, Opts, Input, Pos, Buffer)
     end,
-    Last = escapeu_last(Int2, Input, Skip),
+    Last = escapeu_last(Int2, Rest, Opts, Input, Pos, Buffer),
     Hi = 65536 + (X band 3 bsl 8 + Last bsl 10),
-    escape_surrogate(Rest, Opts, Input, Skip, Stack, Acc, Hi);
-escapeu(<<_Rest/bitstring>>, _Opts, Input, Skip, _Stack, _Acc) ->
-    empty_error(Input, Skip).
+    escape_surrogate(Rest, Opts, Input, Pos, Buffer, Acc, Hi);
+escapeu(<<_Rest/bitstring>>, _Opts, _Input, _Pos, _Buffer, _Acc) ->
+    eof_error().
 
-escapeu_last(Int, Input, Skip) ->
+escapeu_last(Int, Rest, Opts, Input, Pos, Buffer) ->
     case Int of
         12336 -> 0; 12337 -> 1; 12338 -> 2; 12339 -> 3; 12340 -> 4; 12341 -> 5; 12342 -> 6;
         12343 -> 7; 12344 -> 8; 12345 -> 9; 12353 -> 10; 12354 -> 11; 12355 -> 12;
@@ -501,232 +532,240 @@ escapeu_last(Int, Input, Skip) ->
         26167 -> 247; 26168 -> 248; 26169 -> 249; 26177 -> 250; 26178 -> 251; 26179 -> 252;
         26180 -> 253; 26181 -> 254; 26182 -> 255; 26209 -> 250; 26210 -> 251; 26211 -> 252;
         26212 -> 253; 26213 -> 254; 26214 -> 255;
-        _ -> token_error(Input, Skip, 6)
+        _ -> token_error(6, Rest, Opts, Input, Pos, Buffer)
     end.
 
 escape_surrogate(<<92/integer, 117/integer, Int1:16/integer, Int2:16/integer, Rest/bitstring>>,
-                 Opts, Input, Skip, Stack, Acc0, Hi) ->
-    Last = escapeu_last(Int2, Input, Skip + 6),
+                 Opts, Input, Pos, Buffer, Acc0, Hi) ->
+    Last = escapeu_last(Int2, Rest, Opts, Input, Pos+6, Buffer),
     X = case Int1 of
         17475 -> 220; 17476 -> 221; 17477 -> 222; 17478 -> 223; 17507 -> 220;
         17508 -> 221; 17509 -> 222; 17510 -> 223; 25667 -> 220; 25668 -> 221;
         25669 -> 222; 25670 -> 223; 25699 -> 220; 25700 -> 221; 25701 -> 222;
         25702 -> 223;
-        _ -> token_error(Input, Skip, 12)
+        _ -> token_error(12, Rest, Opts, Input, Pos, Buffer)
     end,
     Y = X band 3 bsl 8 + Last,
     Acc = [Acc0, <<(Hi + Y)/utf8>>],
-    string(Rest, Opts, Input, Skip + 12, Stack, Acc, 0);
-escape_surrogate(<<_Rest/bitstring>>, _Opts, Input, Skip, _Stack, _Acc, _Hi) ->
-    throw_error(Input, Skip + 6).
+    string(Rest, Opts, Input, Pos + 12, Buffer, Acc, 0);
+escape_surrogate(<<_Rest/bitstring>> = Rest, Opts, Input, Pos, Buffer, _Acc, _Hi) ->
+    throw_error(Rest, Opts, Input, Pos+6, Buffer).
 
-escapeu_1(<<_/bitstring>> = Rest, Opts, Input, Skip, Stack, Acc, Last, X) ->
+escapeu_1(<<_/bitstring>> = Rest, Opts, Input, Pos, Buffer, Acc, Last, X) ->
     A = 6 bsl 5 + (X bsl 2) + (Last bsr 6),
     B = 2 bsl 6 + Last band 63,
     C = [Acc, A, B],
-    string(Rest, Opts, Input, Skip + 6, Stack, C, 0).
+    string(Rest, Opts, Input, Pos + 6, Buffer, C, 0).
 
-escapeu_2(<<_/bitstring>> = Rest, Opts, Input, Skip, Stack, Acc, Last, X) ->
+escapeu_2(<<_/bitstring>> = Rest, Opts, Input, Pos, Buffer, Acc, Last, X) ->
     A = 14 bsl 4 + (X bsr 4),
     B = 2 bsl 6 + (X band 15 bsl 2) + (Last bsr 6),
     C = 2 bsl 6 + Last band 63,
     D = [Acc, A, B, C],
-    string(Rest, Opts, Input, Skip + 6, Stack, D, 0).
+    string(Rest, Opts, Input, Pos + 6, Buffer, D, 0).
 
-number(<<Byte/integer,Rest/bitstring>>, Opts, Input, Skip, Stack, Len)
+number(<<Byte/integer,Rest/bitstring>>, Opts, Input, Pos, Buffer, Len)
   when ?is_number(Byte) ->
-    number(Rest, Opts, Input, Skip, Stack, Len + 1);
-number(<<$./integer,Rest/bitstring>>, Opts, Input, Skip, Stack, Len) ->
-    number_frac(Rest, Opts, Input, Skip, Stack, Len + 1);
-number(<<E/integer,Rest/bitstring>>, Opts, Input, Skip, Stack, Len)
+    number(Rest, Opts, Input, Pos, Buffer, Len + 1);
+number(<<$./integer,Rest/bitstring>>, Opts, Input, Pos, Buffer, Len) ->
+    number_frac(Rest, Opts, Input, Pos, Buffer, Len + 1);
+number(<<E/integer,Rest/bitstring>>, Opts, Input, Pos, Buffer, Len)
   when E =:= $e orelse E =:= $E ->
-    Prefix = binary_part(Input, Skip, Len),
-    number_exp_copy(Rest, Opts, Input, Skip + Len + 1, Stack, Prefix);
-number(<<Rest/bitstring>>, Opts, Input, Skip, Stack, Len) ->
-    Int = binary_to_integer(binary_part(Input, Skip, Len)),
-    continue(Rest, Opts, Input, Skip + Len, Stack, Int).
+    Prefix = binary_part(Input, Pos, Len),
+    number_exp_copy(Rest, Opts, Input, Pos + Len + 1, Buffer, Prefix);
+number(<<Rest/bitstring>>, Opts, Input, Pos, Buffer, Len) ->
+    Int = binary_to_integer(binary_part(Input, Pos, Len)),
+    continue(Rest, Opts, Input, Pos + Len, Buffer, Int).
 
-number_exp(<<Byte/integer,Rest/bitstring>>, Opts, Input, Skip, Stack, Len)
+number_exp(<<Byte/integer,Rest/bitstring>>, Opts, Input, Pos, Buffer, Len)
   when ?is_number(Byte) ->
-    number_exp_cont(Rest, Opts, Input, Skip, Stack, Len + 1);
-number_exp(<<Byte/integer,Rest/bitstring>>, Opts, Input, Skip, Stack, Len)
+    number_exp_cont(Rest, Opts, Input, Pos, Buffer, Len + 1);
+number_exp(<<Byte/integer,Rest/bitstring>>, Opts, Input, Pos, Buffer, Len)
   when Byte =:= $+ orelse Byte =:= $- ->
-    number_exp_sign(Rest, Opts, Input, Skip, Stack, Len + 1);
-number_exp(<<_Rest/bitstring>>, _Opts, Input, Skip, _Stack, Len) ->
-    throw_error(Input, Skip + Len).
+    number_exp_sign(Rest, Opts, Input, Pos, Buffer, Len + 1);
+number_exp(<<_/integer,_/bitstring>> = Rest, Opts, Input, Pos, Buffer, Len) ->
+    throw_error(Rest, Opts, Input, Pos + Len, Buffer);
+number_exp(<<>>, _Opts, _Input, _Pos, _Buffer, _Len) ->
+    eof_error().
 
-number_exp_cont(<<Byte/integer,Rest/bitstring>>, Opts, Input, Skip, Stack, Len)
+number_exp_cont(<<Byte/integer,Rest/bitstring>>, Opts, Input, Pos, Buffer, Len)
   when ?is_number(Byte) ->
-    number_exp_cont(Rest, Opts, Input, Skip, Stack, Len + 1);
-number_exp_cont(<<Rest/bitstring>>, Opts, Input, Skip, Stack, Len) ->
-    Token = binary_part(Input, Skip, Len),
-    Float = try_parse_float(Token, Token, Skip),
-    continue(Rest, Opts, Input, Skip + Len, Stack, Float).
+    number_exp_cont(Rest, Opts, Input, Pos, Buffer, Len + 1);
+number_exp_cont(<<Rest/bitstring>>, Opts, Input, Pos, Buffer, Len) ->
+    Token = binary_part(Input, Pos, Len),
+    Float = try_parse_float(Token, Token, Rest, Opts, Input, Pos, Buffer),
+    continue(Rest, Opts, Input, Pos + Len, Buffer, Float).
 
-number_exp_cont(<<Byte/integer,Rest/bitstring>>, Opts, Input, Skip, Stack, Prefix, Len)
+number_exp_cont(<<Byte/integer,Rest/bitstring>>, Opts, Input, Pos, Buffer, Prefix, Len)
   when ?is_number(Byte) ->
-    number_exp_cont(Rest, Opts, Input, Skip, Stack, Prefix, Len + 1);
-number_exp_cont(<<Rest/bitstring>>, Opts, Input, Skip, Stack, Prefix, Len) ->
-    Suffix = binary_part(Input, Skip, Len),
+    number_exp_cont(Rest, Opts, Input, Pos, Buffer, Prefix, Len + 1);
+number_exp_cont(<<Rest/bitstring>>, Opts, Input, Pos, Buffer, Prefix, Len) ->
+    Suffix = binary_part(Input, Pos, Len),
     String = <<Prefix/binary,".0e",Suffix/binary>>,
     PrefixSize = byte_size(Prefix),
-    InitialSkip = Skip - PrefixSize - 1,
-    FinalSkip = Skip + Len,
-    Token = binary_part(Input, InitialSkip, PrefixSize + Len + 1),
-    Float = try_parse_float(String, Token, InitialSkip),
-    continue(Rest, Opts, Input, FinalSkip, Stack, Float).
+    InitialPos = Pos - PrefixSize - 1,
+    FinalPos = Pos + Len,
+    Token = binary_part(Input, InitialPos, PrefixSize + Len + 1),
+    Float = try_parse_float(String, Token, Rest, Opts, Input, InitialPos, Buffer),
+    continue(Rest, Opts, Input, FinalPos, Buffer, Float).
 
-number_exp_copy(<<Byte/integer,Rest/bitstring>>, Opts, Input, Skip, Stack, Prefix)
+number_exp_copy(<<Byte/integer,Rest/bitstring>>, Opts, Input, Pos, Buffer, Prefix)
   when ?is_number(Byte) ->
-    number_exp_cont(Rest, Opts, Input, Skip, Stack, Prefix, 1);
-number_exp_copy(<<Byte/integer,Rest/bitstring>>, Opts, Input, Skip, Stack, Prefix)
+    number_exp_cont(Rest, Opts, Input, Pos, Buffer, Prefix, 1);
+number_exp_copy(<<Byte/integer,Rest/bitstring>>, Opts, Input, Pos, Buffer, Prefix)
   when Byte =:= $+ orelse Byte =:= $- ->
-    number_exp_sign(Rest, Opts, Input, Skip, Stack, Prefix, 1);
-number_exp_copy(<<_Rest/bitstring>>, _Opts, Input, Skip, _Stack, _Prefix) ->
-    throw_error(Input, Skip).
+    number_exp_sign(Rest, Opts, Input, Pos, Buffer, Prefix, 1);
+number_exp_copy(<<_/integer,_/bitstring>> = Rest, Opts, Input, Pos, Buffer, _Prefix) ->
+    throw_error(Rest, Opts, Input, Pos, Buffer);
+number_exp_copy(<<>>, _Opts, _Input, _Pos, _Buffer, _Prefix) ->
+    eof_error().
 
-number_exp_sign(<<Byte/integer,Rest/bitstring>>, Opts, Input, Skip, Stack, Len)
+number_exp_sign(<<Byte/integer,Rest/bitstring>>, Opts, Input, Pos, Buffer, Len)
   when ?is_number(Byte) ->
-    number_exp_cont(Rest, Opts, Input, Skip, Stack, Len + 1);
-number_exp_sign(<<_Rest/bitstring>>, _Opts, Input, Skip, _Stack, Len) ->
-    throw_error(Input, Skip + Len).
+    number_exp_cont(Rest, Opts, Input, Pos, Buffer, Len + 1);
+number_exp_sign(<<_/integer,_/bitstring>> = Rest, Opts, Input, Pos, Buffer, Len) ->
+    throw_error(Rest, Opts, Input, Pos + Len, Buffer);
+number_exp_sign(<<>>, _Opts, _Input, _Pos, _Buffer, _Len) ->
+    eof_error().
 
-number_exp_sign(<<Byte/integer,Rest/bitstring>>, Opts, Input, Skip, Stack, Prefix, Len)
+number_exp_sign(<<Byte/integer,Rest/bitstring>>, Opts, Input, Pos, Buffer, Prefix, Len)
   when ?is_number(Byte) ->
-    number_exp_cont(Rest, Opts, Input, Skip, Stack, Prefix, Len + 1);
-number_exp_sign(<<_Rest/bitstring>>, _Opts, Input, Skip, _Stack, _Prefix, Len) ->
-    throw_error(Input, Skip + Len).
+    number_exp_cont(Rest, Opts, Input, Pos, Buffer, Prefix, Len + 1);
+number_exp_sign(<<_/integer,_/bitstring>> = Rest, Opts, Input, Pos, Buffer, _Prefix, Len) ->
+    throw_error(Rest, Opts, Input, Pos + Len, Buffer);
+number_exp_sign(<<>>, _Opts, _Input, _Pos, _Buffer, _Prefix, _Len) ->
+    eof_error().
 
-number_frac(<<Byte/integer,Rest/bitstring>>, Opts, Input, Skip, Stack, Len)
+number_frac(<<Byte/integer,Rest/bitstring>>, Opts, Input, Pos, Buffer, Len)
   when ?is_number(Byte) ->
-    number_frac_cont(Rest, Opts, Input, Skip, Stack, Len + 1);
-number_frac(<<_Rest/bitstring>>, _Opts, Input, Skip, _Stack, Len) ->
-    throw_error(Input, Skip + Len).
+    number_frac_cont(Rest, Opts, Input, Pos, Buffer, Len + 1);
+number_frac(<<_/integer,_/bitstring>> = Rest, Opts, Input, Pos, Buffer, Len) ->
+    throw_error(Rest, Opts, Input, Pos + Len, Buffer);
+number_frac(<<>>, _Opts, _Input, _Pos, _Buffer, _Len) ->
+    eof_error().
 
-number_frac_cont(<<Byte/integer,Rest/bitstring>>, Opts, Input, Skip, Stack, Len)
+number_frac_cont(<<Byte/integer,Rest/bitstring>>, Opts, Input, Pos, Buffer, Len)
   when ?is_number(Byte) ->
-    number_frac_cont(Rest, Opts, Input, Skip, Stack, Len + 1);
-number_frac_cont(<<E/integer,Rest/bitstring>>, Opts, Input, Skip, Stack, Len)
+    number_frac_cont(Rest, Opts, Input, Pos, Buffer, Len + 1);
+number_frac_cont(<<E/integer,Rest/bitstring>>, Opts, Input, Pos, Buffer, Len)
   when E =:= $e orelse E =:= $E ->
-    number_exp(Rest, Opts, Input, Skip, Stack, Len + 1);
-number_frac_cont(<<Rest/bitstring>>, Opts, Input, Skip, Stack, Len) ->
-    Token = binary_part(Input, Skip, Len),
-    Float = try_parse_float(Token, Token, Skip),
-    continue(Rest, Opts, Input, Skip + Len, Stack, Float).
+    number_exp(Rest, Opts, Input, Pos, Buffer, Len + 1);
+number_frac_cont(<<Rest/bitstring>>, Opts, Input, Pos, Buffer, Len) ->
+    Token = binary_part(Input, Pos, Len),
+    Float = try_parse_float(Token, Token, Rest, Opts, Input, Pos, Buffer),
+    continue(Rest, Opts, Input, Pos + Len, Buffer, Float).
 
-number_minus(<<48/integer,Rest/bitstring>>, Opts, Input, Skip, Stack) ->
-    number_zero(Rest, Opts, Input, Skip, Stack, 2);
-number_minus(<<Byte/integer,Rest/bitstring>>, Opts, Input, Skip, Stack)
+number_minus(<<$0/integer,Rest/bitstring>>, Opts, Input, Pos, Buffer) ->
+    number_zero(Rest, Opts, Input, Pos, Buffer, 2);
+number_minus(<<Byte/integer,Rest/bitstring>>, Opts, Input, Pos, Buffer)
   when ?is_number(Byte) ->
-    number(Rest, Opts, Input, Skip, Stack, 2);
-number_minus(<<_Rest/bitstring>>, _Opts, Input, Skip, _Stack) ->
-    throw_error(Input, Skip + 1).
+    number(Rest, Opts, Input, Pos, Buffer, 2);
+number_minus(<<_/integer,_/bitstring>> = Rest, Opts, Input, Pos, Buffer) ->
+    throw_error(Rest, Opts, Input, Pos + 1, Buffer);
+number_minus(<<>>, _Opts, _Input, _Pos, _Buffer) ->
+    eof_error().
 
-number_zero(<<46/integer,Rest/bitstring>>, Opts, Input, Skip, Stack, Len) ->
-    number_frac(Rest, Opts, Input, Skip, Stack, Len + 1);
-number_zero(<<E/integer,Rest/bitstring>>, Opts, Input, Skip, Stack, Len)
+number_zero(<<$./integer,Rest/bitstring>>, Opts, Input, Pos, Buffer, Len) ->
+    number_frac(Rest, Opts, Input, Pos, Buffer, Len + 1);
+number_zero(<<E/integer,Rest/bitstring>>, Opts, Input, Pos, Buffer, Len)
   when E =:= $e orelse E =:= $E ->
-    number_exp_copy(Rest, Opts, Input, Skip + Len + 1, Stack, <<"0">>);
-number_zero(<<Rest/bitstring>>, Opts, Input, Skip, Stack, Len) ->
-    continue(Rest, Opts, Input, Skip + Len, Stack, 0).
+    number_exp_copy(Rest, Opts, Input, Pos + Len + 1, Buffer, <<"0">>);
+number_zero(<<Rest/bitstring>>, Opts, Input, Pos, Buffer, Len) ->
+    continue(Rest, Opts, Input, Pos + Len, Buffer, 0).
 
-try_parse_float(Bin, Token, Skip) ->
+try_parse_float(Bin, Token, Rest, Opts, Input, Pos, Buffer) ->
     try
         binary_to_float(Bin)
     catch
         error:badarg:_ ->
-            token_error(Token, Skip)
+            token_error(Token, Rest, Opts, Input, Pos, Buffer)
     end.
 
-object(<<H/integer,Rest/bitstring>>, Opts, Input, Skip, Stack, Value)
-  when H =:= 32; H =:= 9; H =:= 10; H =:= 13 ->
-    object(Rest, Opts, Input, Skip + 1, Stack, Value);
-object(<<44/integer,Rest/bitstring>>, Opts, Input, Skip, [Key, Acc0 | Stack], Value) ->
+object(<<H/integer,Rest/bitstring>>, Opts, Input, Pos, Buffer, Value)
+  when H =:= $\s; H =:= $\t; H =:= $\n; H =:= $\r ->
+    object(Rest, Opts, Input, Pos + 1, Buffer, Value);
+object(<<$,/integer,Rest/bitstring>>, Opts, Input, Pos, [Key, Acc0 | Buffer], Value) ->
     Acc = [{Key, Value} | Acc0],
-    key(Rest, Opts, Input, Skip + 1, [Acc | Stack]);
-object(<<125/integer,Rest/bitstring>>, Opts, Input, Skip, [Key, Acc0 | Stack], Value) ->
+    key(Rest, Opts, Input, Pos + 1, [Acc | Buffer]);
+object(<<$}/integer,Rest/bitstring>>, Opts, Input, Pos, [Key, Acc0 | Buffer], Value) ->
     Acc = [{Key, Value} | Acc0],
     Map = normalize_object(Opts, maps:from_list(Acc)),
-    continue(Rest, Opts, Input, Skip + 1, Stack, Map);
-object(<<_/integer,_/bitstring>>, _Opts, Input, Skip, _Stack, _Value) ->
-    throw_error(Input, Skip);
-object(<<_/bitstring>>, _Opts, Input, Skip, _Stack, _Value) ->
-    empty_error(Input, Skip).
+    continue(Rest, Opts, Input, Pos + 1, Buffer, Map);
+object(<<_/integer,_/bitstring>> = Rest, Opts, Input, Pos, Buffer, _Value) ->
+    throw_error(Rest, Opts, Input, Pos, Buffer);
+object(<<>>, _Opts, _Input, _Pos, _Buffer, _Value) ->
+    eof_error().
 
-normalize_object(#{object_normalizer := Normalize} = Opts, Object) ->
+normalize_object(#{objects := Normalize} = Opts, Object) ->
     Normalize(Object, Opts);
 normalize_object(_Opts, Object) ->
     Object.
 
-array(<<H/integer,Rest/bitstring>>, Opts, Input, Skip, Stack, Value)
+array(<<H/integer,Rest/bitstring>>, Opts, Input, Pos, Buffer, Value)
   when H =:= $\s; H =:= $\t; H =:= $\n; H =:= $\r ->
-    array(Rest, Opts, Input, Skip + 1, Stack, Value);
-array(<<$,/integer,Rest/bitstring>>, Opts, Input, Skip, Stack, Value) ->
-    [Acc | Stack2] = Stack,
-    value(Rest, Opts, Input, Skip + 1, [?array, [Value | Acc] | Stack2]);
-array(<<$]/integer,Rest/bitstring>>, Opts, Input, Skip, Stack, Value) ->
-    [Acc | Stack2] = Stack,
+    array(Rest, Opts, Input, Pos + 1, Buffer, Value);
+array(<<$,/integer,Rest/bitstring>>, Opts, Input, Pos, [Acc | Buffer], Value) ->
+    value(Rest, Opts, Input, Pos + 1, [?array, [Value | Acc] | Buffer]);
+array(<<$]/integer,Rest/bitstring>>, Opts, Input, Pos, [Acc | Buffer], Value) ->
     List = normalize_array(Opts, lists:reverse(Acc, [Value])),
-    continue(Rest, Opts, Input, Skip + 1, Stack2, List);
-array(<<_/integer,_/bitstring>>, _Opts, Input, Skip, _Stack, _Value) ->
-    throw_error(Input, Skip);
-array(<<_/bitstring>>, _Opts, Input, Skip, _Stack, _Value) ->
-    empty_error(Input, Skip).
+    continue(Rest, Opts, Input, Pos + 1, Buffer, List);
+array(<<_/integer,_/bitstring>> = Rest, Opts, Input, Pos, Buffer, _Value) ->
+    throw_error(Rest, Opts, Input, Pos, Buffer);
+array(<<>>, _Opts, _Input, _Pos, _Buffer, _Value) ->
+    eof_error().
 
-normalize_array(#{array_normalizer := Normalize} = Opts, Array) ->
+normalize_array(#{arrays := Normalize} = Opts, Array) ->
     Normalize(Array, Opts);
 normalize_array(_Opts, Array) ->
     Array.
 
-empty_array(Rest, Opts, Input, Skip, [?array, [] | Stack]) ->
-    continue(Rest, Opts, Input, Skip, Stack, []).
+empty_array(Rest, Opts, Input, Pos, [?array, [] | Buffer]) ->
+    continue(Rest, Opts, Input, Pos, Buffer, []);
+empty_array(Rest, Opts, Input, Pos, Buffer) ->
+    throw_error(Rest, Opts, Input, Pos - 1, Buffer).
 
-continue(Rest, Opts, Input, Skip, [?key | Stack], Value) ->
-    key(Rest, Opts, Input, Skip, Stack, Value);
-continue(Rest, Opts, Input, Skip, [?object | Stack], Value) ->
-    object(Rest, Opts, Input, Skip, Stack, Value);
-continue(Rest, Opts, Input, Skip, [?array | Stack], Value) ->
-    array(Rest, Opts, Input, Skip, Stack, Value);
-continue(Rest, Opts, Input, Skip, [?terminate | Stack], Value) ->
-    terminate(Rest, Opts, Input, Skip, Stack, Value).
+continue(Rest, Opts, Input, Pos, [?key | Buffer], Value) ->
+    key(Rest, Opts, Input, Pos, Buffer, Value);
+continue(Rest, Opts, Input, Pos, [?object | Buffer], Value) ->
+    object(Rest, Opts, Input, Pos, Buffer, Value);
+continue(Rest, Opts, Input, Pos, [?array | Buffer], Value) ->
+    array(Rest, Opts, Input, Pos, Buffer, Value);
+continue(Rest, Opts, Input, Pos, [?terminate | Buffer], Value) ->
+    terminate(Rest, Opts, Input, Pos, Buffer, Value).
 
-terminate(<<H/integer,Rest/bitstring>>, Opts, Input, Skip, Stack, Value)
-  when H =:= 32; H =:= 13; H =:= 10; H =:= 9 ->
-    terminate(Rest, Opts, Input, Skip + 1, Stack, Value);
-terminate(<<>>, _Opts, _Input, _Skip, _Stack, Value) ->
+terminate(<<H/integer,Rest/bitstring>>, Opts, Input, Pos, Buffer, Value)
+  when H =:= $\s; H =:= $\t; H =:= $\n; H =:= $\r ->
+    terminate(Rest, Opts, Input, Pos + 1, Buffer, Value);
+terminate(<<>>, _Opts, _Input, _Pos, _Buffer, Value) ->
     Value;
-terminate(<<_Rest/bitstring>>, _Opts, Input, Skip, _Stack, _Value) ->
-    throw_error(Input, Skip).
+terminate(Rest, Opts, Input, Pos, Buffer, _Value) ->
+    throw_error(Rest, Opts, Input, Pos, Buffer).
 
-empty_error(_Input, Skip) ->
-    throw({position, Skip}).
+eof_error() ->
+    throw(eof).
 
-throw_error(_Input, Skip) ->
-    throw({position, Skip}).
+throw_error(_Rest, _Opts, Input, Pos, _Buffer) when Pos =:= byte_size(Input) ->
+    eof_error();
+throw_error(Rest, Opts, Input, Pos, Buffer) ->
+    throw({position, Rest, Opts, Input, Pos, Buffer}).
 
-throw_error(<<_Rest/bitstring>>, _Input, Skip, _Stack) ->
-    throw({position, Skip - 1}).
+token_error(Len, Rest, Opts, Input, Pos, Buffer) when is_integer(Len) ->
+    Token = binary_part(Input, Pos, Len),
+    token_error(Token, Rest, Opts, Input, Pos, Buffer);
+token_error(Token, Rest, Opts, Input, Pos, Buffer) ->
+    throw({token, Token, Rest, Opts, Input, Pos, Buffer}).
 
-token_error(Token, Position) ->
-    throw({token, Token, Position}).
-
-token_error(Token, Position, Len) ->
-    throw({token, binary_part(Token, Position, Len), Position}).
-
-handle_error(throw, {position, Position}, _Stacktrace, Input, _Opts) ->
-    case Position =:= byte_size(Input) of
-        true ->
-            {error, unexpected_end_of_input};
-        false ->
-            Byte = binary:at(Input, Position),
-            Hex = integer_to_binary(Byte, 16),
-            {error, {unexpected_byte, <<"0x"/utf8,Hex/binary>>, Position}}
-    end;
-handle_error(throw, {token, Token, Position}, _Stacktrace, _Input, _Opts) ->
-    {error, {unexpected_sequence, Token, Position}};
-handle_error(throw, Reason, _Stacktrace, _Input, _Opts) ->
+handle_error(throw, eof, _Stacktrace) ->
+    {error, unexpected_end_of_input};
+handle_error(throw, {position, _Rest, _Opts, Input, Pos, _Buffer}, _Stacktrace) ->
+    Byte = binary:at(Input, Pos),
+    Hex = integer_to_binary(Byte, 16),
+    {error, {unexpected_byte, <<"0x"/utf8,Hex/binary>>, Pos}};
+handle_error(throw, {token, Token, _Rest, _Opts, _Input, Pos, _Buffer}, _Stacktrace) ->
+    {error, {unexpected_sequence, Token, Pos}};
+handle_error(throw, Reason, _Stacktrace) ->
     {error, Reason};
-handle_error(Class, Reason, Stacktrace, _Input, _Opts) ->
+handle_error(Class, Reason, Stacktrace) ->
     erlang:raise(Class, Reason, Stacktrace).
 
 -ifdef(TEST).
@@ -754,8 +793,7 @@ decode_test() ->
         , <<"{\"timestamp\": \"1970-01-01T00:00:00.000Z\"}">>, #{} },
         { {ok, #{foo => 1}}
         , <<"{\"foo\": \"1\"}">>
-        , #{ key_normalizer => fun(K, _) -> binary_to_existing_atom(K) end
-           , value_normalizer => fun(V, _) -> binary_to_integer(V) end } },
+        , #{ keys => to_atom, values => to_integer } },
         {{error, not_an_iodata}, error, #{}}
     ]].
 

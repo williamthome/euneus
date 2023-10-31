@@ -68,7 +68,7 @@ end
       <<"type">> => [<<"fire">>]}}
 
 3> euneus:decode(JSON, #{
-    key_normalizer => fun
+    keys => fun
         (<<Char>> = Key, _Opts) when Char >= $0, Char =< $9 ->
             binary_to_integer(Key);
         (Key, _Opts) ->
@@ -102,12 +102,12 @@ end
 | 123                  	| #{}                                                                                                                                                      	| 123                         	| #{}                                                                                                                      	| 123                  	|
 | 123.45600            	| #{}                                                                                                                                                      	| 123.456                     	| #{}                                                                                                                      	| 123.456              	|
 | [true,0,undefined]   	| #{}                                                                                                                                                      	| [true,0,null]               	| #{null_term => nil}                                                                                                      	| [true,0,nil]         	|
-| #{foo => bar}        	| #{}                                                                                                                                                      	| {"foo":"bar"}               	| #{key_normalizer => fun(Key, _Opts) -> binary_to_atom(Key) end}                                                           	| #{foo => <<"bar">>}  	|
-| {myrecord, val}      	| #{encode_unhandled => fun({myrecord, Val}, Opts) -><br>    Encode = maps:get(encode_list, Opts),<br>    Encode([myrecord, #{key => Val}], Opts)<br>end}) 	| ["myrecord", {"key":"val"}] 	| #{array_normalizer => fun([<<"myrecord">>, #{<<"key">> := Val}], _Opts) -><br>    {myrecord, binary_to_atom(Val)}<br>end} 	| {myrecord, val}      	|
+| #{foo => bar}        	| #{}                                                                                                                                                      	| {"foo":"bar"}               	| #{keys => fun(Key, _Opts) -> binary_to_atom(Key) end}                                                           	| #{foo => <<"bar">>}  	|
+| {myrecord, val}      	| #{encode_unhandled => fun({myrecord, Val}, Opts) -><br>    Encode = maps:get(encode_list, Opts),<br>    Encode([myrecord, #{key => Val}], Opts)<br>end}) 	| ["myrecord", {"key":"val"}] 	| #{arrays => fun([<<"myrecord">>, #{<<"key">> := Val}], _Opts) -><br>    {myrecord, binary_to_atom(Val)}<br>end} 	| {myrecord, val}      	|
 
 ### Why not more built-in types?
 
-The goal of `Euneus` is to have built-in types that can be encoded and then decoded to the original value. If you have any type that can be encoded and rolled back, feel free to open a [new issue](https://github.com/williamthome/euneus/issues/new) to discuss it 😄
+The goal of `Euneus` is to have built-in types that can be encoded and then decoded to the original value. If you have any type that can be encoded and rolled back, feel free to open a [new issue](https://github.com/williamthome/euneus/issues/new) to discuss it.
 
 ## Differences to Thoas
 
@@ -141,13 +141,12 @@ Available encode options:
     timestamp_encoder => function((erlang:timestamp(), Opts :: map()) -> iolist()),
     %% unhandled_encoder allow encode any custom term (default: raise unsupported_type error).
     unhandled_encoder => function((term(), Opts :: map()) -> iolist()),
-    %% escaper allow override the binary escaping (default: escape_json/1)
-    %% There are 4 built-in functions to escape binaries:
-    %%   - escape_json/1;
-    %%   - escape_html/1;
-    %%   - escape_js/1;
-    %%   - escape_unicode/1.
-    escaper => function((binary(), Opts :: map()) -> iolist())
+    %% escaper allow override the binary escaping (default: json)
+    escaper => json
+             | html
+             | javascript
+             | unicode
+             | function((binary(), Opts :: map()) -> iolist())
 }
 ```
 
@@ -187,14 +186,22 @@ Available decode options:
 #{
     %% null_term is the null literal override (default: 'undefined').
     null_term => term(),
-    %% array_normalizer allow override any array/list().
-    array_normalizer => function((list(), Opts :: map()) -> term()),
-    %% object_normalizer allow override any object/map().
-    object_normalizer => function((map(), Opts :: map()) -> term()),
-    %% key_normalizer allow override the keys from JSON objects.
-    key_normalizer => function((binary(), Opts :: map()) -> term()),
-    %% value_normalizer allow override any other term, like array item or object value.
-    value_normalizer => function((binary(), Opts :: map()) -> term())
+    %% arrays allow override any array/list().
+    arrays => function((list(), Opts :: map()) -> term()),
+    %% objects allow override any object/map().
+    objects => function((map(), Opts :: map()) -> term()),
+    %% keys allow override the keys from JSON objects.
+    keys => copy
+          | to_atom
+          | to_existing_atom
+          | to_integer
+          | function((binary(), Opts :: map()) -> term()),
+    %% values allow override any other term, like array item or object value.
+    values => copy
+            | to_atom
+            | to_existing_atom
+            | to_integer
+            | function((binary(), Opts :: map()) -> term())
 }
 ```
 
@@ -203,13 +210,13 @@ For example:
 ```erlang
 DecodeOpts = #{
     null_term => nil,
-    key_normalizer => fun
+    keys => fun
         (<<"bar">>, _Opts) ->
             foo;
         (Key, _Opts) ->
             binary_to_atom(Key)
     end,
-    value_normalizer => fun
+    values => fun
         (<<"127.0.0.1">>, _Opts) ->
             {127, 0, 0, 1};
         (Value, _Opts) ->
