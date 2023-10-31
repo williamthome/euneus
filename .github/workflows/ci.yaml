@@ -22,4 +22,4 @@ jobs:
     - name: Run dialyzer
       run: rebar3 dialyzer
     - name: Run tests
-      run: rebar3 do ct, eunit
+      run: make test

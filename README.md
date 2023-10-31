@@ -316,11 +316,11 @@ Euneus is the twin brother of [Thoas](https://en.wikipedia.org/wiki/Thoas_(son_o
 - [ ] Improve docs
 - [X] Specs
 - [X] Benchmarks
-- [ ] Test suites
+- [X] Test suites
 
 ## Sponsors
 
-If you like this tool, please consider [sponsoring me](https://github.com/sponsors/williamthome).\
+If you like this tool, please consider [sponsoring me](https://github.com/sponsors/williamthome).
 I'm thankful for your never-ending support :heart:
 
 I also accept coffees :coffee:
