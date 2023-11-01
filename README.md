@@ -48,7 +48,7 @@ Like Thoas, both the parser and generator fully conform to
 ```elixir
 # mix.exs
 def deps do
-  [{:euneus, "~> 0.3"}]
+  [{:euneus, "~> 0.4"}]
 end
 ```
 
