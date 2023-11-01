@@ -36,6 +36,8 @@
 ]}).
 -compile({inline_size, 100}).
 
+-dialyzer({no_return, [ throw_byte/5, throw_token/6, throw_eof/4 ]}).
+
 -export([ decode/2, handle_error/3, resume/6, resume/7 ]).
 
 -export_type([

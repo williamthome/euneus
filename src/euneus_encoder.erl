@@ -33,6 +33,8 @@
 
 % By default, encode_unhandled/2 will raise unsupported_type exception,
 % so it is a function without a local return.
+% Note that parse_opts/1 is included because unhandled_encoder option
+% has no local return.
 -dialyzer({no_return, [ parse_opts/1, encode_unhandled/2 ]}).
 
 -export([
