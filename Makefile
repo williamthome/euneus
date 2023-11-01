@@ -15,3 +15,8 @@ test.mix:
 	cd euneus_test && mix test
 
 test: test.rebar3 test.mix
+
+.PHONY: check
+
+check: test
+	rebar3 dialyzer
