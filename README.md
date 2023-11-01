@@ -255,6 +255,10 @@ Euneus permits resuming the decoding when an invalid token is found. Any value c
 % {ok,[foo,foo,#{<<"foo">> => foo}]}
 ```
 
+> **Note**
+>
+> By using `euneus_decoder:resume/6` the replacement will be the `null_term` option.
+
 ### Why Euneus over Thoas?
 
 `Thoas` is incredible, works performant and perfectly fine, but `Euneus` is more flexible, permitting more customizations, and is more performant than Thoas. See the [benchmarks](#benchmarks).
