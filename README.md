@@ -31,6 +31,7 @@ Like Thoas, both the parser and generator fully conform to
 - [Contributing](#contributing)
     - [Issues](#issues)
     - [Installation](#installation-1)
+    - [Commands](#commands)
 - [License](#license)
 
 ## Installation
@@ -374,6 +375,32 @@ cd euneus
 # Compile (ensure you have rebar3 installed)
 rebar3 compile
 ```
+
+### Commands
+
+```
+# Benchmark euneus:encode/1
+$ make bench.encode
+```
+
+```
+# Benchmark euneus:decode/1
+$ make bench.decode
+```
+
+```
+# Run all tests
+$ make test
+```
+
+```
+# Run all tests and dialyzer
+$ make check
+```
+
+> **Note**:
+>
+> Open the [Makefile](Makefile) to see all commands.
 
 ## License
 
