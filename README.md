@@ -19,6 +19,7 @@ Like Thoas, both the parser and generator fully conform to
 - [Differences to Thoas](#differences-to-thoas)
     - [Encode](#encode)
     - [Decode](#decode)
+        - [Resuming](#resuming)
     - [Why Euneus over Thoas?](#why-euneus-over-thoas)
 - [Benchmarks](#benchmarks)
     - [Encode](#encode-1)
@@ -68,7 +69,7 @@ end
       <<"type">> => [<<"fire">>]}}
 
 3> euneus:decode(JSON, #{
-    normalize_key => fun
+    keys => fun
         (<<Char>> = Key, _Opts) when Char >= $0, Char =< $9 ->
             binary_to_integer(Key);
         (Key, _Opts) ->
@@ -102,12 +103,16 @@ end
 | 123                  	| #{}                                                                                                                                                      	| 123                         	| #{}                                                                                                                      	| 123                  	|
 | 123.45600            	| #{}                                                                                                                                                      	| 123.456                     	| #{}                                                                                                                      	| 123.456              	|
 | [true,0,undefined]   	| #{}                                                                                                                                                      	| [true,0,null]               	| #{null_term => nil}                                                                                                      	| [true,0,nil]         	|
-| #{foo => bar}        	| #{}                                                                                                                                                      	| {"foo":"bar"}               	| #{normalize_key => fun(Key, _Opts) -> binary_to_atom(Key) end}                                                           	| #{foo => <<"bar">>}  	|
-| {myrecord, val}      	| #{encode_unhandled => fun({myrecord, Val}, Opts) -><br>    Encode = maps:get(encode_list, Opts),<br>    Encode([myrecord, #{key => Val}], Opts)<br>end}) 	| ["myrecord", {"key":"val"}] 	| #{normalize_array => fun([<<"myrecord">>, #{<<"key">> := Val}], _Opts) -><br>    {myrecord, binary_to_atom(Val)}<br>end} 	| {myrecord, val}      	|
+| #{foo => bar}        	| #{}                                                                                                                                                      	| {"foo":"bar"}               	| #{keys => fun(Key, _Opts) -> binary_to_atom(Key) end}                                                           	| #{foo => <<"bar">>}  	|
+| {myrecord, val}      	| #{encode_unhandled => fun({myrecord, Val}, Opts) -><br>    Encode = maps:get(encode_list, Opts),<br>    Encode([myrecord, #{key => Val}], Opts)<br>end}) 	| ["myrecord", {"key":"val"}] 	| #{arrays => fun([<<"myrecord">>, #{<<"key">> := Val}], _Opts) -><br>    {myrecord, binary_to_atom(Val)}<br>end} 	| {myrecord, val}      	|
+
+> **Note**
+>
+> Proplists (@todo)
 
 ### Why not more built-in types?
 
-The goal of `Euneus` is to have built-in types that can be encoded and then decoded to the original value. If you have any type that can be encoded and rolled back, feel free to open a [new issue](https://github.com/williamthome/euneus/issues/new) to discuss it 😄
+The goal of `Euneus` is to have built-in types that can be encoded and then decoded to the original value. If you have any type that can be encoded and rolled back, feel free to open a [new issue](https://github.com/williamthome/euneus/issues/new) to discuss it.
 
 ## Differences to Thoas
 
@@ -121,33 +126,32 @@ Available encode options:
 
 ```erlang
 #{
-    %% null_terms defines what terms will be replaced with the null literal (default: ['undefined']).
-    null_terms => nonempty_list(),
+    %% nulls defines what terms will be replaced with the null literal (default: ['undefined']).
+    nulls => nonempty_list(),
     %% encode_binary allow override the binary() encoding.
-    encode_binary => function((binary(), Opts :: map()) -> iolist()),
-    %% encode_atom allow override the atom() encoding.
-    encode_atom => function((atom(), Opts :: map()) -> iolist()),
-    %% encode_integer allow override the integer() encoding.
-    encode_integer => function((integer(), Opts :: map()) -> iolist()),
-    %% encode_float allow override the float() encoding.
-    encode_float => function((float(), Opts :: map()) -> iolist()),
-    %% encode_list allow override the list() encoding.
-    encode_list => function((list(), Opts :: map()) -> iolist()),
-    %% encode_map allow override the map() encoding.
-    encode_map => function((map(), Opts :: map()) -> iolist()),
-    %% encode_datetime allow override the calendar:datetime() encoding.
-    encode_datetime => function((calendar:datetime(), Opts :: map()) -> iolist()),
-    %% encode_timestamp allow override the erlang:timestamp() encoding.
-    encode_timestamp => function((erlang:timestamp(), Opts :: map()) -> iolist()),
-    %% encode_unhandled allow encode any custom term (default: raise unsupported_type error).
-    encode_unhandled => function((term(), Opts :: map()) -> iolist()),
-    %% escape_binary allow override the binary escaping (default: escape_json/1)
-    %% There are 4 built-in functions to escape binaries:
-    %%   - escape_json/1;
-    %%   - escape_html/1;
-    %%   - escape_js/1;
-    %%   - escape_unicode/1.
-    escape_binary => function((binary(), Opts :: map()) -> iolist())
+    binary_encoder => function((binary(), Opts :: map()) -> iolist()),
+    %% atom_encoder allow override the atom() encoding.
+    atom_encoder => function((atom(), Opts :: map()) -> iolist()),
+    %% integer_encoder allow override the integer() encoding.
+    integer_encoder => function((integer(), Opts :: map()) -> iolist()),
+    %% float_encoder allow override the float() encoding.
+    float_encoder => function((float(), Opts :: map()) -> iolist()),
+    %% list_encoder allow override the list() encoding.
+    list_encoder => function((list(), Opts :: map()) -> iolist()),
+    %% map_encoder allow override the map() encoding.
+    map_encoder => function((map(), Opts :: map()) -> iolist()),
+    %% datetime_encoder allow override the calendar:datetime() encoding.
+    datetime_encoder => function((calendar:datetime(), Opts :: map()) -> iolist()),
+    %% timestamp_encoder allow override the erlang:timestamp() encoding.
+    timestamp_encoder => function((erlang:timestamp(), Opts :: map()) -> iolist()),
+    %% unhandled_encoder allow encode any custom term (default: raise unsupported_type error).
+    unhandled_encoder => function((term(), Opts :: map()) -> iolist()),
+    %% escaper allow override the binary escaping (default: json)
+    escaper => json
+             | html
+             | javascript
+             | unicode
+             | function((binary(), Opts :: map()) -> iolist())
 }
 ```
 
@@ -155,13 +159,13 @@ For example:
 
 ```erlang
 EncodeOpts = #{
-    encode_binary => fun
+    binary_encoder => fun
         (<<"foo">>, Opts) ->
             euneus_encoder:escape_binary(<<"bar">>, Opts);
         (Bin, Opts) ->
             euneus_encoder:escape_binary(Bin, Opts)
     end,
-    encode_unhandled => fun
+    unhandled_encoder => fun
         ({_, _, _, _} = Ip, Opts) ->
             case inet:ntoa(Ip) of
                 {error, einval} ->
@@ -187,14 +191,22 @@ Available decode options:
 #{
     %% null_term is the null literal override (default: 'undefined').
     null_term => term(),
-    %% normalize_array allow override any array/list().
-    normalize_array => function((list(), Opts :: map()) -> term()),
-    %% normalize_object allow override any object/map().
-    normalize_object => function((map(), Opts :: map()) -> term()),
-    %% normalize_key allow override the keys from JSON objects.
-    normalize_key => function((binary(), Opts :: map()) -> term()),
-    %% normalize_value allow override any other term, like array item or object value.
-    normalize_value => function((binary(), Opts :: map()) -> term())
+    %% arrays allow override any array/list().
+    arrays => function((list(), Opts :: map()) -> term()),
+    %% objects allow override any object/map().
+    objects => function((map(), Opts :: map()) -> term()),
+    %% keys allow override the keys from JSON objects.
+    keys => copy
+          | to_atom
+          | to_existing_atom
+          | to_integer
+          | function((binary(), Opts :: map()) -> term()),
+    %% values allow override any other term, like array item or object value.
+    values => copy
+            | to_atom
+            | to_existing_atom
+            | to_integer
+            | function((binary(), Opts :: map()) -> term())
 }
 ```
 
@@ -203,13 +215,13 @@ For example:
 ```erlang
 DecodeOpts = #{
     null_term => nil,
-    normalize_key => fun
+    keys => fun
         (<<"bar">>, _Opts) ->
             foo;
         (Key, _Opts) ->
             binary_to_atom(Key)
     end,
-    normalize_value => fun
+    values => fun
         (<<"127.0.0.1">>, _Opts) ->
             {127, 0, 0, 1};
         (Value, _Opts) ->
@@ -221,6 +233,26 @@ euneus:decode(JSON, DecodeOpts).
 %% {ok,#{foo"=> <<"bar">>,
 %%       ipv4 => {127,0,0,1},
 %%       none => nil}}
+```
+
+#### Resuming
+
+Euneus permits resuming the decoding when an invalid token is found. Any value can replace the invalid token by overriding the `error_handler` option, e.g.:
+
+```erlang
+1> ErrorHandler = fun
+      (throw, {{token, Token}, Rest, Opts, Input, Pos, Buffer}, _Stacktrace) ->
+          % Instead of throwing the invalid token, it can be replaced.
+          Replacement = foo,
+          euneus_decoder:resume(Token, Replacement, Rest, Opts, Input, Pos, Buffer);
+      (Class, Reason, Stacktrace) ->
+          euneus_decoder:handle_error(Class, Reason, Stacktrace)
+   end.
+
+2> Opts = #{error_handler => ErrorHandler}.
+
+3> euneus:decode(<<"[1e999,1e999,{\"foo\": 1e999}]">>, Opts).
+% {ok,[foo,foo,#{<<"foo">> => foo}]}
 ```
 
 ### Why Euneus over Thoas?
@@ -309,11 +341,11 @@ Euneus is the twin brother of [Thoas](https://en.wikipedia.org/wiki/Thoas_(son_o
 - [ ] Improve docs
 - [X] Specs
 - [X] Benchmarks
-- [ ] Test suites
+- [X] Test suites
 
 ## Sponsors
 
-If you like this tool, please consider [sponsoring me](https://github.com/sponsors/williamthome).\
+If you like this tool, please consider [sponsoring me](https://github.com/sponsors/williamthome).
 I'm thankful for your never-ending support :heart:
 
 I also accept coffees :coffee:
