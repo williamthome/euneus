@@ -19,6 +19,7 @@ Like Thoas, both the parser and generator fully conform to
 - [Differences to Thoas](#differences-to-thoas)
     - [Encode](#encode)
     - [Decode](#decode)
+        - [Resuming](#resuming)
     - [Why Euneus over Thoas?](#why-euneus-over-thoas)
 - [Benchmarks](#benchmarks)
     - [Encode](#encode-1)
@@ -232,6 +233,26 @@ euneus:decode(JSON, DecodeOpts).
 %% {ok,#{foo"=> <<"bar">>,
 %%       ipv4 => {127,0,0,1},
 %%       none => nil}}
+```
+
+#### Resuming
+
+Euneus permits resuming the decoding when an invalid token is found. Any value can replace the invalid token by overriding the `error_handler` option, e.g.:
+
+```erlang
+1> ErrorHandler = fun
+      (throw, {{token, Token}, Rest, Opts, Input, Pos, Buffer}, _Stacktrace) ->
+          % Instead of throwing the invalid token, it can be replaced.
+          Replacement = foo,
+          euneus_decoder:resume(Token, Replacement, Rest, Opts, Input, Pos, Buffer);
+      (Class, Reason, Stacktrace) ->
+          euneus_decoder:handle_error(Class, Reason, Stacktrace)
+   end.
+
+2> Opts = #{error_handler => ErrorHandler}.
+
+3> euneus:decode(<<"[1e999,1e999,{\"foo\": 1e999}]">>, Opts).
+% {ok,[foo,foo,#{<<"foo">> => foo}]}
 ```
 
 ### Why Euneus over Thoas?

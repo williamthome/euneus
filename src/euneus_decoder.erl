@@ -36,7 +36,7 @@
 ]}).
 -compile({inline_size, 100}).
 
--export([ decode/2, handle_error/3 ]).
+-export([ decode/2, handle_error/3, resume/6, resume/7 ]).
 
 -export_type([
     input/0, options/0, result/0, normalizer/1, error_reason/0,
@@ -136,6 +136,18 @@ parse_opts(Opts) ->
     },
     maps:merge(Required, Optionals).
 
+resume(Token, Rest0, #{null_term := Null} = Opts, Input, Pos0, Buffer) ->
+    resume(Token, Null, Rest0, Opts, Input, Pos0, Buffer).
+
+resume(Token, Replacement, Rest0, Opts, Input, Pos0, Buffer) ->
+    Pos = Pos0 + byte_size(Token),
+    try
+        {ok, continue(Rest0, Opts, Input, Pos, Buffer, Replacement)}
+    catch
+        Class:Reason:Stacktrace ->
+            Handle = maps:get(error_handler, Opts),
+            Handle(Class, Reason, Stacktrace)
+    end.
 
 key(<<H/integer,Rest/bitstring>>, Opts, Input, Pos, Buffer)
   when H =:= $\s; H =:= $\t; H =:= $\n; H =:= $\r ->
@@ -753,14 +765,14 @@ token_error(Len, Rest, Opts, Input, Pos, Buffer) when is_integer(Len) ->
     Token = binary_part(Input, Pos, Len),
     token_error(Token, Rest, Opts, Input, Pos, Buffer);
 token_error(Token, Rest, Opts, Input, Pos, Buffer) ->
-    throw({token, Token, Rest, Opts, Input, Pos, Buffer}).
+    throw({{token, Token}, Rest, Opts, Input, Pos, Buffer}).
 
 handle_error(throw, {eof, _Opts, _Input, _Pos, _Buffer}, _Stacktrace) ->
     {error, unexpected_end_of_input};
 handle_error(throw, {{byte, Byte}, _Rest, _Opts, _Input, Pos, _Buffer}, _Stacktrace) ->
     Hex = <<"0x"/utf8,(integer_to_binary(Byte, 16))/binary>>,
     {error, {unexpected_byte, Hex, Pos}};
-handle_error(throw, {token, Token, _Rest, _Opts, _Input, Pos, _Buffer}, _Stacktrace) ->
+handle_error(throw, {{token, Token}, _Rest, _Opts, _Input, Pos, _Buffer}, _Stacktrace) ->
     {error, {unexpected_sequence, Token, Pos}};
 handle_error(Class, Reason, Stacktrace) ->
     erlang:raise(Class, Reason, Stacktrace).
@@ -793,5 +805,18 @@ decode_test() ->
         , #{ keys => to_atom, values => to_integer } },
         {{error, not_an_iodata}, error, #{}}
     ]].
+
+resume_test() ->
+    [ ?assertEqual(Expect, decode(Input, Opts))
+      || {Expect, Input, Opts} <- [
+        { {ok, [undefined, undefined, #{<<"foo">> => undefined}]}
+        , <<"[1e999,1e999,{\"foo\": 1e999}]">>
+        , #{ error_handler => fun do_handle_error/3 } }
+    ]].
+
+do_handle_error(throw, {{token, Token}, Rest, Opts, Input, Pos, Buffer}, _Stacktrace) ->
+    resume(Token, Rest, Opts, Input, Pos, Buffer);
+do_handle_error(Class, Reason, Stacktrace) ->
+    handle_error(Class, Reason, Stacktrace).
 
 -endif.
