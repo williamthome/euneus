@@ -722,14 +722,17 @@ empty_array(Rest, Opts, Input, Pos, [?array, [] | Buffer]) ->
 empty_array(Rest, Opts, Input, Pos, Buffer) ->
     throw_byte(Rest, Opts, Input, Pos - 1, Buffer).
 
-continue(Rest, Opts, Input, Pos, [?key | Buffer], Value) ->
-    key(Rest, Opts, Input, Pos, Buffer, Value);
-continue(Rest, Opts, Input, Pos, [?object | Buffer], Value) ->
-    object(Rest, Opts, Input, Pos, Buffer, Value);
-continue(Rest, Opts, Input, Pos, [?array | Buffer], Value) ->
-    array(Rest, Opts, Input, Pos, Buffer, Value);
-continue(Rest, Opts, Input, Pos, [?terminate | Buffer], Value) ->
-    terminate(Rest, Opts, Input, Pos, Buffer, Value).
+continue(Rest, Opts, Input, Pos, [Continue | Buffer], Value) ->
+    case Continue of
+        ?key ->
+            key(Rest, Opts, Input, Pos, Buffer, Value);
+        ?object ->
+            object(Rest, Opts, Input, Pos, Buffer, Value);
+        ?array ->
+            array(Rest, Opts, Input, Pos, Buffer, Value);
+        ?terminate ->
+            terminate(Rest, Opts, Input, Pos, Buffer, Value)
+    end.
 
 terminate(<<H/integer,Rest/bitstring>>, Opts, Input, Pos, Buffer, Value)
   when H =:= $\s; H =:= $\t; H =:= $\n; H =:= $\r ->
