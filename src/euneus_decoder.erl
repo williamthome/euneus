@@ -60,17 +60,15 @@
 -type input() :: binary() | iolist().
 -type options() :: #{
     null_term => term(),
-    keys => normalizer(Input :: binary()),
-    values => normalizer(Input :: binary()),
-    arrays => normalizer(Input :: list()),
-    objects => normalizer(Input :: map()),
+    keys => normalizer(Key :: binary()),
+    values => normalizer(Value :: binary()),
+    arrays => normalizer(Array :: list()),
+    objects => normalizer(Object :: map()),
     error_handler => error_handler()
-    % @todo add the possibility to resume after an error.
-    % resumer => fun(() -> result())
 }.
 -type position() :: non_neg_integer().
 -type result() :: {ok, term()} | {error, error_reason()}.
--type normalizer(Input) :: fun((Input, options()) -> term()).
+-type normalizer(Term) :: fun((Term, options()) -> term()).
 -type error_class() :: error | exit | throw.
 -type error_reason() :: unexpected_end_of_input
                       | {unexpected_byte, binary(), position()}
