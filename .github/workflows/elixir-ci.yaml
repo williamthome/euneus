@@ -1,0 +1,28 @@
+name: Elixir CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+
+  build:
+
+    runs-on: ubuntu-latest
+    name: Tests
+
+    container:
+      image: elixir:1.15
+
+    steps:
+    - uses: actions/checkout@v2
+    - name: Compile Euneus
+      run: rebar3 compile
+    - name: Install test dependencies
+      run: cd euneus_test && mix deps.get
+    - name: Compile test project
+      run: cd euneus_test && mix compile
+    - name: Run tests
+      run: cd euneus_test && mix test

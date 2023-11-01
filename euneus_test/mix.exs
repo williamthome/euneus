@@ -5,7 +5,7 @@ defmodule EuneusTest.MixProject do
     [
       app: :euneus_test,
       version: "0.1.0",
-      elixir: "~> 1.16-dev",
+      elixir: "~> 1.15-dev",
       start_permanent: Mix.env() == :prod,
       consolidate_protocols: Mix.env() != :test,
       deps: deps()
