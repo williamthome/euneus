@@ -31,6 +31,7 @@ Like Thoas, both the parser and generator fully conform to
 - [Contributing](#contributing)
     - [Issues](#issues)
     - [Installation](#installation-1)
+    - [Commands](#commands)
 - [License](#license)
 
 ## Installation
@@ -108,7 +109,7 @@ end
 
 > **Note**
 >
-> Proplists (@todo)
+> Proplists are not handled by Euneus, you must override the `list_encoder` option in the encoder to handle them. Another option is to convert proplists to maps before the encoding. The reason is because it's impossible to know when a list is a proplist and also because a proplist cannot be decoded. See the [Why not more built-in types?](#why-not-more-built-in-types) section.
 
 ### Why not more built-in types?
 
@@ -255,6 +256,10 @@ Euneus permits resuming the decoding when an invalid token is found. Any value c
 % {ok,[foo,foo,#{<<"foo">> => foo}]}
 ```
 
+> **Note**
+>
+> By using `euneus_decoder:resume/6` the replacement will be the `null_term` option.
+
 ### Why Euneus over Thoas?
 
 `Thoas` is incredible, works performant and perfectly fine, but `Euneus` is more flexible, permitting more customizations, and is more performant than Thoas. See the [benchmarks](#benchmarks).
@@ -370,6 +375,32 @@ cd euneus
 # Compile (ensure you have rebar3 installed)
 rebar3 compile
 ```
+
+### Commands
+
+```
+# Benchmark euneus:encode/1
+$ make bench.encode
+```
+
+```
+# Benchmark euneus:decode/1
+$ make bench.decode
+```
+
+```
+# Run all tests
+$ make test
+```
+
+```
+# Run all tests and dialyzer
+$ make check
+```
+
+> **Note**:
+>
+> Open the [Makefile](Makefile) to see all commands.
 
 ## License
 
