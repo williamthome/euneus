@@ -145,9 +145,9 @@ key(<<$"/integer,Rest/bitstring>>, Opts, Input, Pos, Buffer) ->
 key(<<$}/integer,Rest/bitstring>>, Opts, Input, Pos, [[] | Buffer]) ->
     continue(Rest, Opts, Input, Pos + 1, Buffer, #{});
 key(<<_/integer,_/bitstring>> = Rest, Opts, Input, Pos, Buffer) ->
-    throw_error(Rest, Opts, Input, Pos, Buffer);
-key(<<_/bitstring>>, _Opts, _Input, _Pos, _Buffer) ->
-    eof_error().
+    throw_byte(Rest, Opts, Input, Pos, Buffer);
+key(<<_/bitstring>>, Opts, Input, Pos, Buffer) ->
+    throw_eof(Opts, Input, Pos, Buffer).
 
 key(<<H/integer,Rest/bitstring>>, Opts, Input, Pos, Buffer, Value)
   when H =:= $\s; H =:= $\t; H =:= $\n; H =:= $\r ->
@@ -155,9 +155,9 @@ key(<<H/integer,Rest/bitstring>>, Opts, Input, Pos, Buffer, Value)
 key(<<$:/integer,Rest/bitstring>>, Opts, Input, Pos, Buffer, Value) ->
     value(Rest, Opts, Input, Pos + 1, [?object, Value | Buffer]);
 key(<<_/integer,_/bitstring>> = Rest, Opts, Input, Pos, Buffer, _Value) ->
-    throw_error(Rest, Opts, Input, Pos, Buffer);
-key(<<>>, _Opts, _Input, _Pos, _Buffer, _Value) ->
-    eof_error().
+    throw_byte(Rest, Opts, Input, Pos, Buffer);
+key(<<_/bitstring>>, Opts, Input, Pos, Buffer, _Value) ->
+    throw_eof(Opts, Input, Pos, Buffer).
 
 value(<<H/integer,Rest/bitstring>>, Opts, Input, Pos, Buffer)
   when H =:= $\s; H =:= $\t; H =:= $\n; H =:= $\r ->
@@ -184,9 +184,9 @@ value(<<$[/integer,Rest/bitstring>>, Opts, Input, Pos, Buffer) ->
 value(<<$]/integer,Rest/bitstring>>, Opts, Input, Pos, Buffer) ->
     empty_array(Rest, Opts, Input, Pos + 1, Buffer);
 value(<<_/integer,_/bitstring>> = Rest, Opts, Input, Pos, Buffer) ->
-    throw_error(Rest, Opts, Input, Pos, Buffer);
-value(<<_/bitstring>>, _Opts, _Input, _Pos, _Buffer) ->
-    eof_error().
+    throw_byte(Rest, Opts, Input, Pos, Buffer);
+value(<<_/bitstring>>, Opts, Input, Pos, Buffer) ->
+    throw_eof(Opts, Input, Pos, Buffer).
 
 string(<<$"/integer,Rest/bitstring>>, Opts, Input, Pos, Buffer, Len) ->
     String = binary_part(Input, Pos, Len),
@@ -197,7 +197,7 @@ string(<<$\\/integer,Rest/bitstring>>, Opts, Input, Pos, Buffer, Len) ->
     escape(Rest, Opts, Input, Pos + Len, Buffer, Part);
 string(<<H/integer,_/bitstring>> = Rest, Opts, Input, Pos, Buffer, _Len)
   when H =< ?NON_PRINTABLE_LAST ->
-    throw_error(Rest, Opts, Input, Pos, Buffer);
+    throw_byte(Rest, Opts, Input, Pos, Buffer);
 string(<< Y4/integer, Y3/integer, Y2/integer, Y1/integer, $-/integer
         , M2/integer, M1/integer, $-/integer
         , D2/integer, D1/integer
@@ -243,9 +243,9 @@ string(<<H/utf8,Rest/bitstring>>, Opts, Input, Pos, Buffer, Len)
 string(<<_/utf8,Rest/bitstring>>, Opts, Input, Pos, Buffer, Len) ->
     string(Rest, Opts, Input, Pos, Buffer, Len + 4);
 string(<<_/integer,_/bitstring>> = Rest, Opts, Input, Pos, Buffer, _Len) ->
-    throw_error(Rest, Opts, Input, Pos, Buffer);
-string(<<_/bitstring>>, _Opts, _Input, _Pos, _Buffer, _Len) ->
-    eof_error().
+    throw_byte(Rest, Opts, Input, Pos, Buffer);
+string(<<_/bitstring>>, Opts, Input, Pos, Buffer, _Len) ->
+    throw_eof(Opts, Input, Pos, Buffer).
 
 string(<<$"/integer,Rest/bitstring>>, Opts, Input, Pos, Buffer, Acc, Len) ->
     Last = binary_part(Input, Pos, Len),
@@ -256,7 +256,7 @@ string(<<$\\/integer,Rest/bitstring>>, Opts, Input, Pos, Buffer, Acc, Len) ->
     escape(Rest, Opts, Input, Pos + Len, Buffer, [Acc, Part]);
 string(<<H/integer,_/bitstring>> = Rest, Opts, Input, Pos, Buffer, _Acc, _Len)
   when H =< ?NON_PRINTABLE_LAST ->
-    throw_error(Rest, Opts, Input, Pos, Buffer);
+    throw_byte(Rest, Opts, Input, Pos, Buffer);
 string(<<H/integer,Rest/bitstring>>, Opts, Input, Pos, Buffer, Acc, Len)
   when H =< ?ONE_BYTE_LAST ->
     string(Rest, Opts, Input, Pos, Buffer, Acc, Len + 1);
@@ -269,9 +269,9 @@ string(<<H/utf8,Rest/bitstring>>, Opts, Input, Pos, Buffer, Acc, Len)
 string(<<_/utf8,Rest/bitstring>>, Opts, Input, Pos, Buffer, Acc, Len) ->
     string(Rest, Opts, Input, Pos, Buffer, Acc, Len + 4);
 string(<<_/integer,_/bitstring>> = Rest, Opts, Input, Pos, Buffer, _Acc, _Len) ->
-    throw_error(Rest, Opts, Input, Pos, Buffer);
-string(<<_/bitstring>>, _Opts, _Input, _Pos, _Buffer, _Acc, _Len) ->
-    eof_error().
+    throw_byte(Rest, Opts, Input, Pos, Buffer);
+string(<<_/bitstring>>, Opts, Input, Pos, Buffer, _Acc, _Len) ->
+    throw_eof(Opts, Input, Pos, Buffer).
 
 normalize_string([?key | _], #{keys := Normalize} = Opts, Key) ->
     Normalize(Key, Opts);
@@ -310,9 +310,9 @@ escape(<<$t/integer,Rest/bitstring>>, Opts, Input, Pos, Buffer, Acc) ->
 escape(<<$u/integer,Rest/bitstring>>, Opts, Input, Pos, Buffer, Acc) ->
     escapeu(Rest, Opts, Input, Pos, Buffer, Acc);
 escape(<<_/integer,_/bitstring>> = Rest, Opts, Input, Pos, Buffer, _Acc) ->
-    throw_error(Rest, Opts, Input, Pos + 1, Buffer);
-escape(<<_/bitstring>>, _Opts, _Input, _Pos, _Buffer, _Acc) ->
-    eof_error().
+    throw_byte(Rest, Opts, Input, Pos + 1, Buffer);
+escape(<<_/bitstring>>, Opts, Input, Pos, Buffer, _Acc) ->
+    throw_eof(Opts, Input, Pos, Buffer).
 
 escapeu(<<12336:16/integer,Int2:16/integer,Rest/bitstring>>, Opts, Input, Pos, Buffer, Acc0) ->
     Last = escapeu_last(Int2, Rest, Opts, Input, Pos, Buffer),
@@ -444,8 +444,8 @@ escapeu(<<Int1:16/integer,Int2:16/integer,Rest/bitstring>>, Opts, Input, Pos, Bu
     Last = escapeu_last(Int2, Rest, Opts, Input, Pos, Buffer),
     Hi = 65536 + (X band 3 bsl 8 + Last bsl 10),
     escape_surrogate(Rest, Opts, Input, Pos, Buffer, Acc, Hi);
-escapeu(<<_Rest/bitstring>>, _Opts, _Input, _Pos, _Buffer, _Acc) ->
-    eof_error().
+escapeu(<<_Rest/bitstring>>, Opts, Input, Pos, Buffer, _Acc) ->
+    throw_eof(Opts, Input, Pos, Buffer).
 
 escapeu_last(Int, Rest, Opts, Input, Pos, Buffer) ->
     case Int of
@@ -547,7 +547,7 @@ escape_surrogate(<<92/integer, 117/integer, Int1:16/integer, Int2:16/integer, Re
     Acc = [Acc0, <<(Hi + Y)/utf8>>],
     string(Rest, Opts, Input, Pos + 12, Buffer, Acc, 0);
 escape_surrogate(<<_Rest/bitstring>> = Rest, Opts, Input, Pos, Buffer, _Acc, _Hi) ->
-    throw_error(Rest, Opts, Input, Pos+6, Buffer).
+    throw_byte(Rest, Opts, Input, Pos+6, Buffer).
 
 escapeu_1(<<_/bitstring>> = Rest, Opts, Input, Pos, Buffer, Acc, Last, X) ->
     A = 6 bsl 5 + (X bsl 2) + (Last bsr 6),
@@ -582,9 +582,9 @@ number_exp(<<Byte/integer,Rest/bitstring>>, Opts, Input, Pos, Buffer, Len)
   when Byte =:= $+ orelse Byte =:= $- ->
     number_exp_sign(Rest, Opts, Input, Pos, Buffer, Len + 1);
 number_exp(<<_/integer,_/bitstring>> = Rest, Opts, Input, Pos, Buffer, Len) ->
-    throw_error(Rest, Opts, Input, Pos + Len, Buffer);
-number_exp(<<>>, _Opts, _Input, _Pos, _Buffer, _Len) ->
-    eof_error().
+    throw_byte(Rest, Opts, Input, Pos + Len, Buffer);
+number_exp(<<_/bitstring>>, Opts, Input, Pos, Buffer, _Len) ->
+    throw_eof(Opts, Input, Pos, Buffer).
 
 number_exp_cont(<<Byte/integer,Rest/bitstring>>, Opts, Input, Pos, Buffer, Len)
   when ?is_number(Byte) ->
@@ -614,33 +614,33 @@ number_exp_copy(<<Byte/integer,Rest/bitstring>>, Opts, Input, Pos, Buffer, Prefi
   when Byte =:= $+ orelse Byte =:= $- ->
     number_exp_sign(Rest, Opts, Input, Pos, Buffer, Prefix, 1);
 number_exp_copy(<<_/integer,_/bitstring>> = Rest, Opts, Input, Pos, Buffer, _Prefix) ->
-    throw_error(Rest, Opts, Input, Pos, Buffer);
-number_exp_copy(<<>>, _Opts, _Input, _Pos, _Buffer, _Prefix) ->
-    eof_error().
+    throw_byte(Rest, Opts, Input, Pos, Buffer);
+number_exp_copy(<<_/bitstring>>, Opts, Input, Pos, Buffer, _Prefix) ->
+    throw_eof(Opts, Input, Pos, Buffer).
 
 number_exp_sign(<<Byte/integer,Rest/bitstring>>, Opts, Input, Pos, Buffer, Len)
   when ?is_number(Byte) ->
     number_exp_cont(Rest, Opts, Input, Pos, Buffer, Len + 1);
 number_exp_sign(<<_/integer,_/bitstring>> = Rest, Opts, Input, Pos, Buffer, Len) ->
-    throw_error(Rest, Opts, Input, Pos + Len, Buffer);
-number_exp_sign(<<>>, _Opts, _Input, _Pos, _Buffer, _Len) ->
-    eof_error().
+    throw_byte(Rest, Opts, Input, Pos + Len, Buffer);
+number_exp_sign(<<_/bitstring>>, Opts, Input, Pos, Buffer, _Len) ->
+    throw_eof(Opts, Input, Pos, Buffer).
 
 number_exp_sign(<<Byte/integer,Rest/bitstring>>, Opts, Input, Pos, Buffer, Prefix, Len)
   when ?is_number(Byte) ->
     number_exp_cont(Rest, Opts, Input, Pos, Buffer, Prefix, Len + 1);
 number_exp_sign(<<_/integer,_/bitstring>> = Rest, Opts, Input, Pos, Buffer, _Prefix, Len) ->
-    throw_error(Rest, Opts, Input, Pos + Len, Buffer);
-number_exp_sign(<<>>, _Opts, _Input, _Pos, _Buffer, _Prefix, _Len) ->
-    eof_error().
+    throw_byte(Rest, Opts, Input, Pos + Len, Buffer);
+number_exp_sign(<<_/bitstring>>, Opts, Input, Pos, Buffer, _Prefix, _Len) ->
+    throw_eof(Opts, Input, Pos, Buffer).
 
 number_frac(<<Byte/integer,Rest/bitstring>>, Opts, Input, Pos, Buffer, Len)
   when ?is_number(Byte) ->
     number_frac_cont(Rest, Opts, Input, Pos, Buffer, Len + 1);
 number_frac(<<_/integer,_/bitstring>> = Rest, Opts, Input, Pos, Buffer, Len) ->
-    throw_error(Rest, Opts, Input, Pos + Len, Buffer);
-number_frac(<<>>, _Opts, _Input, _Pos, _Buffer, _Len) ->
-    eof_error().
+    throw_byte(Rest, Opts, Input, Pos + Len, Buffer);
+number_frac(<<_/bitstring>>, Opts, Input, Pos, Buffer, _Len) ->
+    throw_eof(Opts, Input, Pos, Buffer).
 
 number_frac_cont(<<Byte/integer,Rest/bitstring>>, Opts, Input, Pos, Buffer, Len)
   when ?is_number(Byte) ->
@@ -659,9 +659,9 @@ number_minus(<<Byte/integer,Rest/bitstring>>, Opts, Input, Pos, Buffer)
   when ?is_number(Byte) ->
     number(Rest, Opts, Input, Pos, Buffer, 2);
 number_minus(<<_/integer,_/bitstring>> = Rest, Opts, Input, Pos, Buffer) ->
-    throw_error(Rest, Opts, Input, Pos + 1, Buffer);
-number_minus(<<>>, _Opts, _Input, _Pos, _Buffer) ->
-    eof_error().
+    throw_byte(Rest, Opts, Input, Pos + 1, Buffer);
+number_minus(<<_/bitstring>>, Opts, Input, Pos, Buffer) ->
+    throw_eof(Opts, Input, Pos, Buffer).
 
 number_zero(<<$./integer,Rest/bitstring>>, Opts, Input, Pos, Buffer, Len) ->
     number_frac(Rest, Opts, Input, Pos, Buffer, Len + 1);
@@ -690,9 +690,9 @@ object(<<$}/integer,Rest/bitstring>>, Opts, Input, Pos, [Key, Acc0 | Buffer], Va
     Map = normalize_object(Opts, maps:from_list(Acc)),
     continue(Rest, Opts, Input, Pos + 1, Buffer, Map);
 object(<<_/integer,_/bitstring>> = Rest, Opts, Input, Pos, Buffer, _Value) ->
-    throw_error(Rest, Opts, Input, Pos, Buffer);
-object(<<>>, _Opts, _Input, _Pos, _Buffer, _Value) ->
-    eof_error().
+    throw_byte(Rest, Opts, Input, Pos, Buffer);
+object(<<_/bitstring>>, Opts, Input, Pos, Buffer, _Value) ->
+    throw_eof(Opts, Input, Pos, Buffer).
 
 normalize_object(#{objects := Normalize} = Opts, Object) ->
     Normalize(Object, Opts);
@@ -708,9 +708,9 @@ array(<<$]/integer,Rest/bitstring>>, Opts, Input, Pos, [Acc | Buffer], Value) ->
     List = normalize_array(Opts, lists:reverse(Acc, [Value])),
     continue(Rest, Opts, Input, Pos + 1, Buffer, List);
 array(<<_/integer,_/bitstring>> = Rest, Opts, Input, Pos, Buffer, _Value) ->
-    throw_error(Rest, Opts, Input, Pos, Buffer);
-array(<<>>, _Opts, _Input, _Pos, _Buffer, _Value) ->
-    eof_error().
+    throw_byte(Rest, Opts, Input, Pos, Buffer);
+array(<<_/bitstring>>, Opts, Input, Pos, Buffer, _Value) ->
+    throw_eof(Opts, Input, Pos, Buffer).
 
 normalize_array(#{arrays := Normalize} = Opts, Array) ->
     Normalize(Array, Opts);
@@ -720,7 +720,7 @@ normalize_array(_Opts, Array) ->
 empty_array(Rest, Opts, Input, Pos, [?array, [] | Buffer]) ->
     continue(Rest, Opts, Input, Pos, Buffer, []);
 empty_array(Rest, Opts, Input, Pos, Buffer) ->
-    throw_error(Rest, Opts, Input, Pos - 1, Buffer).
+    throw_byte(Rest, Opts, Input, Pos - 1, Buffer).
 
 continue(Rest, Opts, Input, Pos, [?key | Buffer], Value) ->
     key(Rest, Opts, Input, Pos, Buffer, Value);
@@ -736,16 +736,15 @@ terminate(<<H/integer,Rest/bitstring>>, Opts, Input, Pos, Buffer, Value)
     terminate(Rest, Opts, Input, Pos + 1, Buffer, Value);
 terminate(<<>>, _Opts, _Input, _Pos, _Buffer, Value) ->
     Value;
-terminate(Rest, Opts, Input, Pos, Buffer, _Value) ->
-    throw_error(Rest, Opts, Input, Pos, Buffer).
+terminate(<<Rest/bitstring>>, Opts, Input, Pos, Buffer, _Value) ->
+    throw_byte(Rest, Opts, Input, Pos, Buffer).
 
-eof_error() ->
-    throw(eof).
+throw_eof(Opts, Input, Pos, Buffer) ->
+    throw({eof, Opts, Input, Pos, Buffer}).
 
-throw_error(_Rest, _Opts, Input, Pos, _Buffer) when Pos =:= byte_size(Input) ->
-    eof_error();
-throw_error(Rest, Opts, Input, Pos, Buffer) ->
-    throw({position, Rest, Opts, Input, Pos, Buffer}).
+throw_byte(<<Rest/bitstring>>, Opts, Input, Pos, Buffer) ->
+    Byte = binary:at(Input, Pos),
+    throw({{byte, Byte}, Rest, Opts, Input, Pos, Buffer}).
 
 token_error(Len, Rest, Opts, Input, Pos, Buffer) when is_integer(Len) ->
     Token = binary_part(Input, Pos, Len),
@@ -753,16 +752,13 @@ token_error(Len, Rest, Opts, Input, Pos, Buffer) when is_integer(Len) ->
 token_error(Token, Rest, Opts, Input, Pos, Buffer) ->
     throw({token, Token, Rest, Opts, Input, Pos, Buffer}).
 
-handle_error(throw, eof, _Stacktrace) ->
+handle_error(throw, {eof, _Opts, _Input, _Pos, _Buffer}, _Stacktrace) ->
     {error, unexpected_end_of_input};
-handle_error(throw, {position, _Rest, _Opts, Input, Pos, _Buffer}, _Stacktrace) ->
-    Byte = binary:at(Input, Pos),
-    Hex = integer_to_binary(Byte, 16),
-    {error, {unexpected_byte, <<"0x"/utf8,Hex/binary>>, Pos}};
+handle_error(throw, {{byte, Byte}, _Rest, _Opts, _Input, Pos, _Buffer}, _Stacktrace) ->
+    Hex = <<"0x"/utf8,(integer_to_binary(Byte, 16))/binary>>,
+    {error, {unexpected_byte, Hex, Pos}};
 handle_error(throw, {token, Token, _Rest, _Opts, _Input, Pos, _Buffer}, _Stacktrace) ->
     {error, {unexpected_sequence, Token, Pos}};
-handle_error(throw, Reason, _Stacktrace) ->
-    {error, Reason};
 handle_error(Class, Reason, Stacktrace) ->
     erlang:raise(Class, Reason, Stacktrace).
 
