@@ -345,7 +345,7 @@ escapeu(<<Int1:16/integer,Int2:16/integer,Rest/bitstring>>, Opts, Input, Pos, Bu
     X = case Int1 of
         12337 -> 1; 12338 -> 2; 12339 -> 3; 12340 -> 4; 12341 -> 5;
         12342 -> 6; 12343 -> 7;
-        _ -> token_error(6, Rest, Opts, Input, Pos, Buffer)
+        _ -> throw_token(6, Rest, Opts, Input, Pos, Buffer)
     end,
     Last = escapeu_last(Int2, Rest, Opts, Input, Pos, Buffer),
     escapeu_1(Rest, Opts, Input, Pos, Buffer, Acc, Last, X);
@@ -442,7 +442,7 @@ escapeu(<<Int1:16/integer,Int2:16/integer,Rest/bitstring>>, Opts, Input, Pos, Bu
         26169 -> 249; 26177 -> 250; 26178 -> 251; 26179 -> 252; 26180 -> 253;
         26181 -> 254; 26182 -> 255; 26209 -> 250; 26210 -> 251; 26211 -> 252;
         26212 -> 253; 26213 -> 254; 26214 -> 255;
-        _ -> token_error(6, Rest, Opts, Input, Pos, Buffer)
+        _ -> throw_token(6, Rest, Opts, Input, Pos, Buffer)
     end,
     Last = escapeu_last(Int2, Rest, Opts, Input, Pos, Buffer),
     escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, X);
@@ -451,7 +451,7 @@ escapeu(<<Int1:16/integer,Int2:16/integer,Rest/bitstring>>, Opts, Input, Pos, Bu
         17464 -> 216; 17465 -> 217; 17473 -> 218; 17474 -> 219; 17505 -> 218;
         17506 -> 219; 25656 -> 216; 25657 -> 217; 25665 -> 218; 25666 -> 219;
         25697 -> 218; 25698 -> 219;
-        _ -> token_error(6, Rest, Opts, Input, Pos, Buffer)
+        _ -> throw_token(6, Rest, Opts, Input, Pos, Buffer)
     end,
     Last = escapeu_last(Int2, Rest, Opts, Input, Pos, Buffer),
     Hi = 65536 + (X band 3 bsl 8 + Last bsl 10),
@@ -542,7 +542,7 @@ escapeu_last(Int, Rest, Opts, Input, Pos, Buffer) ->
         26167 -> 247; 26168 -> 248; 26169 -> 249; 26177 -> 250; 26178 -> 251; 26179 -> 252;
         26180 -> 253; 26181 -> 254; 26182 -> 255; 26209 -> 250; 26210 -> 251; 26211 -> 252;
         26212 -> 253; 26213 -> 254; 26214 -> 255;
-        _ -> token_error(6, Rest, Opts, Input, Pos, Buffer)
+        _ -> throw_token(6, Rest, Opts, Input, Pos, Buffer)
     end.
 
 escape_surrogate(<<92/integer, 117/integer, Int1:16/integer, Int2:16/integer, Rest/bitstring>>,
@@ -553,7 +553,7 @@ escape_surrogate(<<92/integer, 117/integer, Int1:16/integer, Int2:16/integer, Re
         17508 -> 221; 17509 -> 222; 17510 -> 223; 25667 -> 220; 25668 -> 221;
         25669 -> 222; 25670 -> 223; 25699 -> 220; 25700 -> 221; 25701 -> 222;
         25702 -> 223;
-        _ -> token_error(12, Rest, Opts, Input, Pos, Buffer)
+        _ -> throw_token(12, Rest, Opts, Input, Pos, Buffer)
     end,
     Y = X band 3 bsl 8 + Last,
     Acc = [Acc0, <<(Hi + Y)/utf8>>],
@@ -688,7 +688,7 @@ try_parse_float(Bin, Token, Rest, Opts, Input, Pos, Buffer) ->
         binary_to_float(Bin)
     catch
         error:badarg:_ ->
-            token_error(Token, Rest, Opts, Input, Pos, Buffer)
+            throw_token(Token, Rest, Opts, Input, Pos, Buffer)
     end.
 
 object(<<H/integer,Rest/bitstring>>, Opts, Input, Pos, Buffer, Value)
@@ -754,18 +754,18 @@ terminate(<<>>, _Opts, _Input, _Pos, _Buffer, Value) ->
 terminate(<<Rest/bitstring>>, Opts, Input, Pos, Buffer, _Value) ->
     throw_byte(Rest, Opts, Input, Pos, Buffer).
 
-throw_eof(Opts, Input, Pos, Buffer) ->
-    throw({eof, Opts, Input, Pos, Buffer}).
-
 throw_byte(<<Rest/bitstring>>, Opts, Input, Pos, Buffer) ->
     Byte = binary:at(Input, Pos),
     throw({{byte, Byte}, Rest, Opts, Input, Pos, Buffer}).
 
-token_error(Len, Rest, Opts, Input, Pos, Buffer) when is_integer(Len) ->
+throw_token(Len, Rest, Opts, Input, Pos, Buffer) when is_integer(Len) ->
     Token = binary_part(Input, Pos, Len),
-    token_error(Token, Rest, Opts, Input, Pos, Buffer);
-token_error(Token, Rest, Opts, Input, Pos, Buffer) ->
+    throw_token(Token, Rest, Opts, Input, Pos, Buffer);
+throw_token(Token, Rest, Opts, Input, Pos, Buffer) ->
     throw({{token, Token}, Rest, Opts, Input, Pos, Buffer}).
+
+throw_eof(Opts, Input, Pos, Buffer) ->
+    throw({eof, Opts, Input, Pos, Buffer}).
 
 handle_error(throw, {eof, _Opts, _Input, _Pos, _Buffer}, _Stacktrace) ->
     {error, unexpected_end_of_input};
