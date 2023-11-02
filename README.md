@@ -28,7 +28,6 @@ Like Thoas, both the parser and generator fully conform to
 - [Tests](#tests)
 - [Credits](#credits)
 - [Why the name Euneus?](#why-the-name-euneus)
-- [TODO](#todo)
 - [Sponsors](#sponsors)
 - [Contributing](#contributing)
     - [Issues](#issues)
@@ -374,13 +373,6 @@ Euneus is a rewrite of Thoas, so all credits go to [Michał Muskała](https://gi
 ## Why the name Euneus?
 
 Euneus is the twin brother of [Thoas](https://en.wikipedia.org/wiki/Thoas_(son_of_Jason)).
-
-## TODO
-
-- [ ] Improve docs
-- [X] Specs
-- [X] Benchmarks
-- [X] Test suites
 
 ## Sponsors
 
