@@ -19,7 +19,7 @@
 
 -compile({inline, [
     % misc
-    parse_opts/1, continue/6, terminate/6,
+    decode_parsed/2, parse_opts/1, continue/6, terminate/6,
     % values
     string/6, number/6, object/6, array/6, empty_array/5,
     % numbers
@@ -38,7 +38,10 @@
 
 -dialyzer({no_return, [ throw_byte/5, throw_token/6, throw_eof/4 ]}).
 
--export([ decode/2, handle_error/3, resume/6, resume/7 ]).
+-export([
+    decode/2, parse_opts/1, decode_parsed/2, handle_error/3,
+    resume/6, resume/7
+]).
 
 -export_type([
     input/0, options/0, result/0, normalizer/1, error_reason/0,
@@ -86,8 +89,15 @@
     Opts :: options(),
     Result :: result().
 
-decode(Bin, Opts0) when is_binary(Bin) andalso is_map(Opts0) ->
-    Opts = parse_opts(Opts0),
+decode(Bin, Opts) when is_map(Opts) ->
+    decode_parsed(Bin, parse_opts(Opts)).
+
+-spec decode_parsed(Input, Opts) -> Result when
+    Input :: input(),
+    Opts :: options(),
+    Result :: result().
+
+decode_parsed(Bin, Opts) when is_binary(Bin) ->
     try
         {ok, value(Bin, Opts, Bin, 0, [?terminate])}
     catch
@@ -95,10 +105,10 @@ decode(Bin, Opts0) when is_binary(Bin) andalso is_map(Opts0) ->
             Handle = maps:get(error_handler, Opts),
             Handle(Class, Reason, Stacktrace)
     end;
-decode(MaybeIOList, Opts) ->
+decode_parsed(MaybeIOList, Opts) ->
     case attempt_iolist_to_binary(MaybeIOList) of
         {ok, Bin} ->
-            decode(Bin, Opts);
+            decode_parsed(Bin, Opts);
         {error, Reason} ->
             {error, Reason}
     end.

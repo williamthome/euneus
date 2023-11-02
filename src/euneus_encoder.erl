@@ -38,7 +38,8 @@
 -dialyzer({no_return, [ parse_opts/1, encode_unhandled/2 ]}).
 
 -export([
-    encode/2, encode_binary/2, encode_atom/2, encode_integer/2,
+    encode/2, parse_opts/1, encode_parsed/2,
+    encode_binary/2, encode_atom/2, encode_integer/2,
     encode_float/2, encode_list/2, encode_map/2, encode_datetime/2,
     encode_timestamp/2, encode_unhandled/2
 ]).
@@ -94,8 +95,15 @@
     Opts :: options(),
     Return :: result().
 
-encode(Term, Opts0) ->
-    Opts = parse_opts(Opts0),
+encode(Term, Opts) ->
+    encode_parsed(Term, parse_opts(Opts)).
+
+-spec encode_parsed(Term, Opts) -> Return when
+    Term :: term(),
+    Opts :: options(),
+    Return :: result().
+
+encode_parsed(Term, Opts) ->
     try
         {ok, value(Term, Opts)}
     catch
