@@ -28,7 +28,6 @@ Like Thoas, both the parser and generator fully conform to
 - [Tests](#tests)
 - [Credits](#credits)
 - [Why the name Euneus?](#why-the-name-euneus)
-- [TODO](#todo)
 - [Sponsors](#sponsors)
 - [Contributing](#contributing)
     - [Issues](#issues)
@@ -359,12 +358,13 @@ Use `$ make bench.encode` or `$ make bench.decode` to run the benchmarks. Edit t
 
 There are Eunit tests in [euneus_encoder](/src/euneus_encoder.erl) and [euneus_decoder](/src/euneus_decoder.erl) and tests suites in a specific project under the [euneus_test](/euneus_test/) directory. Euneus has more than 330 tests.
 
-Also, the parser is tested using [JSONTestSuite](https://github.com/nst/JSONTestSuite).
+Also, the parser is tested using [JSONTestSuite](https://github.com/nst/JSONTestSuite) and all tests are green:
+
+![JSON Test Suite](/assets/images/json-test-suite-result.png)
 
 > **Note**
 >
-> The [submitted PR](https://github.com/nst/JSONTestSuite/pull/132) was not accepted yet, but all tests are green:
-> ![JSON Test Suite](/assets/images/json-test-suite-result.png)
+> All of the JSONTestSuite tests are embedded in Euneus tests.
 
 ## Credits
 
@@ -373,13 +373,6 @@ Euneus is a rewrite of Thoas, so all credits go to [Michał Muskała](https://gi
 ## Why the name Euneus?
 
 Euneus is the twin brother of [Thoas](https://en.wikipedia.org/wiki/Thoas_(son_of_Jason)).
-
-## TODO
-
-- [ ] Improve docs
-- [X] Specs
-- [X] Benchmarks
-- [X] Test suites
 
 ## Sponsors
 
