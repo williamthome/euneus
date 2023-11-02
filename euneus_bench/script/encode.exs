@@ -7,15 +7,15 @@ jobs = %{
 
 data = [
   "Blockchain",
-  "Giphy",
-  "GitHub",
-  "GovTrack",
-  "Issue 90",
-  "JSON Generator (Pretty)",
-  "JSON Generator",
-  "Pokedex",
-  "UTF-8 escaped",
-  "UTF-8 unescaped"
+  # "Giphy",
+  # "GitHub",
+  # "GovTrack",
+  # "Issue 90",
+  # "JSON Generator (Pretty)",
+  # "JSON Generator",
+  # "Pokedex",
+  # "UTF-8 escaped",
+  # "UTF-8 unescaped"
 ]
 
 inputs =
