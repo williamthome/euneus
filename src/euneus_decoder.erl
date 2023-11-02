@@ -1,6 +1,6 @@
 %% @author William Fank Thomé <willilamthome@hotmail.com>
 %% @copyright 2023 William Fank Thomé
-%% @doc Decode JSON to Erlang terms.
+%% @doc JSON parser.
 
 %% Copyright 2023 William Fank Thomé
 %%

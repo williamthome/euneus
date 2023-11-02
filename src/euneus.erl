@@ -1,6 +1,6 @@
 %% @author William Fank Thomé <willilamthome@hotmail.com>
 %% @copyright 2023 William Fank Thomé
-%% @doc Core module to parse and generate JSON.
+%% @doc Core module.
 
 %% Copyright 2023 William Fank Thomé
 %%
