@@ -16,6 +16,7 @@ Like Thoas, both the parser and generator fully conform to
 - [Basic Usage](#basic-usage)
 - [Data Mapping](#data-mapping)
     - [Why not more built-in types?](#why-not-more-built-in-types)
+    - [Note about proplists](#note-about-proplists)
 - [Differences to Thoas](#differences-to-thoas)
     - [Encode](#encode)
     - [Decode](#decode)
@@ -107,13 +108,33 @@ end
 | #{foo => bar}        	| #{}                                                                                                                                                      	| {"foo":"bar"}               	| #{keys => fun(Key, _Opts) -> binary_to_atom(Key) end}                                                           	| #{foo => <<"bar">>}  	|
 | {myrecord, val}      	| #{encode_unhandled => fun({myrecord, Val}, Opts) -><br>    Encode = maps:get(encode_list, Opts),<br>    Encode([myrecord, #{key => Val}], Opts)<br>end}) 	| ["myrecord", {"key":"val"}] 	| #{arrays => fun([<<"myrecord">>, #{<<"key">> := Val}], _Opts) -><br>    {myrecord, binary_to_atom(Val)}<br>end} 	| {myrecord, val}      	|
 
-> **Note**
->
-> Proplists are not handled by Euneus, you must override the `list_encoder` option in the encoder to handle them. Another option is to convert proplists to maps before the encoding. The reason is because it's impossible to know when a list is a proplist and also because a proplist cannot be decoded. See the [Why not more built-in types?](#why-not-more-built-in-types) section.
-
 ### Why not more built-in types?
 
 The goal of `Euneus` is to have built-in types that can be encoded and then decoded to the original value. If you have any type that can be encoded and rolled back, feel free to open a [new issue](https://github.com/williamthome/euneus/issues/new) to discuss it.
+
+### Note about proplists
+
+Proplists are not handled by Euneus, you must override the `list_encoder` option in the encoder to handle them, for example:
+
+```erlang
+1> Options = #{
+       list_encoder => fun
+           ([{K, _} | _] = Proplist, Opts)
+             when is_binary(K); is_atom(K); is_integer(K) ->
+               Map = proplists:to_map(Proplist),
+               euneus_encoder:encode_map(Map, Opts);
+           (List, Opts) ->
+               euneus_encoder:encode_list(List, Opts)
+       end
+   }.
+
+2> Proplist = [{foo, bar}, {bar, [{0, ok}]}].
+
+3> euneus:encode_to_binary(Proplist, Options).
+% {ok,<<"{\"foo\":\"bar\",\"bar\":{\"0\":\"ok\"}}">>}
+```
+
+Another option is to convert proplists to maps before the encoding. The reason is because it's impossible to know when a list is a proplist and also because a proplist cannot be decoded. See the [Why not more built-in types?](#why-not-more-built-in-types) section.
 
 ## Differences to Thoas
 
