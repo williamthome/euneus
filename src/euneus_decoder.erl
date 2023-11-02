@@ -243,14 +243,14 @@ string(<< Y4/integer, Y3/integer, Y2/integer, Y1/integer, $-/integer
             Value = {Date, Time},
             continue(Rest, Opts, Input, Pos + 21, Buffer, Value);
         << $./integer
-         , Mil3/integer, Mil2/integer, Mil1/integer
+         , MSec3/integer, MSec2/integer, MSec1/integer
          , $Z/integer, $"
          , Rest/bitstring >>
-        when ?is_number(Mil3), ?is_number(Mil2), ?is_number(Mil1) ->
+        when ?is_number(MSec3), ?is_number(MSec2), ?is_number(MSec1) ->
             Date = {chars_to_integer(Y4, Y3, Y2, Y1), chars_to_integer(M2, M1), chars_to_integer(D2, D1)},
             Time = {chars_to_integer(H2, H1), chars_to_integer(Min2, Min1), chars_to_integer(S2, S1)},
             DateTime = {Date, Time},
-            MilliSeconds = chars_to_integer(Mil3, Mil2, Mil1),
+            MilliSeconds = chars_to_integer(MSec3, MSec2, MSec1),
             Seconds = calendar:datetime_to_gregorian_seconds(DateTime) - 62167219200,
             Value = {Seconds div 1000000, Seconds rem 1000000, MilliSeconds * 1000},
             continue(Rest, Opts, Input, Pos + 25, Buffer, Value)
