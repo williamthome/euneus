@@ -25,6 +25,7 @@ Like Thoas, both the parser and generator fully conform to
 - [Benchmarks](#benchmarks)
     - [Encode](#encode-1)
     - [Decode](#decode-1)
+- [Tests](#tests)
 - [Credits](#credits)
 - [Why the name Euneus?](#why-the-name-euneus)
 - [TODO](#todo)
@@ -353,6 +354,17 @@ Use `$ make bench.encode` or `$ make bench.decode` to run the benchmarks. Edit t
 | pokedex.json               	|  **1.37 K** 	|    1.33 K 	|          1.03x 	|
 | utf-8-escaped.json         	|  **1.88 K** 	|    1.66 K 	|          1.13x 	|
 | utf-8-unescaped.json       	| **10.87 K** 	|   10.47 K 	|          1.04x 	|
+
+## Tests
+
+There are Eunit tests in [euneus_encoder](/src/euneus_encoder.erl) and [euneus_decoder](/src/euneus_decoder.erl) and tests suites in a specific project under the [euneus_test](/euneus_test/) directory. Euneus has more than 330 tests.
+
+Also, the parser is tested using [JSONTestSuite](https://github.com/nst/JSONTestSuite).
+
+> **Note**
+>
+> The [submitted PR](https://github.com/nst/JSONTestSuite/pull/132) was not accepted yet, but all tests are green:
+> ![JSON Test Suite](/assets/images/json-test-suite-result.png)
 
 ## Credits
 
