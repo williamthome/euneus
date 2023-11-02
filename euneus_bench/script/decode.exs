@@ -30,9 +30,10 @@ EuneusBench.Helper.run(
   jobs,
   inputs,
   %{
+    # graph: true,
     # parallel: 1,
     # warmup: 5,
-    # time: 30,
+    # time: 5,
     # memory_time: 1,
   }
 )
