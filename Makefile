@@ -20,3 +20,8 @@ test: test.rebar3 test.mix
 
 check: test
 	rebar3 dialyzer
+
+.PHONY: publish
+
+publish: check
+	rebar3 hex publish
