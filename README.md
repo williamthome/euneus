@@ -264,7 +264,6 @@ Euneus permits resuming the decoding when an invalid token is found. Any value c
 ```erlang
 1> ErrorHandler = fun
       (throw, {{token, Token}, Rest, Opts, Input, Pos, Buffer}, _Stacktrace) ->
-          % Instead of throwing the invalid token, it can be replaced.
           Replacement = foo,
           euneus_decoder:resume(Token, Replacement, Rest, Opts, Input, Pos, Buffer);
       (Class, Reason, Stacktrace) ->
