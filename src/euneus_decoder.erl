@@ -17,36 +17,90 @@
 %% limitations under the License.
 -module(euneus_decoder).
 
--compile({inline, [
-    % misc
-    decode_parsed/2, parse_opts/1, continue/6, terminate/6,
-    % values
-    string/6, number/6, object/6, array/6, empty_array/5,
-    % numbers
-    number_exp_cont/6, number_exp_sign/6, number_exp_copy/6, number_frac/6,
-    number_frac_cont/6, number_minus/5, number_zero/6, try_parse_float/7,
-    % helpers
-    chars_to_integer/2, chars_to_integer/3, chars_to_integer/4,
-    % escape
-    escapeu/6, escapeu_1/8, escapeu_2/8, escape_surrogate/7, escapeu_last/6,
-    % normalize
-    normalize_string/3, normalize_object/2, normalize_array/2,
-    % error
-    handle_error/3
-]}).
--compile({inline_size, 100}).
+-compile({ inline, decode_parsed/2 }).
+-compile({ inline, parse_opts/1 }).
+-compile({ inline, continue/6 }).
+-compile({ inline, terminate/6 }).
+-compile({ inline, string/6 }).
+-compile({ inline, string/7 }).
+-compile({ inline, number/6 }).
+-compile({ inline, object/6 }).
+-compile({ inline, array/6 }).
+-compile({ inline, empty_array/5 }).
+-compile({ inline, number_exp_cont/6 }).
+-compile({ inline, number_exp_cont/7 }).
+-compile({ inline, number_exp_sign/6 }).
+-compile({ inline, number_exp_sign/7 }).
+-compile({ inline, number_exp_copy/6 }).
+-compile({ inline, number_frac/6 }).
+-compile({ inline, number_frac_cont/6 }).
+-compile({ inline, number_minus/5 }).
+-compile({ inline, number_zero/6 }).
+-compile({ inline, try_parse_float/7 }).
+-compile({ inline, chars_to_integer/2 }).
+-compile({ inline, chars_to_integer/3 }).
+-compile({ inline, chars_to_integer/4 }).
+-compile({ inline, escapeu/6 }).
+-compile({ inline, escapeu_1/8 }).
+-compile({ inline, escapeu_2/8 }).
+-compile({ inline, escape_surrogate/7 }).
+-compile({ inline, escapeu_last/6 }).
+-compile({ inline, normalize_string/3 }).
+-compile({ inline, normalize_object/2 }).
+-compile({ inline, normalize_array/2 }).
+-compile({ inline, handle_error/3 }).
+-compile({ inline, maps_get/3 }).
+-compile({ inline, maps_to_list/1 }).
+-compile({ inline_list_funcs, true }).
+-compile({ inline_size, 100 }).
 
--dialyzer({no_return, [ throw_byte/5, throw_token/6, throw_eof/4 ]}).
+-dialyzer({ no_return, throw_byte/5 }).
+-dialyzer({ no_return, throw_token/6 }).
+-dialyzer({ no_return, throw_eof/4 }).
 
--export([
-    decode/2, parse_opts/1, decode_parsed/2, handle_error/3,
-    resume/6, resume/7
-]).
+-export([ decode/2 ]).
+-export([ decode_parsed/2 ]).
+-export([ parse_opts/1 ]).
+-export([ handle_error/3 ]).
+-export([ resume/6 ]).
+-export([ resume/7 ]).
 
--export_type([
-    input/0, options/0, result/0, normalizer/1, error_reason/0,
-    error_handler/0
-]).
+-export_type([ input/0 ]).
+-export_type([ options/0 ]).
+-export_type([ result/0 ]).
+-export_type([ normalizer/1 ]).
+-export_type([ error_reason/0 ]).
+-export_type([ error_handler/0 ]).
+
+%% Types
+
+-type input() :: binary() | iolist().
+-type options() :: #{ null_term => term()
+                    , keys => normalizer(Key :: binary())
+                    , values => normalizer(Value :: binary())
+                    , arrays => normalizer(Array :: list())
+                    , objects => normalizer(Object :: map())
+                    , error_handler => error_handler()
+                    }.
+-type position() :: non_neg_integer().
+-type result() :: {ok, term()} | {error, error_reason()}.
+-type normalizer(Term) :: fun((Term, options()) -> term()).
+-type error_class() :: error | exit | throw.
+-type unexpected_end_of_input_error() :: unexpected_end_of_input.
+-type unexpected_byte_error() :: {unexpected_byte, binary(), position()}.
+-type unexpected_sequence_error() :: {unexpected_sequence, binary(), position()}.
+-type invalid_option_error() :: {invalid_option, term()}.
+-type error_reason() :: unexpected_end_of_input_error()
+                      | unexpected_byte_error()
+                      | unexpected_sequence_error()
+                      | invalid_option_error().
+-type error_stacktrace() :: erlang:stacktrace().
+-type error_handler() :: fun(( error_class()
+                             , error_reason()
+                             , error_stacktrace()
+                             ) -> error_stacktrace()).
+
+%% Macros
 
 % Use integers instead of atoms to take advantage of the jump table optimization.
 -define(terminate, 0).
@@ -60,29 +114,10 @@
 -define(ONE_BYTE_LAST, 127).
 -define(TWO_BYTE_LAST, 2_047).
 -define(THREE_BYTE_LAST, 65_535).
-% -define(FOUR_BYTE_LAST, 1_114_111).
 
--type input() :: binary() | iolist().
--type options() :: #{
-    null_term => term(),
-    keys => normalizer(Key :: binary()),
-    values => normalizer(Value :: binary()),
-    arrays => normalizer(Array :: list()),
-    objects => normalizer(Object :: map()),
-    error_handler => error_handler()
-}.
--type position() :: non_neg_integer().
--type result() :: {ok, term()} | {error, error_reason()}.
--type normalizer(Term) :: fun((Term, options()) -> term()).
--type error_class() :: error | exit | throw.
--type error_reason() :: unexpected_end_of_input
-                      | {unexpected_byte, binary(), position()}
-                      | {unexpected_sequence, binary(), position()}.
--type error_stacktrace() :: erlang:stacktrace().
--type error_handler() :: fun(
-    (error_class(), error_reason(), error_stacktrace()) ->
-        error_stacktrace()
-).
+%%%=====================================================================
+%%% API functions
+%%%=====================================================================
 
 -spec decode(Input, Opts) -> Result when
     Input :: input(),
@@ -105,48 +140,45 @@ decode_parsed(Bin, Opts) when is_binary(Bin) ->
             Handle = maps:get(error_handler, Opts),
             Handle(Class, Reason, Stacktrace)
     end;
-decode_parsed(MaybeIOList, Opts) ->
-    case attempt_iolist_to_binary(MaybeIOList) of
-        {ok, Bin} ->
-            decode_parsed(Bin, Opts);
-        {error, Reason} ->
-            {error, Reason}
-    end.
-
-attempt_iolist_to_binary(IOList) ->
+decode_parsed(IOList, Opts) ->
     try
-        {ok, iolist_to_binary(IOList)}
+        decode_parsed(iolist_to_binary(IOList), Opts)
     catch
         error:badarg ->
             {error, not_an_iodata}
     end.
 
 parse_opts(Opts) ->
-    OptionalKeys = [
-        keys,
-        values,
-        arrays,
-        objects
-    ],
-    Optionals = maps:map(fun
-        (_, Fun) when is_function(Fun, 2) ->
-            Fun;
-        (K, copy) when K =:= keys; K =:= values ->
-            fun(X, _O) -> binary:copy(X) end;
-        (K, to_atom) when K =:= keys; K =:= values ->
-            fun(X, _O) -> binary_to_atom(X) end;
-        (K, to_existing_atom) when K =:= keys; K =:= values ->
-            fun(X, _O) -> binary_to_existing_atom(X) end;
-        (K, to_integer) when K =:= keys; K =:= values ->
-            fun(X, _O) -> binary_to_integer(X) end
-    end, maps:with(OptionalKeys, Opts)),
-    Required = #{
-        null_term => maps:get(null_term, Opts, undefined),
-        error_handler => maps:get(error_handler, Opts, fun(C, R, S) ->
+    WithDefaults = Opts#{
+        null_term => maps_get(null_term, Opts, undefined),
+        error_handler => maps_get(error_handler, Opts, fun(C, R, S) ->
             handle_error(C, R, S)
         end)
     },
-    maps:merge(Required, Optionals).
+    Normalized = lists:map(fun normalize_option/1, maps_to_list(WithDefaults)),
+    maps:from_list(Normalized).
+
+normalize_option({null_term, V}) ->
+    {null_term, V};
+normalize_option({error_handler, V}) when is_function(V, 3) ->
+    {error_handler, V};
+normalize_option({K, copy}) when K =:= keys; K =:= values ->
+    {K, fun(X, _O) -> binary:copy(X) end};
+normalize_option({K, to_atom}) when K =:= keys; K =:= values ->
+    {K, fun(X, _O) -> binary_to_atom(X, utf8) end};
+normalize_option({K, to_existing_atom}) when K =:= keys; K =:= values ->
+    {K, fun(X, _O) -> binary_to_existing_atom(X, utf8) end};
+normalize_option({K, to_integer}) when K =:= keys; K =:= values ->
+    {K, fun(X, _O) -> binary_to_integer(X) end};
+normalize_option({K, V})
+  when is_function(V, 2) andalso
+       ( K =:= keys orelse
+         K =:= values orelse
+         K =:= arrays orelse
+         K =:= objects ) ->
+    {K, V};
+normalize_option({K, _}) ->
+    throw({invalid_option, K}).
 
 resume(Token, Rest0, #{null_term := Null} = Opts, Input, Pos0, Buffer) ->
     resume(Token, Null, Rest0, Opts, Input, Pos0, Buffer).
@@ -238,8 +270,12 @@ string(<< Y4/integer, Y3/integer, Y2/integer, Y1/integer, $-/integer
      , ?is_number(S2), ?is_number(S1) ->
     case Rest0 of
         <<$Z/integer, $", Rest/bitstring>> ->
-            Date = {chars_to_integer(Y4, Y3, Y2, Y1), chars_to_integer(M2, M1), chars_to_integer(D2, D1)},
-            Time = {chars_to_integer(H2, H1), chars_to_integer(Min2, Min1), chars_to_integer(S2, S1)},
+            Date = { chars_to_integer(Y4, Y3, Y2, Y1)
+                   , chars_to_integer(M2, M1)
+                   , chars_to_integer(D2, D1) },
+            Time = { chars_to_integer(H2, H1)
+                   , chars_to_integer(Min2, Min1)
+                   , chars_to_integer(S2, S1) },
             Value = {Date, Time},
             continue(Rest, Opts, Input, Pos + 21, Buffer, Value);
         << $./integer
@@ -247,8 +283,12 @@ string(<< Y4/integer, Y3/integer, Y2/integer, Y1/integer, $-/integer
          , $Z/integer, $"
          , Rest/bitstring >>
         when ?is_number(MSec3), ?is_number(MSec2), ?is_number(MSec1) ->
-            Date = {chars_to_integer(Y4, Y3, Y2, Y1), chars_to_integer(M2, M1), chars_to_integer(D2, D1)},
-            Time = {chars_to_integer(H2, H1), chars_to_integer(Min2, Min1), chars_to_integer(S2, S1)},
+            Date = { chars_to_integer(Y4, Y3, Y2, Y1)
+                   , chars_to_integer(M2, M1)
+                   , chars_to_integer(D2, D1) },
+            Time = { chars_to_integer(H2, H1)
+                   , chars_to_integer(Min2, Min1)
+                   , chars_to_integer(S2, S1) },
             DateTime = {Date, Time},
             MilliSeconds = chars_to_integer(MSec3, MSec2, MSec1),
             Seconds = calendar:datetime_to_gregorian_seconds(DateTime) - 62167219200,
@@ -362,7 +402,9 @@ escapeu(<<Int1:16/integer,Int2:16/integer,Rest/bitstring>>, Opts, Input, Pos, Bu
     Last = escapeu_last(Int2, Rest, Opts, Input, Pos, Buffer),
     escapeu_1(Rest, Opts, Input, Pos, Buffer, Acc, Last, X);
 escapeu(<<Int1:16/integer,Int2:16/integer,Rest/bitstring>>, Opts, Input, Pos, Buffer, Acc)
-  when (Int1 > 12343 andalso Int1 < 17464) orelse (Int1 > 17711 andalso Int1 < 25656) orelse (Int1 > 25903 andalso Int1 < 26215) ->
+    when (Int1 > 12343 andalso Int1 < 17464)
+  orelse (Int1 > 17711 andalso Int1 < 25656)
+  orelse (Int1 > 25903 andalso Int1 < 26215) ->
     X = case Int1 of
         12344 -> 8; 12345 -> 9; 12353 -> 10; 12354 -> 11; 12355 -> 12;
         12356 -> 13; 12357 -> 14; 12358 -> 15; 12385 -> 10; 12386 -> 11;
@@ -786,8 +828,32 @@ handle_error(throw, {{byte, Byte}, _Rest, _Opts, _Input, Pos, _Buffer}, _Stacktr
     {error, {unexpected_byte, Hex, Pos}};
 handle_error(throw, {{token, Token}, _Rest, _Opts, _Input, Pos, _Buffer}, _Stacktrace) ->
     {error, {unexpected_sequence, Token, Pos}};
+handle_error(throw, {invalid_option, Key}, _Stacktrace) ->
+    {error, {invalid_option, Key}};
 handle_error(Class, Reason, Stacktrace) ->
     erlang:raise(Class, Reason, Stacktrace).
+
+%%%=====================================================================
+%%% Support functions
+%%%=====================================================================
+
+maps_get(Key, Map, Default) ->
+    case Map of
+        #{Key := Value} -> Value;
+        #{} -> Default
+    end.
+
+maps_to_list(Map) ->
+    do_maps_to_list(erts_internal:map_next(0, Map, [])).
+
+do_maps_to_list([Iter, Map | Acc]) when is_integer(Iter) ->
+    do_maps_to_list(erts_internal:map_next(Iter, Map, Acc));
+do_maps_to_list(Acc) ->
+    Acc.
+
+%%%=====================================================================
+%%% Eunit tests
+%%%=====================================================================
 
 -ifdef(TEST).
 

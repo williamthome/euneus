@@ -183,9 +183,9 @@ For example:
 EncodeOpts = #{
     binary_encoder => fun
         (<<"foo">>, Opts) ->
-            euneus_encoder:escape_binary(<<"bar">>, Opts);
+            euneus_encoder:escape(<<"bar">>, Opts);
         (Bin, Opts) ->
-            euneus_encoder:escape_binary(Bin, Opts)
+            euneus_encoder:escape(Bin, Opts)
     end,
     unhandled_encoder => fun
         ({_, _, _, _} = Ip, Opts) ->
@@ -194,7 +194,7 @@ EncodeOpts = #{
                     error(invalid_ip);
                 IpStr ->
                     IpBin = list_to_binary(IpStr),
-                    euneus_encoder:escape_binary(IpBin, Opts)
+                    euneus_encoder:escape(IpBin, Opts)
             end;
         (Term, Opts) ->
             euneus_encoder:throw_unsupported_type_error(Term, Opts)

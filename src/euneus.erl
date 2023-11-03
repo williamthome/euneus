@@ -17,11 +17,21 @@
 %% limitations under the License.
 -module(euneus).
 
--compile({inline, [ encode/2, encode_to_binary/2, decode/2 ]}).
+-compile({ inline, encode/2 }).
+-compile({ inline, encode_to_binary/2 }).
+-compile({ inline, decode/2 }).
 
--export([ encode/1, encode/2 ]).
--export([ encode_to_binary/1, encode_to_binary/2 ]).
--export([ decode/1, decode/2 ]).
+%% API functions
+-export([ encode/1 ]).
+-export([ encode/2 ]).
+-export([ encode_to_binary/1 ]).
+-export([ encode_to_binary/2 ]).
+-export([ decode/1 ]).
+-export([ decode/2 ]).
+
+%%%=====================================================================
+%%% API functions
+%%%=====================================================================
 
 -spec encode(Input) -> Return when
     Input :: euneus_encoder:input(),
