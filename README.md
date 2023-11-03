@@ -134,7 +134,7 @@ Proplists are not handled by Euneus, you must override the `list_encoder` option
 % {ok,<<"{\"foo\":\"bar\",\"bar\":{\"0\":\"ok\"}}">>}
 ```
 
-Another option is to convert proplists to maps before the encoding. The reason is because it's impossible to know when a list is a proplist and also because a proplist cannot be decoded. See the [Why not more built-in types?](#why-not-more-built-in-types) section.
+Another option is to convert proplists to maps before the encoding. The reason is because it's impossible to know when a list is a proplist and also because a proplist cannot be decoded. Please see the [Why not more built-in types?](#why-not-more-built-in-types) section for more info about this decision.
 
 ## Differences to Thoas
 
@@ -360,7 +360,7 @@ Use `$ make bench.encode` or `$ make bench.decode` to run the benchmarks. Edit t
 
 There are Eunit tests in [euneus_encoder](/src/euneus_encoder.erl) and [euneus_decoder](/src/euneus_decoder.erl) and tests suites in a specific project under the [euneus_test](/euneus_test/) directory. Euneus has more than 330 tests.
 
-Also, the parser is tested using [JSONTestSuite](https://github.com/nst/JSONTestSuite) and all tests are green:
+Also, the parser is tested using [JSONTestSuite](https://github.com/nst/JSONTestSuite) and all tests passes:
 
 ![JSON Test Suite](/assets/images/json-test-suite-result.png)
 
