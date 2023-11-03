@@ -19,8 +19,9 @@ defmodule EuneusBench.Helper do
       inputs: inputs,
       formatters: [
         Benchee.Formatters.Console,
-        {Benchee.Formatters.HTML, file: Path.expand("../tmp/#{label}.html", __DIR__)}
-      ]
+      ] ++ if opts[:graph] do
+        [{Benchee.Formatters.HTML, file: Path.expand("../tmp/#{label}.html", __DIR__)}]
+      else [] end
     )
   end
 end

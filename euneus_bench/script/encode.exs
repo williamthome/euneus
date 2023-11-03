@@ -1,21 +1,24 @@
 Code.eval_file("helper.exs", "./script")
 
+euneus_opts = :euneus_encoder.parse_opts(%{})
+thoas_opts = %{}
+
 jobs = %{
-  "euneus" => &:euneus.encode/1,
-  "thoas" => &:thoas.encode_to_iodata/1
+  "euneus" => &:euneus_encoder.encode_parsed(&1, euneus_opts),
+  "thoas" => &:thoas_encode.encode(&1, thoas_opts),
 }
 
 data = [
   "Blockchain",
-  "Giphy",
-  "GitHub",
-  "GovTrack",
-  "Issue 90",
-  "JSON Generator (Pretty)",
-  "JSON Generator",
-  "Pokedex",
-  "UTF-8 escaped",
-  "UTF-8 unescaped"
+  # "Giphy",
+  # "GitHub",
+  # "GovTrack",
+  # "Issue 90",
+  # "JSON Generator (Pretty)",
+  # "JSON Generator",
+  # "Pokedex",
+  # "UTF-8 escaped",
+  # "UTF-8 unescaped"
 ]
 
 inputs =
@@ -31,9 +34,10 @@ EuneusBench.Helper.run(
   jobs,
   inputs,
   %{
+    # graph: true,
     # parallel: 1,
     # warmup: 5,
-    # time: 30,
+    # time: 5,
     # memory_time: 1,
   }
 )

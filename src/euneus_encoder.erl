@@ -1,6 +1,6 @@
 %% @author William Fank Thomé <willilamthome@hotmail.com>
 %% @copyright 2023 William Fank Thomé
-%% @doc Encode Erlang terms to JSON.
+%% @doc JSON generator.
 
 %% Copyright 2023 William Fank Thomé
 %%
@@ -17,41 +17,93 @@
 %% limitations under the License.
 -module(euneus_encoder).
 
--compile({inline, [
-    % misc
-    parse_opts/1,
-    % encode
-    encode_binary/2, encode_atom/2, encode_integer/2, encode_float/2,
-    encode_list/2, encode_map/2, encode_datetime/2, encode_timestamp/2,
-    encode_unhandled/2,
-    % escape
-    escape_json/1, escape_html/1, escape_js/1, escape_unicode/1,
-    % error
-    handle_error/3
-]}).
--compile({inline_size, 100}).
+-compile({ inline, parse_opts/1 }).
+-compile({ inline, encode_binary/2 }).
+-compile({ inline, encode_atom/2 }).
+-compile({ inline, encode_integer/2 }).
+-compile({ inline, encode_float/2 }).
+-compile({ inline, encode_list/2 }).
+-compile({ inline, encode_map/2 }).
+-compile({ inline, encode_datetime/2 }).
+-compile({ inline, encode_timestamp/2 }).
+-compile({ inline, encode_unhandled/2 }).
+-compile({ inline, escape_json/1 }).
+-compile({ inline, escape_html/1 }).
+-compile({ inline, escape_js/1 }).
+-compile({ inline, escape_unicode/1 }).
+-compile({ inline, handle_error/3 }).
+-compile({ inline, maps_get/3 }).
+-compile({ inline, maps_to_list/1 }).
+-compile({ inline_size, 100 }).
 
 % By default, encode_unhandled/2 will raise unsupported_type exception,
 % so it is a function without a local return.
 % Note that parse_opts/1 is included because unhandled_encoder option
 % has no local return.
--dialyzer({no_return, [ parse_opts/1, encode_unhandled/2 ]}).
+-dialyzer({ no_return, parse_opts/1 }).
+-dialyzer({ no_return, encode_unhandled/2 }).
 
--export([
-    encode/2, encode_binary/2, encode_atom/2, encode_integer/2,
-    encode_float/2, encode_list/2, encode_map/2, encode_datetime/2,
-    encode_timestamp/2, encode_unhandled/2
-]).
--export([
-    escape_binary/2, escape_byte/1, escape_json/1,
-    escape_html/1, escape_js/1, escape_unicode/1
-]).
--export([ throw_unsupported_type_error/1, handle_error/3 ]).
+-export([ encode/2 ]).
+-export([ encode_parsed/2 ]).
+-export([ parse_opts/1 ]).
+-export([ encode_binary/2 ]).
+-export([ encode_atom/2 ]).
+-export([ encode_integer/2 ]).
+-export([ encode_float/2 ]).
+-export([ encode_list/2 ]).
+-export([ encode_map/2 ]).
+-export([ encode_datetime/2 ]).
+-export([ encode_timestamp/2 ]).
+-export([ encode_unhandled/2 ]).
+-export([ escape/2 ]).
+-export([ escape_byte/1 ]).
+-export([ escape_json/1 ]).
+-export([ escape_html/1 ]).
+-export([ escape_js/1 ]).
+-export([ escape_unicode/1 ]).
+-export([ throw_unsupported_type_error/1 ]).
+-export([ handle_error/3 ]).
 
--export_type([
-    input/0, options/0, result/0, encoder/1, escaper/1,
-    error_handler/0, error_reason/0
-]).
+-export_type([ input/0 ]).
+-export_type([ options/0 ]).
+-export_type([ result/0 ]).
+-export_type([ encoder/1 ]).
+-export_type([ escaper/1 ]).
+-export_type([ error_handler/0 ]).
+-export_type([ error_reason/0 ]).
+
+%% Types
+
+-type input() :: term().
+-type options() :: #{ nulls => list()
+                    , binary_encoder => encoder(binary())
+                    , atom_encoder => encoder(atom())
+                    , integer_encoder => encoder(integer())
+                    , float_encoder => encoder(float())
+                    , list_encoder => encoder(list())
+                    , map_encoder => encoder(map())
+                    , datetime_encoder => encoder(calendar:datetime())
+                    , timestamp_encoder => encoder(erlang:timestamp())
+                    , unhandled_encoder => encoder(term())
+                    , escaper => escaper(binary())
+                    , error_handler => error_handler()
+                    }.
+-type result() :: {ok, iolist()} | {error, error_reason()}.
+-type encoder(Input) :: fun((Input, options()) -> iolist()).
+-type escaper(Input) :: fun((Input, options()) -> iolist()).
+-type error_class() :: error | exit | throw.
+-type unsupported_type_error() :: {unsupported_type, Unsupported :: term()}.
+-type invalid_byte_error() :: {invalid_byte, Byte :: byte(), Input :: binary()}.
+-type error_reason() :: unsupported_type_error() | invalid_byte_error().
+-type error_stacktrace() :: erlang:stacktrace().
+-type error_handler() :: fun(( error_class()
+                             , error_reason()
+                             , error_stacktrace()
+                             , input()
+                             , options()
+                             ) -> error_stacktrace()).
+
+%% Macros
 
 -define(min(X, Min), is_integer(X) andalso X >= Min).
 -define(range(X, Min, Max), is_integer(X) andalso X >= Min andalso X =< Max).
@@ -60,42 +112,19 @@
 -define(ONE_BYTE_LAST, 127).
 -define(TWO_BYTE_LAST, 2_047).
 -define(THREE_BYTE_LAST, 65_535).
-% -define(FOUR_BYTE_LAST, 1_114_111).
 
--type input() :: term().
--type options() :: #{
-    nulls => list(),
-    binary_encoder => encoder(Input :: binary()),
-    atom_encoder => encoder(Input :: atom()),
-    integer_encoder => encoder(Input :: integer()),
-    float_encoder => encoder(Input :: float()),
-    list_encoder => encoder(Input :: list()),
-    map_encoder => encoder(Input :: map()),
-    datetime_encoder => encoder(Input :: calendar:datetime()),
-    timestamp_encoder => encoder(Input :: erlang:timestamp()),
-    unhandled_encoder => encoder(Input :: term()),
-    escaper => escaper(Input :: binary()),
-    error_handler => error_handler()
-}.
--type result() :: {ok, iolist()} | {error, error_reason()}.
--type encoder(Input) :: fun((Input, options()) -> iolist()).
--type escaper(Input) :: fun((Input, options()) -> iolist()).
--type error_class() :: error | exit | throw.
--type error_reason() :: {unsupported_type, Unsupported :: term()}
-                      | {invalid_byte, Byte :: byte(), Input :: binary()}.
--type error_stacktrace() :: erlang:stacktrace().
--type error_handler() :: fun(
-    (error_class(), error_reason(), error_stacktrace(), input(), options()) ->
-        error_stacktrace()
-).
+%%%=====================================================================
+%%% API functions
+%%%=====================================================================
 
--spec encode(Term, Opts) -> Return when
-    Term :: term(),
-    Opts :: options(),
-    Return :: result().
+-spec encode(term(), options()) -> result().
 
-encode(Term, Opts0) ->
-    Opts = parse_opts(Opts0),
+encode(Term, Opts) ->
+    encode_parsed(Term, parse_opts(Opts)).
+
+-spec encode_parsed(term(), options()) -> result().
+
+encode_parsed(Term, Opts) ->
     try
         {ok, value(Term, Opts)}
     catch
@@ -104,40 +133,42 @@ encode(Term, Opts0) ->
             Handle(Class, Reason, Stacktrace)
     end.
 
+-spec parse_opts(map()) -> options().
+
 % The explicit call of the functions wrapped in a function is required
 % for the inline optimization.
 parse_opts(Opts) ->
     #{
-        nulls => maps:get(nulls, Opts, [undefined]),
-        binary_encoder => maps:get(binary_encoder, Opts, fun (X, O) ->
-            encode_binary(X, O)
+        nulls => maps_get(nulls, Opts, [undefined]),
+        binary_encoder => maps_get(binary_encoder, Opts, fun (X, O) ->
+            escape(X, O)
         end),
-        atom_encoder => maps:get(atom_encoder, Opts, fun (X, O) ->
+        atom_encoder => maps_get(atom_encoder, Opts, fun (X, O) ->
             encode_atom(X, O)
         end),
-        integer_encoder => maps:get(integer_encoder, Opts, fun (X, O) ->
+        integer_encoder => maps_get(integer_encoder, Opts, fun (X, O) ->
             encode_integer(X, O)
         end),
-        float_encoder => maps:get(float_encoder, Opts, fun (X, O) ->
+        float_encoder => maps_get(float_encoder, Opts, fun (X, O) ->
             encode_float(X, O)
         end),
-        list_encoder => maps:get(list_encoder, Opts, fun (X, O) ->
+        list_encoder => maps_get(list_encoder, Opts, fun (X, O) ->
             encode_list(X, O)
         end),
-        map_encoder => maps:get(map_encoder, Opts, fun (X, O) ->
+        map_encoder => maps_get(map_encoder, Opts, fun (X, O) ->
             encode_map(X, O)
         end),
-        datetime_encoder => maps:get(datetime_encoder, Opts, fun (X, O) ->
+        datetime_encoder => maps_get(datetime_encoder, Opts, fun (X, O) ->
             encode_datetime(X, O)
         end),
-        timestamp_encoder => maps:get(timestamp_encoder, Opts, fun (X, O) ->
+        timestamp_encoder => maps_get(timestamp_encoder, Opts, fun (X, O) ->
             encode_timestamp(X, O)
         end),
-        unhandled_encoder => maps:get(unhandled_encoder, Opts, fun (X, O) ->
+        unhandled_encoder => maps_get(unhandled_encoder, Opts, fun (X, O) ->
             encode_unhandled(X, O)
         end),
         escaper =>
-            case maps:get(escaper, Opts, json) of
+            case maps_get(escaper, Opts, json) of
                 json ->
                     fun(X, _O) -> [$", escape_json(X), $"] end;
                 html ->
@@ -149,7 +180,7 @@ parse_opts(Opts) ->
                 Fun when is_function(Fun, 2) ->
                     Fun
             end,
-        error_handler => maps:get(error_handler, Opts, fun(C, R, S) ->
+        error_handler => maps_get(error_handler, Opts, fun(C, R, S) ->
             handle_error(C, R, S)
         end)
     }.
@@ -186,7 +217,7 @@ value(Term, #{unhandled_encoder := Encode} = Opts) ->
     Encode(Term, Opts).
 
 encode_binary(Bin, Opts) ->
-    escape_binary(Bin, Opts).
+    escape(Bin, Opts).
 
 encode_atom(true, _Opts) ->
     <<"true">>;
@@ -197,7 +228,7 @@ encode_atom(Atom, #{nulls := Nulls} = Opts) ->
         true ->
             <<"null">>;
         false ->
-            escape_binary(atom_to_binary(Atom, utf8), Opts)
+            escape(atom_to_binary(Atom, utf8), Opts)
     end.
 
 encode_integer(Int, _Opts) ->
@@ -217,7 +248,7 @@ do_encode_list_loop([], _Opts) ->
     $].
 
 encode_map(Map, Opts) ->
-    do_encode_map(maps:to_list(Map), Opts).
+    do_encode_map(maps_to_list(Map), Opts).
 
 do_encode_map([{K, V} | T], Opts) ->
     [${, key(K, Opts), $:, value(V, Opts), do_encode_map_loop(T, Opts)];
@@ -234,7 +265,7 @@ encode_datetime({{YYYY,MM,DD},{H,M,S}}, Opts) ->
         "~4.10.0B-~2.10.0B-~2.10.0BT~2.10.0B:~2.10.0B:~2.10.0BZ",
         [YYYY,MM,DD,H,M,S])
     ),
-    escape_binary(DateTime, Opts).
+    escape(DateTime, Opts).
 
 encode_timestamp({_,_,MicroSecs} = Timestamp, Opts) ->
     MilliSecs = MicroSecs div 1000,
@@ -243,50 +274,13 @@ encode_timestamp({_,_,MicroSecs} = Timestamp, Opts) ->
         "~4.10.0B-~2.10.0B-~2.10.0BT~2.10.0B:~2.10.0B:~2.10.0B.~3.10.0BZ",
         [YYYY,MM,DD,H,M,S,MilliSecs])
     ),
-    escape_binary(DateTime, Opts).
+    escape(DateTime, Opts).
 
 encode_unhandled(Term, _Opts) ->
     throw_unsupported_type_error(Term).
 
-escape_binary(Bin, #{escaper := Escape} = Opts) ->
+escape(Bin, #{escaper := Escape} = Opts) ->
     Escape(Bin, Opts).
-
-escape_byte(0) -> <<"\\u0000">>;
-escape_byte(1) -> <<"\\u0001">>;
-escape_byte(2) -> <<"\\u0002">>;
-escape_byte(3) -> <<"\\u0003">>;
-escape_byte(4) -> <<"\\u0004">>;
-escape_byte(5) -> <<"\\u0005">>;
-escape_byte(6) -> <<"\\u0006">>;
-escape_byte(7) -> <<"\\u0007">>;
-escape_byte($\b) -> <<"\\b">>;
-escape_byte($\t) -> <<"\\t">>;
-escape_byte($\n) -> <<"\\n">>;
-escape_byte($\v) -> <<"\\u000B">>;
-escape_byte($\f) -> <<"\\f">>;
-escape_byte($\r) -> <<"\\r">>;
-escape_byte(14) -> <<"\\u000E">>;
-escape_byte(15) -> <<"\\u000F">>;
-escape_byte(16) -> <<"\\u0010">>;
-escape_byte(17) -> <<"\\u0011">>;
-escape_byte(18) -> <<"\\u0012">>;
-escape_byte(19) -> <<"\\u0013">>;
-escape_byte(20) -> <<"\\u0014">>;
-escape_byte(21) -> <<"\\u0015">>;
-escape_byte(22) -> <<"\\u0016">>;
-escape_byte(23) -> <<"\\u0017">>;
-escape_byte(24) -> <<"\\u0018">>;
-escape_byte(25) -> <<"\\u0019">>;
-escape_byte(26) -> <<"\\u001A">>;
-escape_byte($\e) -> <<"\\u001B">>;
-escape_byte(28) -> <<"\\u001C">>;
-escape_byte(29) -> <<"\\u001D">>;
-escape_byte(30) -> <<"\\u001E">>;
-escape_byte(31) -> <<"\\u001F">>;
-escape_byte($\") -> <<"\\\"">>;
-escape_byte($/) -> <<"\\/">>;
-escape_byte($\\) -> <<"\\\\">>;
-escape_byte(Byte) -> throw_invalid_byte_error(Byte, Byte).
 
 escape_json(Bin) ->
     escape_json(Bin, [], Bin, 0).
@@ -540,6 +534,43 @@ escape_unicode_chunk(<<>>, Acc, Input, Pos, Len) ->
 escape_unicode_chunk(<<Byte/integer, _Rest/bitstring>>, _Acc, Input, _Pos, _Len) ->
     throw_invalid_byte_error(Byte, Input).
 
+escape_byte(0) -> <<"\\u0000">>;
+escape_byte(1) -> <<"\\u0001">>;
+escape_byte(2) -> <<"\\u0002">>;
+escape_byte(3) -> <<"\\u0003">>;
+escape_byte(4) -> <<"\\u0004">>;
+escape_byte(5) -> <<"\\u0005">>;
+escape_byte(6) -> <<"\\u0006">>;
+escape_byte(7) -> <<"\\u0007">>;
+escape_byte($\b) -> <<"\\b">>;
+escape_byte($\t) -> <<"\\t">>;
+escape_byte($\n) -> <<"\\n">>;
+escape_byte($\v) -> <<"\\u000B">>;
+escape_byte($\f) -> <<"\\f">>;
+escape_byte($\r) -> <<"\\r">>;
+escape_byte(14) -> <<"\\u000E">>;
+escape_byte(15) -> <<"\\u000F">>;
+escape_byte(16) -> <<"\\u0010">>;
+escape_byte(17) -> <<"\\u0011">>;
+escape_byte(18) -> <<"\\u0012">>;
+escape_byte(19) -> <<"\\u0013">>;
+escape_byte(20) -> <<"\\u0014">>;
+escape_byte(21) -> <<"\\u0015">>;
+escape_byte(22) -> <<"\\u0016">>;
+escape_byte(23) -> <<"\\u0017">>;
+escape_byte(24) -> <<"\\u0018">>;
+escape_byte(25) -> <<"\\u0019">>;
+escape_byte(26) -> <<"\\u001A">>;
+escape_byte($\e) -> <<"\\u001B">>;
+escape_byte(28) -> <<"\\u001C">>;
+escape_byte(29) -> <<"\\u001D">>;
+escape_byte(30) -> <<"\\u001E">>;
+escape_byte(31) -> <<"\\u001F">>;
+escape_byte($\") -> <<"\\\"">>;
+escape_byte($/) -> <<"\\/">>;
+escape_byte($\\) -> <<"\\\\">>;
+escape_byte(Byte) -> throw_invalid_byte_error(Byte, Byte).
+
 throw_unsupported_type_error(Term) ->
     throw({unsupported_type, Term}).
 
@@ -555,6 +586,28 @@ handle_error(throw, Reason, _Stacktrace) ->
     {error, Reason};
 handle_error(Class, Reason, Stacktrace) ->
     erlang:raise(Class, Reason, Stacktrace).
+
+%%%=====================================================================
+%%% Support functions
+%%%=====================================================================
+
+maps_get(Key, Map, Default) ->
+    case Map of
+        #{Key := Value} -> Value;
+        #{} -> Default
+    end.
+
+maps_to_list(Map) ->
+    do_maps_to_list(erts_internal:map_next(0, Map, [])).
+
+do_maps_to_list([Iter, Map | Acc]) when is_integer(Iter) ->
+    do_maps_to_list(erts_internal:map_next(Iter, Map, Acc));
+do_maps_to_list(Acc) ->
+    Acc.
+
+%%%=====================================================================
+%%% Eunit tests
+%%%=====================================================================
 
 -ifdef(TEST).
 
