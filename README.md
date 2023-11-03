@@ -309,8 +309,11 @@ Use `$ make bench.encode` or `$ make bench.decode` to run the benchmarks. Edit t
 >   - Number of Available Cores: 8
 >
 > - Benchmark setup:
->   - warmup: 5
->   - time: 30
+>   - warmup: 5 s
+>   - time: 30 s
+>   - memory time: 1 s
+>   - reduction time: 0 ns
+>   - parallel: 1
 
 ### Encode
 
