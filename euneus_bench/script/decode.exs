@@ -1,8 +1,11 @@
 Code.eval_file("helper.exs", "./script")
 
+euneus_opts = :euneus_decoder.parse_opts(%{})
+thoas_opts = %{}
+
 jobs = %{
-  "euneus" => &:euneus.decode/1,
-  "thoas" => &:thoas.decode/1
+  "euneus" => &:euneus_decoder.decode_parsed(&1, euneus_opts),
+  "thoas" => &:thoas_decode.decode(&1, thoas_opts)
 }
 
 data = [
