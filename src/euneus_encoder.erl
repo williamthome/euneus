@@ -115,12 +115,12 @@
 %%% API functions
 %%%=====================================================================
 
--spec encode(term(), options()) -> result().
+-spec encode(input(), map()) -> result().
 
 encode(Term, Opts) ->
     encode_parsed(Term, parse_opts(Opts)).
 
--spec encode_parsed(term(), options()) -> result().
+-spec encode_parsed(input(), options()) -> result().
 
 encode_parsed(Term, Opts) ->
     try

@@ -119,18 +119,12 @@
 %%% API functions
 %%%=====================================================================
 
--spec decode(Input, Opts) -> Result when
-    Input :: input(),
-    Opts :: options(),
-    Result :: result().
+-spec decode(input(), map()) -> result().
 
 decode(Bin, Opts) when is_map(Opts) ->
     decode_parsed(Bin, parse_opts(Opts)).
 
--spec decode_parsed(Input, Opts) -> Result when
-    Input :: input(),
-    Opts :: options(),
-    Result :: result().
+-spec decode_parsed(input(), options()) -> result().
 
 decode_parsed(Bin, Opts) when is_binary(Bin) ->
     try
@@ -147,6 +141,8 @@ decode_parsed(IOList, Opts) ->
         error:badarg ->
             {error, not_an_iodata}
     end.
+
+-spec parse_opts(map()) -> options().
 
 parse_opts(Opts) ->
     WithDefaults = Opts#{
