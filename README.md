@@ -24,8 +24,10 @@ Like Thoas, both the parser and generator fully conform to
     - [Why Euneus over Thoas?](#why-euneus-over-thoas)
 - [Benchmarks](#benchmarks)
     - [Encode](#encode-1)
+        - [TODO](#todo)
     - [Decode](#decode-1)
 - [Tests](#tests)
+- [Smart modules](#smart-modules)
 - [Credits](#credits)
 - [Why the name Euneus?](#why-the-name-euneus)
 - [Sponsors](#sponsors)
@@ -292,6 +294,8 @@ All the benchmarks compare `Euneus` and `Thoas` via [Benchee](https://github.com
 
 Use `$ make bench.encode` or `$ make bench.decode` to run the benchmarks. Edit the scripts in the `./euneus_bench/script` folder if needed.
 
+The benchmarks use the smart versions. Please the [Smart modules](#smart-modules) section for more information.
+
 > **Note**
 >
 > - Results:
@@ -324,16 +328,20 @@ Use `$ make bench.encode` or `$ make bench.decode` to run the benchmarks. Edit t
 <!-- To edit, open "./assets/md-tables/bench-encode.tgn" in the link above. -->
 | **File**                   	|  **Euneus** 	|  **Thoas** 	| **Comparison** 	|
 |----------------------------	|------------:	|-----------:	|---------------:	|
-| blockchain.json            	|  **9.73 K** 	|     7.86 K 	|          1.24x 	|
-| giphy.json                 	|  **897.47** 	|     853.31 	|          1.05x 	|
-| github.json                	|  **3.14 K** 	|     2.54 K 	|          1.24x 	|
-| govtrack.json              	|   **12.72** 	|      12.27 	|          1.04x 	|
-| issue-90.json              	|   **28.92** 	|      17.50 	|          1.65x 	|
-| json-generator-pretty.json 	|  **1.16 K** 	|     1.08 K 	|          1.08x 	|
-| json-generator.json        	|  **1.17 K** 	|     1.08 K 	|          1.08x 	|
-| pokedex.json               	|      1.63 K 	| **1.73 K** 	|          1.07x 	|
-| utf-8-escaped.json         	| **11.88 K** 	|    10.57 K 	|          1.12x 	|
-| utf-8-unescaped.json       	| **12.19 K** 	|    10.83 K 	|          1.13x 	|
+| blockchain.json            	|  **12.00 K** 	|     7.92 K 	|          1.52x 	|
+| giphy.json                 	|  **1.03 K** 	|     0.86 K 	|          1.20x 	|
+| github.json                	|  **3.67 K** 	|     2.57 K 	|          1.43x 	|
+| govtrack.json              	|   **22.51** 	|      12.34 	|          1.82x 	|
+| issue-90.json              	|   **30.10** 	|      17.56 	|          1.71x 	|
+| json-generator-pretty.json 	|    0.93 K 	|   **1.09 K** 	|          1.16x 	|
+| json-generator.json        	|    0.93 K 	|   **1.09 K** 	|          1.16x 	|
+| pokedex.json               	|  **2.08 K** 	|     1.75 K 	|          1.19x 	|
+| utf-8-escaped.json         	| **11.99 K** 	|    10.63 K 	|          1.13x 	|
+| utf-8-unescaped.json       	| **12.46 K** 	|    10.85 K 	|          1.15x 	|
+
+#### TODO
+
+Mitigate why encoding [json-generator-pretty.json](/euneus_bench/priv/data/json-generator-pretty.json) and [json-generator.json](/euneus_bench/priv/data/json-generator.json) have worst performance compared to Thoas.
 
 ### Decode
 
@@ -367,6 +375,14 @@ Also, the parser is tested using [JSONTestSuite](https://github.com/nst/JSONTest
 > **Note**
 >
 > All of the JSONTestSuite tests are embedded in Euneus tests.
+
+## Smart modules
+
+Euneus has two modules to encode and two to decode, one that permits customizations and another that uses the default options. The modules without customizations are called smart. The smart versions are faster because they do not do any option checks.
+
+If you are good to go with the default options, please use the smart versions:
+- `euneus:encode/1` or `euneus_smart_encoder:encode/1`;
+- `euneus:decode/1` or `euneus_smart_decoder:decode/1`.
 
 ## Credits
 

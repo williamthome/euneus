@@ -1,4 +1,4 @@
-defmodule EuneusTest.JsonSuiteTest do
+defmodule EuneusTest.EuneusSmartDecoderJsonSuiteTest do
   use ExUnit.Case, async: true
 
   # Implementation-dependent tests

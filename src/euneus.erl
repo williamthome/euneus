@@ -17,10 +17,6 @@
 %% limitations under the License.
 -module(euneus).
 
--compile({ inline, encode/2 }).
--compile({ inline, encode_to_binary/2 }).
--compile({ inline, decode/2 }).
-
 %% API functions
 -export([ encode/1 ]).
 -export([ encode/2 ]).
@@ -38,7 +34,7 @@
     Return :: euneus_encoder:result().
 
 encode(Input) ->
-    encode(Input, #{}).
+    euneus_smart_encoder:encode(Input).
 
 -spec encode(Input, Opts) -> Return when
     Input :: euneus_encoder:input(),
@@ -53,7 +49,12 @@ encode(Input, Opts) ->
     Return :: {ok, binary()} | {error, euneus_encoder:error_reason()}.
 
 encode_to_binary(Input) ->
-    encode_to_binary(Input, #{}).
+    case encode(Input) of
+        {ok, Result} ->
+            {ok, iolist_to_binary(Result)};
+        {error, Reason} ->
+            {error, Reason}
+    end.
 
 -spec encode_to_binary(Input, Opts) -> Return when
     Input :: euneus_encoder:input(),
@@ -73,7 +74,7 @@ encode_to_binary(Input, Opts) ->
     Result :: euneus_decoder:result().
 
 decode(Input) ->
-    decode(Input, #{}).
+    euneus_smart_decoder:decode(Input).
 
 -spec decode(Input, Opts) -> Result when
     Input :: euneus_decoder:input(),

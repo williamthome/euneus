@@ -1,5 +1,5 @@
 if Code.ensure_loaded?(ExUnitProperties) do
-  defmodule EuneusTest.PropertyTest do
+  defmodule EuneusTest.EuneusPropertyTest do
     use ExUnit.Case, async: true
     use ExUnitProperties
 
