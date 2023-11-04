@@ -99,8 +99,6 @@
 -type error_handler() :: fun(( error_class()
                              , error_reason()
                              , error_stacktrace()
-                             , input()
-                             , options()
                              ) -> error_stacktrace()).
 
 %% Macros
