@@ -34,7 +34,7 @@
     Return :: euneus_encoder:result().
 
 encode(Input) ->
-    euneus_smart_encoder:encode(Input).
+    euneus_smart_json_encoder:encode(Input).
 
 -spec encode(Input, Opts) -> Return when
     Input :: euneus_encoder:input(),

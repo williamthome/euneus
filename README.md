@@ -371,11 +371,16 @@ Also, the parser is tested using [JSONTestSuite](https://github.com/nst/JSONTest
 
 ## Smart modules
 
-Euneus has two modules to encode and two to decode, one that permits customizations and another that uses the default options. The modules without customizations are called smart. The smart versions are faster because they do not do any option checks.
+Euneus has modules that permit customizations and others that use the default options. The modules without customizations are called smart. The smart versions are faster because they do not do any option checks.
 
 If you are good to go with the default options, please use the smart versions:
-- `euneus:encode/1` or `euneus_smart_encoder:encode/1`;
-- `euneus:decode/1` or `euneus_smart_decoder:decode/1`.
+- Encode:
+    - `euneus:encode/1` or `euneus_smart_json_encoder:encode/1`;
+    - `euneus_smart_html_encoder:encode/1`;
+    - `euneus_smart_js_encoder:encode/1`;
+    - `euneus_smart_unicode_encoder:encode/1`;
+- Decode:
+    - `euneus:decode/1` or `euneus_smart_decoder:decode/1`.
 
 ## Credits
 
