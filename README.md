@@ -26,6 +26,7 @@ Like Thoas, both the parser and generator fully conform to
     - [Encode](#encode-1)
     - [Decode](#decode-1)
 - [Tests](#tests)
+- [Smart modules](#smart-modules)
 - [Credits](#credits)
 - [Why the name Euneus?](#why-the-name-euneus)
 - [Sponsors](#sponsors)
@@ -292,6 +293,8 @@ All the benchmarks compare `Euneus` and `Thoas` via [Benchee](https://github.com
 
 Use `$ make bench.encode` or `$ make bench.decode` to run the benchmarks. Edit the scripts in the `./euneus_bench/script` folder if needed.
 
+The benchmarks use the smart versions. Please the [Smart modules](#smart-modules) section for more information.
+
 > **Note**
 >
 > - Results:
@@ -324,18 +327,16 @@ Use `$ make bench.encode` or `$ make bench.decode` to run the benchmarks. Edit t
 <!-- To edit, open "./assets/md-tables/bench-encode.tgn" in the link above. -->
 | **File**                   	|  **Euneus** 	|  **Thoas** 	| **Comparison** 	|
 |----------------------------	|------------:	|-----------:	|---------------:	|
-| blockchain.json            	|  **9.73 K** 	|     7.86 K 	|          1.24x 	|
-| giphy.json                 	|  **897.47** 	|     853.31 	|          1.05x 	|
-| github.json                	|  **3.14 K** 	|     2.54 K 	|          1.24x 	|
-| govtrack.json              	|   **12.72** 	|      12.27 	|          1.04x 	|
-| issue-90.json              	|   **28.92** 	|      17.50 	|          1.65x 	|
-| json-generator-pretty.json 	|  **1.16 K** 	|     1.08 K 	|          1.08x 	|
-| json-generator.json        	|  **1.17 K** 	|     1.08 K 	|          1.08x 	|
-| pokedex.json               	|      1.63 K 	| **1.73 K** 	|          1.07x 	|
-| utf-8-escaped.json         	| **11.88 K** 	|    10.57 K 	|          1.12x 	|
-| utf-8-unescaped.json       	| **12.19 K** 	|    10.83 K 	|          1.13x 	|
-
-### Decode
+| blockchain.json            	|  **12.00 K** 	|     7.92 K 	|          1.52x 	|
+| giphy.json                 	|  **1.03 K** 	|     0.86 K 	|          1.20x 	|
+| github.json                	|  **3.67 K** 	|     2.57 K 	|          1.43x 	|
+| govtrack.json              	|   **13.33** 	|      12.37 	|          1.08x 	|
+| issue-90.json              	|   **30.10** 	|      17.56 	|          1.71x 	|
+| json-generator-pretty.json 	|  **1.45 K** 	|     1.09 K 	|          1.33x 	|
+| json-generator.json        	|  **1.45 K** 	|     1.08 K 	|          1.34x 	|
+| pokedex.json               	|  **2.08 K** 	|     1.75 K 	|          1.19x 	|
+| utf-8-escaped.json         	| **11.99 K** 	|    10.63 K 	|          1.13x 	|
+| utf-8-unescaped.json       	| **11.99 K** 	|    10.89 K 	|          1.10x 	|
 
 > **Note**
 >
@@ -346,15 +347,15 @@ Use `$ make bench.encode` or `$ make bench.decode` to run the benchmarks. Edit t
 | **File**                   	|  **Euneus** 	| **Thoas** 	| **Comparison** 	|
 |----------------------------	|------------:	|----------:	|---------------:	|
 | blockchain.json            	|  **7.18 K** 	|    5.78 K 	|          1.24x 	|
-| giphy.json                 	|  **474.91** 	|    474.75 	|          1.00x 	|
+| giphy.json                 	|  **589.54** 	|    546.31 	|          1.08x 	|
 | github.json                	|  **2.33 K** 	|    2.02 K 	|          1.16x 	|
-| govtrack.json              	|   **16.35** 	|     15.65 	|          1.04x 	|
+| govtrack.json              	|   **16.90** 	|     15.89 	|          1.06x 	|
 | issue-90.json              	|   **25.35** 	|     17.70 	|          1.43x 	|
 | json-generator-pretty.json 	|  **617.33** 	|    542.99 	|          1.14x 	|
-| json-generator.json        	|  **728.01** 	|    655.15 	|          1.11x 	|
-| pokedex.json               	|  **1.37 K** 	|    1.33 K 	|          1.03x 	|
-| utf-8-escaped.json         	|  **1.88 K** 	|    1.66 K 	|          1.13x 	|
-| utf-8-unescaped.json       	| **10.87 K** 	|   10.47 K 	|          1.04x 	|
+| json-generator.json        	|  **800.43** 	|    700.34 	|          1.15x 	|
+| pokedex.json               	|  **1.36 K** 	|    1.31 K 	|          1.04x 	|
+| utf-8-escaped.json         	|  **2.05 K** 	|    1.67 K 	|          1.23x 	|
+| utf-8-unescaped.json       	| **11.27 K** 	|   10.48 K 	|          1.08x 	|
 
 ## Tests
 
@@ -367,6 +368,19 @@ Also, the parser is tested using [JSONTestSuite](https://github.com/nst/JSONTest
 > **Note**
 >
 > All of the JSONTestSuite tests are embedded in Euneus tests.
+
+## Smart modules
+
+Euneus has modules that permit customizations and others that use the default options. The modules without customizations are called smart. The smart versions are faster because they do not do any option checks.
+
+If you are good to go with the default options, please use the smart versions:
+- Encode:
+    - `euneus:encode/1` or `euneus_smart_json_encoder:encode/1`;
+    - `euneus_smart_html_encoder:encode/1`;
+    - `euneus_smart_js_encoder:encode/1`;
+    - `euneus_smart_unicode_encoder:encode/1`;
+- Decode:
+    - `euneus:decode/1` or `euneus_smart_decoder:decode/1`.
 
 ## Credits
 
