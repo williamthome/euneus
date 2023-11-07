@@ -27,9 +27,13 @@
 -compile({ inline, encode_timestamp/2 }).
 -compile({ inline, encode_unhandled/2 }).
 -compile({ inline, escape_json/4 }).
+-compile({ inline, escape_json_chunk/5 }).
 -compile({ inline, escape_html/4 }).
+-compile({ inline, escape_html_chunk/5 }).
 -compile({ inline, escape_js/4 }).
+-compile({ inline, escape_js_chunk/5 }).
 -compile({ inline, escape_unicode/4 }).
+-compile({ inline, escape_unicode_chunk/5 }).
 -compile({ inline, handle_error/3 }).
 -compile({ inline, maps_get/3 }).
 -compile({ inline, maps_to_list/1 }).
@@ -40,6 +44,7 @@
 % has no local return.
 -dialyzer({ no_return, parse_opts/1 }).
 -dialyzer({ no_return, encode_unhandled/2 }).
+-dialyzer( no_improper_lists ).
 
 -export([ encode/2 ]).
 -export([ encode_parsed/2 ]).
@@ -96,8 +101,7 @@
 -type error_stacktrace() :: erlang:stacktrace().
 -type error_handler() :: fun(( error_class()
                              , error_reason()
-                             , error_stacktrace()
-                             ) -> error_stacktrace()).
+                             , error_stacktrace() ) -> error_stacktrace()).
 
 %% Macros
 
@@ -238,23 +242,23 @@ encode_list([H | T], Opts) ->
 encode_list([], _Opts) ->
     <<"[]">>.
 
-do_encode_list_loop([H | T], Opts) ->
-    [$,, value(H, Opts), do_encode_list_loop(T, Opts)];
 do_encode_list_loop([], _Opts) ->
-    $].
+    [$]];
+do_encode_list_loop([H | T], Opts) ->
+    [$,, value(H, Opts) | do_encode_list_loop(T, Opts)].
 
 encode_map(Map, Opts) ->
     do_encode_map(maps_to_list(Map), Opts).
 
 do_encode_map([{K, V} | T], Opts) ->
-    [${, key(K, Opts), $:, value(V, Opts), do_encode_map_loop(T, Opts)];
+    [${, key(K, Opts), $:, value(V, Opts) | do_encode_map_loop(T, Opts)];
 do_encode_map([], _) ->
     <<"{}">>.
 
-do_encode_map_loop([{K, V} | T], Opts) ->
-    [$,, key(K, Opts), $:, value(V, Opts), do_encode_map_loop(T, Opts)];
 do_encode_map_loop([], _Opts) ->
-    $}.
+    [$}];
+do_encode_map_loop([{K, V} | T], Opts) ->
+    [$,, key(K, Opts), $:, value(V, Opts) | do_encode_map_loop(T, Opts)].
 
 encode_datetime({{YYYY,MM,DD},{H,M,S}}, Opts) ->
     DateTime = iolist_to_binary(io_lib:format(
@@ -281,266 +285,317 @@ escape(Bin, #{escaper := Escape} = Opts) ->
 escape_json(Bin) ->
     escape_json(Bin, [], Bin, 0).
 
-escape_json(<<Byte/integer, Rest/bitstring>>, Acc0, Input, Pos)
-  when Byte =< ?NON_PRINTABLE_LAST; Byte =:= $\"; Byte =:= $\\ ->
-    Acc = [Acc0, escape_byte(Byte)],
-    escape_json(Rest, Acc, Input, Pos+1);
-escape_json(<<Byte/integer, Rest/bitstring>>, Acc, Input, Pos)
-  when Byte =< ?ONE_BYTE_LAST ->
-    escape_json_chunk(Rest, Acc, Input, Pos, 1);
-escape_json(<<Char/utf8, Rest/bitstring>>, Acc, Input, Pos)
-  when Char =< ?TWO_BYTE_LAST ->
-    escape_json_chunk(Rest, Acc, Input, Pos, 2);
-escape_json(<<Char/utf8, Rest/bitstring>>, Acc, Input, Pos)
-  when Char =< ?THREE_BYTE_LAST ->
-    escape_json_chunk(Rest, Acc, Input, Pos, 3);
-escape_json(<<_Char/utf8, Rest/bitstring>>, Acc, Input, Pos) ->
-    escape_json_chunk(Rest, Acc, Input, Pos, 4);
-escape_json(<<>>, Acc, _Input, _Pos) ->
-    Acc;
-escape_json(<<Byte/integer, _Rest/bitstring>>, _Acc, Input, _Pos) ->
-    throw_invalid_byte_error(Byte, Input).
+escape_json(Data, Acc, Input, Pos) ->
+    case Data of
+        <<$"/integer, Rest/bitstring>> ->
+            Acc1 = [Acc | <<"\\\"">>],
+            escape_json(Rest, Acc1, Input, Pos+1);
+        <<$\\/integer, Rest/bitstring>> ->
+            Acc1 = [Acc | <<"\\\\">>],
+            escape_json(Rest, Acc1, Input, Pos+1);
+        <<Byte/integer, Rest/bitstring>> when Byte =< ?NON_PRINTABLE_LAST ->
+            Acc1 = [Acc | escape_byte(Byte)],
+            escape_json(Rest, Acc1, Input, Pos+1);
+        <<Byte/integer, Rest/bitstring>> when Byte =< ?ONE_BYTE_LAST ->
+            escape_json_chunk(Rest, Acc, Input, Pos, 1);
+        <<Char/utf8, Rest/bitstring>> when Char =< ?TWO_BYTE_LAST ->
+            escape_json_chunk(Rest, Acc, Input, Pos, 2);
+        <<Char/utf8, Rest/bitstring>> when Char =< ?THREE_BYTE_LAST ->
+            escape_json_chunk(Rest, Acc, Input, Pos, 3);
+        <<_Char/utf8, Rest/bitstring>> ->
+            escape_json_chunk(Rest, Acc, Input, Pos, 4);
+        <<>> ->
+            Acc;
+        <<Byte/integer, _Rest/bitstring>> ->
+            throw_invalid_byte_error(Byte, Input)
+    end.
 
-escape_json_chunk(<<Byte/integer, Rest/bitstring>>, Acc0, Input, Pos, Len)
-  when Byte =< ?NON_PRINTABLE_LAST; Byte =:= $\"; Byte =:= $\\ ->
-    Part = binary_part(Input, Pos, Len),
-    Acc = [Acc0, Part, escape_byte(Byte)],
-    escape_json(Rest, Acc, Input, Pos+Len+1);
-escape_json_chunk(<<Byte/integer, Rest/bitstring>>, Acc, Input, Pos, Len)
-  when Byte =< ?ONE_BYTE_LAST ->
-    escape_json_chunk(Rest, Acc, Input, Pos, Len+1);
-escape_json_chunk(<<>>, Acc, Input, Pos, Len) ->
-    case Acc =:= [] of
-        true ->
-            binary_part(Input, Pos, Len);
-        false ->
-            [Acc, binary_part(Input, Pos, Len)]
-    end;
-escape_json_chunk(<<Char/utf8, Rest/bitstring>>, Acc, Input, Pos, Len)
-  when Char =< ?TWO_BYTE_LAST ->
-    escape_json_chunk(Rest, Acc, Input, Pos, Len+2);
-escape_json_chunk(<<Char/utf8, Rest/bitstring>>, Acc, Input, Pos, Len)
-  when Char =< ?THREE_BYTE_LAST ->
-    escape_json_chunk(Rest, Acc, Input, Pos, Len+3);
-escape_json_chunk(<<_Char/utf8, Rest/bitstring>>, Acc, Input, Pos, Len) ->
-    escape_json_chunk(Rest, Acc, Input, Pos, Len+4);
-escape_json_chunk(<<Byte/integer, _Rest/bitstring>>, _Acc, Input, _Pos, _Len) ->
-    throw_invalid_byte_error(Byte, Input).
+escape_json_chunk(Data, Acc, Input, Pos, Len) ->
+    case Data of
+        <<$"/integer, Rest/bitstring>> ->
+            Part = binary_part(Input, Pos, Len),
+            Acc1 = [Acc | [Part, <<"\\\"">>]],
+            escape_json(Rest, Acc1, Input, Pos+Len+1);
+        <<$\\/integer, Rest/bitstring>> ->
+            Part = binary_part(Input, Pos, Len),
+            Acc1 = [Acc | [Part, <<"\\\\">>]],
+            escape_json(Rest, Acc1, Input, Pos+Len+1);
+        <<Byte/integer, Rest/bitstring>> when Byte =< ?NON_PRINTABLE_LAST ->
+            Part = binary_part(Input, Pos, Len),
+            Acc1 = [Acc | [Part, escape_byte(Byte)]],
+            escape_json(Rest, Acc1, Input, Pos+Len+1);
+        <<Byte/integer, Rest/bitstring>> when Byte =< ?ONE_BYTE_LAST ->
+            escape_json_chunk(Rest, Acc, Input, Pos, Len+1);
+        <<>> ->
+            case Acc =:= [] of
+                true ->
+                    binary_part(Input, Pos, Len);
+                false ->
+                    [Acc, binary_part(Input, Pos, Len)]
+            end;
+        <<Char/utf8, Rest/bitstring>> when Char =< ?TWO_BYTE_LAST ->
+            escape_json_chunk(Rest, Acc, Input, Pos, Len+2);
+        <<Char/utf8, Rest/bitstring>> when Char =< ?THREE_BYTE_LAST ->
+            escape_json_chunk(Rest, Acc, Input, Pos, Len+3);
+        <<_Char/utf8, Rest/bitstring>> ->
+            escape_json_chunk(Rest, Acc, Input, Pos, Len+4);
+        <<Byte/integer, _Rest/bitstring>> ->
+            throw_invalid_byte_error(Byte, Input)
+    end.
 
 escape_html(Bin) ->
     escape_html(Bin, [], Bin, 0).
 
-escape_html(<<Byte/integer, Rest/bitstring>>, Acc0, Input, Pos)
-  when Byte < 33; Byte =:= $\"; Byte =:= $/; Byte =:= $\\ ->
-    Acc = [Acc0, escape_byte(Byte)],
-    escape_html(Rest, Acc, Input, Pos+1);
-escape_html(<<Byte/integer, Rest/bitstring>>, Acc, Input, Pos)
-  when Byte =< ?ONE_BYTE_LAST ->
-    escape_html_chunk(Rest, Acc, Input, Pos, 1);
-escape_html(<<Char/utf8, Rest/bitstring>>, Acc, Input, Pos)
-  when Char =< ?TWO_BYTE_LAST ->
-    escape_html_chunk(Rest, Acc, Input, Pos, 2);
-escape_html(<<8232/utf8, Rest/bitstring>>, Acc0, Input, Pos) ->
-    Acc = [Acc0, <<"\\u2028">>],
-    escape_html(Rest, Acc, Input, Pos+3);
-escape_html(<<8233/utf8, Rest/bitstring>>, Acc0, Input, Pos) ->
-    Acc = [Acc0, <<"\\u2029">>],
-    escape_html(Rest, Acc, Input, Pos+3);
-escape_html(<<Char/utf8, Rest/bitstring>>, Acc, Input, Pos)
-  when Char =< ?THREE_BYTE_LAST ->
-    escape_html_chunk(Rest, Acc, Input, Pos, 3);
-escape_html(<<_Char/utf8, Rest/bitstring>>, Acc, Input, Pos) ->
-    escape_html_chunk(Rest, Acc, Input, Pos, 4);
-escape_html(<<>>, Acc, _Input, _Pos) ->
-    Acc;
-escape_html(<<Byte/integer, _Rest/bitstring>>, _Acc, Input, _Pos) ->
-    throw_invalid_byte_error(Byte, Input).
+escape_html(Data, Acc, Input, Pos) ->
+    case Data of
+        <<$"/integer, Rest/bitstring>> ->
+          Acc1 = [Acc, <<"\\\"">>],
+          escape_html(Rest, Acc1, Input, Pos+1);
+        <<$\\/integer, Rest/bitstring>> ->
+            Acc1 = [Acc | <<"\\\\">>],
+            escape_html(Rest, Acc1, Input, Pos+1);
+        <<$//integer, Rest/bitstring>> ->
+          Acc1 = [Acc | <<"\\/">>],
+          escape_html(Rest, Acc1, Input, Pos+1);
+        <<Byte/integer, Rest/bitstring>> when Byte < 33 ->
+            Acc1 = [Acc, escape_byte(Byte)],
+            escape_html(Rest, Acc1, Input, Pos+1);
+        <<Byte/integer, Rest/bitstring>> when Byte =< ?ONE_BYTE_LAST ->
+            escape_html_chunk(Rest, Acc, Input, Pos, 1);
+        <<Char/utf8, Rest/bitstring>> when Char =< ?TWO_BYTE_LAST ->
+            escape_html_chunk(Rest, Acc, Input, Pos, 2);
+        <<8232/utf8, Rest/bitstring>> ->
+            Acc1 = [Acc | <<"\\u2028">>],
+            escape_html(Rest, Acc1, Input, Pos+3);
+        <<8233/utf8, Rest/bitstring>> ->
+            Acc1 = [Acc | <<"\\u2029">>],
+            escape_html(Rest, Acc1, Input, Pos+3);
+        <<Char/utf8, Rest/bitstring>> when Char =< ?THREE_BYTE_LAST ->
+            escape_html_chunk(Rest, Acc, Input, Pos, 3);
+        <<_Char/utf8, Rest/bitstring>> ->
+            escape_html_chunk(Rest, Acc, Input, Pos, 4);
+        <<>> ->
+            Acc;
+        <<Byte/integer, _Rest/bitstring>> ->
+            throw_invalid_byte_error(Byte, Input)
+    end.
 
-escape_html_chunk(<<Byte/integer, Rest/bitstring>>, Acc, Input, Pos, Len)
-  when Byte < 32; Byte =:= $\"; Byte =:= $/; Byte =:= $\\ ->
-    Part = binary_part(Input, Pos, Len),
-    Acc2 = [Acc, Part, escape_byte(Byte)],
-    escape_html(Rest, Acc2, Input, Pos+Len+1);
-escape_html_chunk(<<Byte/integer, Rest/bitstring>>, Acc, Input, Pos, Len)
-  when Byte =< ?ONE_BYTE_LAST ->
-    escape_html_chunk(Rest, Acc, Input, Pos, Len+1);
-escape_html_chunk(<<>>, Acc, Input, Pos, Len) ->
-    case Acc =:= [] of
-        true ->
-            binary_part(Input, Pos, Len);
-        false ->
-            [Acc, binary_part(Input, Pos, Len)]
-    end;
-escape_html_chunk(<<Char/utf8, Rest/bitstring>>, Acc, Input, Pos, Len)
-  when Char =< ?TWO_BYTE_LAST ->
-    escape_html_chunk(Rest, Acc, Input, Pos, Len+2);
-escape_html_chunk(<<8232/utf8, Rest/bitstring>>, Acc, Input, Pos, Len) ->
-    Part = binary_part(Input, Pos, Len),
-    Acc2 = [Acc, Part, <<"\\u2028">>],
-    escape_html(Rest, Acc2, Input, Pos+Len+3);
-escape_html_chunk(<<8233/utf8, Rest/bitstring>>, Acc, Input, Pos, Len) ->
-    Part = binary_part(Input, Pos, Len),
-    Acc2 = [Acc, Part, <<"\\u2029">>],
-    escape_html(Rest, Acc2, Input, Pos+Len+3);
-escape_html_chunk(<<Char/utf8, Rest/bitstring>>, Acc, Input, Pos, Len)
-  when Char =< ?THREE_BYTE_LAST ->
-    escape_html_chunk(Rest, Acc, Input, Pos, Len+3);
-escape_html_chunk(<<_Char/utf8, Rest/bitstring>>, Acc, Input, Pos, Len) ->
-    escape_html_chunk(Rest, Acc, Input, Pos, Len+4);
-escape_html_chunk(<<Byte/integer, _Rest/bitstring>>, _Acc, Input, _Pos, _Len) ->
-    throw_invalid_byte_error(Byte, Input).
+escape_html_chunk(Data, Acc, Input, Pos, Len) ->
+    case Data of
+        <<$"/integer, Rest/bitstring>> ->
+            Part = binary_part(Input, Pos, Len),
+            Acc2 = [Acc | [Part, <<"\\\"">>]],
+            escape_html(Rest, Acc2, Input, Pos+Len+1);
+        <<$\\/integer, Rest/bitstring>> ->
+            Part = binary_part(Input, Pos, Len),
+            Acc2 = [Acc | [Part, <<"\\\\">>]],
+            escape_html(Rest, Acc2, Input, Pos+Len+1);
+        <<$//integer, Rest/bitstring>> ->
+            Part = binary_part(Input, Pos, Len),
+            Acc2 = [Acc | [Part, <<"\\/">>]],
+            escape_html(Rest, Acc2, Input, Pos+Len+1);
+        <<Byte/integer, Rest/bitstring>> when Byte =< ?NON_PRINTABLE_LAST ->
+            Part = binary_part(Input, Pos, Len),
+            Acc2 = [Acc, Part, escape_byte(Byte)],
+            escape_html(Rest, Acc2, Input, Pos+Len+1);
+        <<Byte/integer, Rest/bitstring>> when Byte =< ?ONE_BYTE_LAST ->
+            escape_html_chunk(Rest, Acc, Input, Pos, Len+1);
+        <<>> ->
+            case Acc =:= [] of
+                true ->
+                    binary_part(Input, Pos, Len);
+                false ->
+                    [Acc, binary_part(Input, Pos, Len)]
+            end;
+        <<Char/utf8, Rest/bitstring>> when Char =< ?TWO_BYTE_LAST ->
+            escape_html_chunk(Rest, Acc, Input, Pos, Len+2);
+        <<8232/utf8, Rest/bitstring>> ->
+            Part = binary_part(Input, Pos, Len),
+            Acc2 = [Acc | [Part, <<"\\u2028">>]],
+            escape_html(Rest, Acc2, Input, Pos+Len+3);
+        <<8233/utf8, Rest/bitstring>> ->
+            Part = binary_part(Input, Pos, Len),
+            Acc2 = [Acc | [Part, <<"\\u2029">>]],
+            escape_html(Rest, Acc2, Input, Pos+Len+3);
+        <<Char/utf8, Rest/bitstring>> when Char =< ?THREE_BYTE_LAST ->
+            escape_html_chunk(Rest, Acc, Input, Pos, Len+3);
+        <<_Char/utf8, Rest/bitstring>> ->
+            escape_html_chunk(Rest, Acc, Input, Pos, Len+4);
+        <<Byte/integer, _Rest/bitstring>> ->
+            throw_invalid_byte_error(Byte, Input)
+    end.
 
 escape_js(Bin) ->
     escape_js(Bin, [], Bin, 0).
 
-escape_js(<<Byte/integer, Rest/bitstring>>, Acc0, Input, Pos)
-  when Byte =< ?NON_PRINTABLE_LAST; Byte =:= $\"; Byte =:= $\\ ->
-    Acc = [Acc0, escape_byte(Byte)],
-    escape_js(Rest, Acc, Input, Pos+1);
-escape_js(<<Byte/integer, Rest/bitstring>>, Acc, Input, Pos)
-  when Byte =< ?ONE_BYTE_LAST ->
-    escape_js_chunk(Rest, Acc, Input, Pos, 1);
-escape_js(<<Char/utf8, Rest/bitstring>>, Acc, Input, Pos)
-  when Char =< ?TWO_BYTE_LAST ->
-    escape_js_chunk(Rest, Acc, Input, Pos, 2);
-escape_js(<<8232/utf8, Rest/bitstring>>, Acc0, Input, Pos) ->
-    Acc = [Acc0, <<"\\u2028">>],
-    escape_js(Rest, Acc, Input, Pos+3);
-escape_js(<<8233/utf8, Rest/bitstring>>, Acc0, Input, Pos) ->
-    Acc = [Acc0, <<"\\u2029">>],
-    escape_js(Rest, Acc, Input, Pos+3);
-escape_js(<<Char/utf8, Rest/bitstring>>, Acc, Input, Pos)
-  when Char =< ?THREE_BYTE_LAST ->
-    escape_js_chunk(Rest, Acc, Input, Pos, 3);
-escape_js(<<_Char/utf8, Rest/bitstring>>, Acc, Input, Pos) ->
-    escape_js_chunk(Rest, Acc, Input, Pos, 4);
-escape_js(<<>>, Acc, _Input, _Pos) ->
-    Acc;
-escape_js(<<Byte/integer, _Rest/bitstring>>, _Acc, Input, _Pos) ->
-    throw_invalid_byte_error(Byte, Input).
+escape_js(Data, Acc, Input, Pos) ->
+    case Data of
+        <<$"/integer, Rest/bitstring>> ->
+            Acc1 = [Acc | <<"\\\"">>],
+            escape_js(Rest, Acc1, Input, Pos+1);
+        <<$\\/integer, Rest/bitstring>> ->
+            Acc1 = [Acc | <<"\\\\">>],
+            escape_js(Rest, Acc1, Input, Pos+1);
+        <<Byte/integer, Rest/bitstring>> when Byte =< ?NON_PRINTABLE_LAST ->
+            Acc1 = [Acc | escape_byte(Byte)],
+            escape_js(Rest, Acc1, Input, Pos+1);
+        <<Byte/integer, Rest/bitstring>> when Byte =< ?ONE_BYTE_LAST ->
+            escape_js_chunk(Rest, Acc, Input, Pos, 1);
+        <<Char/utf8, Rest/bitstring>> when Char =< ?TWO_BYTE_LAST ->
+            escape_js_chunk(Rest, Acc, Input, Pos, 2);
+        <<8232/utf8, Rest/bitstring>> ->
+            Acc1 = [Acc | <<"\\u2028">>],
+            escape_js(Rest, Acc1, Input, Pos+3);
+        <<8233/utf8, Rest/bitstring>> ->
+            Acc1 = [Acc | <<"\\u2029">>],
+            escape_js(Rest, Acc1, Input, Pos+3);
+        <<Char/utf8, Rest/bitstring>> when Char =< ?THREE_BYTE_LAST ->
+            escape_js_chunk(Rest, Acc, Input, Pos, 3);
+        <<_Char/utf8, Rest/bitstring>> ->
+            escape_js_chunk(Rest, Acc, Input, Pos, 4);
+        <<>> ->
+            Acc;
+        <<Byte/integer, _Rest/bitstring>> ->
+            throw_invalid_byte_error(Byte, Input)
+    end.
 
-escape_js_chunk(<<Byte/integer, Rest/bitstring>>, Acc0, Input, Pos, Len)
-  when Byte =< ?NON_PRINTABLE_LAST; Byte =:= $\"; Byte =:= $\\ ->
-    Part = binary_part(Input, Pos, Len),
-    Acc = [Acc0, Part, escape_byte(Byte)],
-    escape_js(Rest, Acc, Input, Pos+Len+1);
-escape_js_chunk(<<Byte/integer, Rest/bitstring>>, Acc, Input, Pos, Len)
-  when Byte =< ?ONE_BYTE_LAST ->
-    escape_js_chunk(Rest, Acc, Input, Pos, Len+1);
-escape_js_chunk(<<>>, Acc, Input, Pos, Len) ->
-    case Acc =:= [] of
-        true ->
-            binary_part(Input, Pos, Len);
-        false ->
-            [Acc, binary_part(Input, Pos, Len)]
-    end;
-escape_js_chunk(<<Char/utf8, Rest/bitstring>>, Acc, Input, Pos, Len)
-  when Char =< ?TWO_BYTE_LAST ->
-    escape_js_chunk(Rest, Acc, Input, Pos, Len+2);
-escape_js_chunk(<<8232/utf8, Rest/bitstring>>, Acc0, Input, Pos, Len) ->
-    Part = binary_part(Input, Pos, Len),
-    Acc = [Acc0, Part, <<"\\u2028">>],
-    escape_js(Rest, Acc, Input, Pos+Len+3);
-escape_js_chunk(<<8233/utf8, Rest/bitstring>>, Acc0, Input, Pos, Len) ->
-    Part = binary_part(Input, Pos, Len),
-    Acc = [Acc0, Part, <<"\\u2029">>],
-    escape_js(Rest, Acc, Input, Pos+Len+3);
-escape_js_chunk(<<Char/utf8, Rest/bitstring>>, Acc, Input, Pos, Len)
-  when Char =< ?THREE_BYTE_LAST ->
-    escape_js_chunk(Rest, Acc, Input, Pos, Len+3);
-escape_js_chunk(<<_Char/utf8, Rest/bitstring>>, Acc, Input, Pos, Len) ->
-    escape_js_chunk(Rest, Acc, Input, Pos, Len+4);
-escape_js_chunk(<<Byte/integer, _Rest/bitstring>>, _Acc, Input, _Pos, _Len) ->
-    throw_invalid_byte_error(Byte, Input).
+escape_js_chunk(Data, Acc, Input, Pos, Len) ->
+    case Data of
+        <<$"/integer, Rest/bitstring>> ->
+            Part = binary_part(Input, Pos, Len),
+            Acc1 = [Acc | [Part, <<"\\\"">>]],
+            escape_js(Rest, Acc1, Input, Pos+Len+1);
+        <<$\\/integer, Rest/bitstring>> ->
+            Part = binary_part(Input, Pos, Len),
+            Acc1 = [Acc | [Part, <<"\\\\">>]],
+            escape_js(Rest, Acc1, Input, Pos+Len+1);
+        <<Byte/integer, Rest/bitstring>> when Byte =< ?NON_PRINTABLE_LAST ->
+            Part = binary_part(Input, Pos, Len),
+            Acc1 = [Acc | [Part, escape_byte(Byte)]],
+            escape_js(Rest, Acc1, Input, Pos+Len+1);
+        <<Byte/integer, Rest/bitstring>> when Byte =< ?ONE_BYTE_LAST ->
+            escape_js_chunk(Rest, Acc, Input, Pos, Len+1);
+        <<>> ->
+            case Acc =:= [] of
+                true ->
+                    binary_part(Input, Pos, Len);
+                false ->
+                    [Acc, binary_part(Input, Pos, Len)]
+            end;
+        <<Char/utf8, Rest/bitstring>> when Char =< ?TWO_BYTE_LAST ->
+            escape_js_chunk(Rest, Acc, Input, Pos, Len+2);
+        <<8232/utf8, Rest/bitstring>> ->
+            Part = binary_part(Input, Pos, Len),
+            Acc1 = [Acc | [Part, <<"\\u2028">>]],
+            escape_js(Rest, Acc1, Input, Pos+Len+3);
+        <<8233/utf8, Rest/bitstring>> ->
+            Part = binary_part(Input, Pos, Len),
+            Acc1 = [Acc | [Part, <<"\\u2029">>]],
+            escape_js(Rest, Acc1, Input, Pos+Len+3);
+        <<Char/utf8, Rest/bitstring>> when Char =< ?THREE_BYTE_LAST ->
+            escape_js_chunk(Rest, Acc, Input, Pos, Len+3);
+        <<_Char/utf8, Rest/bitstring>> ->
+            escape_js_chunk(Rest, Acc, Input, Pos, Len+4);
+        <<Byte/integer, _Rest/bitstring>> ->
+            throw_invalid_byte_error(Byte, Input)
+    end.
 
 escape_unicode(Bin) ->
     escape_unicode(Bin, [], Bin, 0).
 
-escape_unicode(<<Byte/integer, Rest/bitstring>>, Acc0, Input, Pos)
-  when Byte =< ?NON_PRINTABLE_LAST; Byte =:= $\"; Byte =:= $\\ ->
-    Acc = [Acc0, escape_byte(Byte)],
-    escape_unicode(Rest, Acc, Input, Pos+1);
-escape_unicode(<<Byte/integer, Rest/bitstring>>, Acc, Input, Pos)
-  when Byte =< ?ONE_BYTE_LAST ->
-    escape_unicode_chunk(Rest, Acc, Input, Pos, 1);
-escape_unicode(<<Char/utf8, Rest/bitstring>>, Acc0, Input, Pos)
-  when Char < 256 ->
-    Acc = [Acc0, <<"\\u00">>, integer_to_binary(Char, 16)],
-    escape_unicode(Rest, Acc, Input, Pos+2);
-escape_unicode(<<Char/utf8, Rest/bitstring>>, Acc0, Input, Pos)
-  when Char =< ?TWO_BYTE_LAST ->
-    Acc = [Acc0, <<"\\u0">>, integer_to_binary(Char, 16)],
-    escape_unicode(Rest, Acc, Input, Pos+2);
-escape_unicode(<<Char/utf8, Rest/bitstring>>, Acc0, Input, Pos)
-  when Char < 4096 ->
-    Acc = [Acc0, <<"\\u0">>, integer_to_binary(Char, 16)],
-    escape_unicode(Rest, Acc, Input, Pos+3);
-escape_unicode(<<Char/utf8, Rest/bitstring>>, Acc0, Input, Pos)
-  when Char =< ?THREE_BYTE_LAST ->
-    Acc = [Acc0, <<"\\u">>, integer_to_binary(Char, 16)],
-    escape_unicode(Rest, Acc, Input, Pos+3);
-escape_unicode(<<Char0/utf8, Rest/bitstring>>, Acc0, Input, Pos) ->
-    Char = Char0 - 65536,
-    Acc = [ Acc0
-          , <<"\\uD">>
-          , integer_to_binary(2048 bor (Char bsr 10), 16)
-          , <<"\\uD">>
-          , integer_to_binary(3072 bor Char band 1023, 16)
-          ],
-    escape_unicode(Rest, Acc, Input, Pos+4);
-escape_unicode(<<>>, Acc, _Input, _Pos) ->
-    Acc;
-escape_unicode(<<Byte/integer, _Rest/bitstring>>, _Acc, Input, _Pos) ->
-    throw_invalid_byte_error(Byte, Input).
+escape_unicode(Data, Acc, Input, Pos) ->
+    case Data of
+        <<$"/integer, Rest/bitstring>> ->
+            Acc1 = [Acc | <<"\\\"">>],
+            escape_unicode(Rest, Acc1, Input, Pos+1);
+        <<$\\/integer, Rest/bitstring>> ->
+            Acc1 = [Acc | <<"\\\\">>],
+            escape_unicode(Rest, Acc1, Input, Pos+1);
+        <<Byte/integer, Rest/bitstring>> when Byte =< ?NON_PRINTABLE_LAST ->
+            Acc1 = [Acc | escape_byte(Byte)],
+            escape_unicode(Rest, Acc1, Input, Pos+1);
+        <<Byte/integer, Rest/bitstring>> when Byte =< ?ONE_BYTE_LAST ->
+            escape_unicode_chunk(Rest, Acc, Input, Pos, 1);
+        <<Char/utf8, Rest/bitstring>> when Char < 256 ->
+            Acc1 = [Acc | [<<"\\u00">>, integer_to_binary(Char, 16)]],
+            escape_unicode(Rest, Acc1, Input, Pos+2);
+        <<Char/utf8, Rest/bitstring>> when Char =< ?TWO_BYTE_LAST ->
+            Acc1 = [Acc | [<<"\\u0">>, integer_to_binary(Char, 16)]],
+            escape_unicode(Rest, Acc1, Input, Pos+2);
+        <<Char/utf8, Rest/bitstring>> when Char < 4096 ->
+            Acc1 = [Acc | [<<"\\u0">>, integer_to_binary(Char, 16)]],
+            escape_unicode(Rest, Acc1, Input, Pos+3);
+        <<Char/utf8, Rest/bitstring>> when Char =< ?THREE_BYTE_LAST ->
+            Acc1 = [Acc | [<<"\\u">>, integer_to_binary(Char, 16)]],
+            escape_unicode(Rest, Acc1, Input, Pos+3);
+        <<Char0/utf8, Rest/bitstring>> ->
+            Char = Char0 - 65536,
+            Acc1 = [ Acc
+                   | [ <<"\\uD">>
+                     , integer_to_binary(2048 bor (Char bsr 10), 16)
+                     , <<"\\uD">>
+                     , integer_to_binary(3072 bor Char band 1023, 16) ]
+                   ],
+            escape_unicode(Rest, Acc1, Input, Pos+4);
+        <<>> ->
+            Acc;
+        <<Byte/integer, _Rest/bitstring>> ->
+            throw_invalid_byte_error(Byte, Input)
+    end.
 
-escape_unicode_chunk(<<Byte/integer, Rest/bitstring>>, Acc0, Input, Pos, Len)
-  when Byte =< ?NON_PRINTABLE_LAST; Byte =:= $\"; Byte =:= $\\ ->
-    Part = binary_part(Input, Pos, Len),
-    Acc = [Acc0, Part, escape_byte(Byte)],
-    escape_unicode(Rest, Acc, Input, Pos+Len+1);
-escape_unicode_chunk(<<Byte/integer, Rest/bitstring>>, Acc, Input, Pos, Len)
-  when Byte =< ?ONE_BYTE_LAST ->
-    escape_unicode_chunk(Rest, Acc, Input, Pos, Len+1);
-escape_unicode_chunk(<<>>, Acc, Input, Pos, Len) ->
-    case Acc =:= [] of
-        true ->
-            binary_part(Input, Pos, Len);
-        false ->
-            [Acc, binary_part(Input, Pos, Len)]
-    end;
-escape_unicode_chunk(<<Char/utf8, Rest/bitstring>>, Acc0, Input, Pos, Len)
-  when Char < 256 ->
-    Part = binary_part(Input, Pos, Len),
-    Acc = [Acc0, Part, <<"\\u00">>, integer_to_binary(Char, 16)],
-    escape_unicode(Rest, Acc, Input, Pos+Len+2);
-escape_unicode_chunk(<<Char/utf8, Rest/bitstring>>, Acc0, Input, Pos, Len)
-  when Char =< ?TWO_BYTE_LAST ->
-    Part = binary_part(Input, Pos, Len),
-    Acc = [Acc0, Part, <<"\\u0">>, integer_to_binary(Char, 16)],
-    escape_unicode(Rest, Acc, Input, Pos+Len+2);
-escape_unicode_chunk(<<Char/utf8, Rest/bitstring>>, Acc0, Input, Pos, Len)
-  when Char < 4096 ->
-    Part = binary_part(Input, Pos, Len),
-    Acc = [Acc0, Part, <<"\\u0">>, integer_to_binary(Char, 16)],
-    escape_unicode(Rest, Acc, Input, Pos+Len+3);
-escape_unicode_chunk(<<Char/utf8, Rest/bitstring>>, Acc0, Input, Pos, Len)
-  when Char =< ?THREE_BYTE_LAST ->
-    Part = binary_part(Input, Pos, Len),
-    Acc = [Acc0, Part, <<"\\u">>, integer_to_binary(Char, 16)],
-    escape_unicode(Rest, Acc, Input, Pos+Len+3);
-escape_unicode_chunk(<<Char0/utf8, Rest/bitstring>>, Acc0, Input, Pos, Len) ->
-    Char = Char0 - 65536,
-    Part = binary_part(Input, Pos, Len),
-    Acc = [ Acc0
-          , Part
-          , <<"\\uD">>
-          , integer_to_binary(2048 bor (Char bsr 10), 16)
-          , <<"\\uD">>
-          , integer_to_binary(3072 bor Char band 1023, 16)
-          ],
-    escape_unicode(Rest, Acc, Input, Pos+Len+4);
-escape_unicode_chunk(<<Byte/integer, _Rest/bitstring>>, _Acc, Input, _Pos, _Len) ->
-    throw_invalid_byte_error(Byte, Input).
+escape_unicode_chunk(Data, Acc, Input, Pos, Len) ->
+    case Data of
+        <<$"/integer, Rest/bitstring>> ->
+            Part = binary_part(Input, Pos, Len),
+            Acc1 = [Acc | [Part, <<"\\\"">>]],
+            escape_unicode(Rest, Acc1, Input, Pos+Len+1);
+        <<$\\/integer, Rest/bitstring>> ->
+            Part = binary_part(Input, Pos, Len),
+            Acc1 = [Acc | [Part, <<"\\\\">>]],
+            escape_unicode(Rest, Acc1, Input, Pos+Len+1);
+        <<Byte/integer, Rest/bitstring>> when Byte =< ?NON_PRINTABLE_LAST ->
+            Part = binary_part(Input, Pos, Len),
+            Acc1 = [Acc | [Part, escape_byte(Byte)]],
+            escape_unicode(Rest, Acc1, Input, Pos+Len+1);
+        <<Byte/integer, Rest/bitstring>> when Byte =< ?ONE_BYTE_LAST ->
+            escape_unicode_chunk(Rest, Acc, Input, Pos, Len+1);
+        <<>> ->
+            case Acc =:= [] of
+                true ->
+                    binary_part(Input, Pos, Len);
+                false ->
+                    [Acc | binary_part(Input, Pos, Len)]
+            end;
+        <<Char/utf8, Rest/bitstring>> when Char < 256 ->
+            Part = binary_part(Input, Pos, Len),
+            Acc1 = [Acc | [Part, <<"\\u00">>, integer_to_binary(Char, 16)]],
+            escape_unicode(Rest, Acc1, Input, Pos+Len+2);
+        <<Char/utf8, Rest/bitstring>> when Char =< ?TWO_BYTE_LAST ->
+            Part = binary_part(Input, Pos, Len),
+            Acc1 = [Acc | [Part, <<"\\u0">>, integer_to_binary(Char, 16)]],
+            escape_unicode(Rest, Acc1, Input, Pos+Len+2);
+        <<Char/utf8, Rest/bitstring>> when Char < 4096 ->
+            Part = binary_part(Input, Pos, Len),
+            Acc1 = [Acc | [Part, <<"\\u0">>, integer_to_binary(Char, 16)]],
+            escape_unicode(Rest, Acc1, Input, Pos+Len+3);
+        <<Char/utf8, Rest/bitstring>> when Char =< ?THREE_BYTE_LAST ->
+            Part = binary_part(Input, Pos, Len),
+            Acc1 = [Acc | [Part, <<"\\u">>, integer_to_binary(Char, 16)]],
+            escape_unicode(Rest, Acc1, Input, Pos+Len+3);
+        <<Char0/utf8, Rest/bitstring>> ->
+            Char = Char0 - 65536,
+            Part = binary_part(Input, Pos, Len),
+            Acc1 = [ Acc
+                   | [ Part
+                     , <<"\\uD">>
+                     , integer_to_binary(2048 bor (Char bsr 10), 16)
+                     , <<"\\uD">>
+                     , integer_to_binary(3072 bor Char band 1023, 16) ]
+                   ],
+            escape_unicode(Rest, Acc1, Input, Pos+Len+4);
+        <<Byte/integer, _Rest/bitstring>> ->
+            throw_invalid_byte_error(Byte, Input)
+    end.
 
 escape_byte(0) -> <<"\\u0000">>;
 escape_byte(1) -> <<"\\u0001">>;
@@ -585,13 +640,16 @@ throw_unsupported_type_error(Term) ->
 throw_invalid_byte_error(Byte, Input) ->
     throw({invalid_byte, Byte, Input}).
 
-handle_error(throw, {unsupported_type, Unsupported}, _Stacktrace) ->
-    {error, {unsupported_type, Unsupported}};
-handle_error(throw, {invalid_byte, Byte0, Input}, _Stacktrace) ->
-    Byte = <<"0x"/utf8, (integer_to_binary(Byte0, 16))/binary>>,
-    {error, {invalid_byte, Byte, Input}};
 handle_error(throw, Reason, _Stacktrace) ->
-    {error, Reason};
+    case Reason of
+        {unsupported_type, Unsupported} ->
+            {error, {unsupported_type, Unsupported}};
+        {invalid_byte, Byte0, Input} ->
+            Byte = <<"0x"/utf8, (integer_to_binary(Byte0, 16))/binary>>,
+            {error, {invalid_byte, Byte, Input}};
+        _ ->
+            {error, Reason}
+    end;
 handle_error(Class, Reason, Stacktrace) ->
     erlang:raise(Class, Reason, Stacktrace).
 

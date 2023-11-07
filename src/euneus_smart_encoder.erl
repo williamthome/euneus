@@ -20,7 +20,7 @@
 -compile({ inline, escape_json/4 }).
 -compile({ inline, escape_json_chunk/5 }).
 
--dialyzer(no_improper_lists).
+-dialyzer( no_improper_lists ).
 
 %% API functions
 
