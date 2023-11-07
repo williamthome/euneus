@@ -24,7 +24,6 @@ Like Thoas, both the parser and generator fully conform to
     - [Why Euneus over Thoas?](#why-euneus-over-thoas)
 - [Benchmarks](#benchmarks)
     - [Encode](#encode-1)
-        - [TODO](#todo)
     - [Decode](#decode-1)
 - [Tests](#tests)
 - [Smart modules](#smart-modules)
@@ -331,19 +330,13 @@ The benchmarks use the smart versions. Please the [Smart modules](#smart-modules
 | blockchain.json            	|  **12.00 K** 	|     7.92 K 	|          1.52x 	|
 | giphy.json                 	|  **1.03 K** 	|     0.86 K 	|          1.20x 	|
 | github.json                	|  **3.67 K** 	|     2.57 K 	|          1.43x 	|
-| govtrack.json              	|   **22.51** 	|      12.34 	|          1.82x 	|
+| govtrack.json              	|   **13.33** 	|      12.37 	|          1.08x 	|
 | issue-90.json              	|   **30.10** 	|      17.56 	|          1.71x 	|
-| json-generator-pretty.json 	|    0.93 K 	|   **1.09 K** 	|          1.16x 	|
-| json-generator.json        	|    0.93 K 	|   **1.09 K** 	|          1.16x 	|
+| json-generator-pretty.json 	|  **1.45 K** 	|     1.09 K 	|          1.33x 	|
+| json-generator.json        	|  **1.45 K** 	|     1.08 K 	|          1.34x 	|
 | pokedex.json               	|  **2.08 K** 	|     1.75 K 	|          1.19x 	|
 | utf-8-escaped.json         	| **11.99 K** 	|    10.63 K 	|          1.13x 	|
-| utf-8-unescaped.json       	| **12.46 K** 	|    10.85 K 	|          1.15x 	|
-
-#### TODO
-
-Mitigate why encoding [json-generator-pretty.json](/euneus_bench/priv/data/json-generator-pretty.json) and [json-generator.json](/euneus_bench/priv/data/json-generator.json) have worst performance compared to Thoas.
-
-### Decode
+| utf-8-unescaped.json       	| **11.99 K** 	|    10.89 K 	|          1.10x 	|
 
 > **Note**
 >
@@ -354,15 +347,15 @@ Mitigate why encoding [json-generator-pretty.json](/euneus_bench/priv/data/json-
 | **File**                   	|  **Euneus** 	| **Thoas** 	| **Comparison** 	|
 |----------------------------	|------------:	|----------:	|---------------:	|
 | blockchain.json            	|  **7.18 K** 	|    5.78 K 	|          1.24x 	|
-| giphy.json                 	|  **474.91** 	|    474.75 	|          1.00x 	|
+| giphy.json                 	|  **589.54** 	|    546.31 	|          1.08x 	|
 | github.json                	|  **2.33 K** 	|    2.02 K 	|          1.16x 	|
-| govtrack.json              	|   **16.35** 	|     15.65 	|          1.04x 	|
+| govtrack.json              	|   **16.90** 	|     15.89 	|          1.06x 	|
 | issue-90.json              	|   **25.35** 	|     17.70 	|          1.43x 	|
 | json-generator-pretty.json 	|  **617.33** 	|    542.99 	|          1.14x 	|
-| json-generator.json        	|  **728.01** 	|    655.15 	|          1.11x 	|
-| pokedex.json               	|  **1.37 K** 	|    1.33 K 	|          1.03x 	|
-| utf-8-escaped.json         	|  **1.88 K** 	|    1.66 K 	|          1.13x 	|
-| utf-8-unescaped.json       	| **10.87 K** 	|   10.47 K 	|          1.04x 	|
+| json-generator.json        	|  **800.43** 	|    700.34 	|          1.15x 	|
+| pokedex.json               	|  **1.36 K** 	|    1.31 K 	|          1.04x 	|
+| utf-8-escaped.json         	|  **2.05 K** 	|    1.67 K 	|          1.23x 	|
+| utf-8-unescaped.json       	| **11.27 K** 	|   10.48 K 	|          1.08x 	|
 
 ## Tests
 
