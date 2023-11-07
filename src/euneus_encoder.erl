@@ -17,7 +17,6 @@
 %% limitations under the License.
 -module(euneus_encoder).
 
--compile({ inline, parse_opts/1 }).
 -compile({ inline, encode_binary/2 }).
 -compile({ inline, encode_atom/2 }).
 -compile({ inline, encode_integer/2 }).
@@ -27,14 +26,13 @@
 -compile({ inline, encode_datetime/2 }).
 -compile({ inline, encode_timestamp/2 }).
 -compile({ inline, encode_unhandled/2 }).
--compile({ inline, escape_json/1 }).
--compile({ inline, escape_html/1 }).
--compile({ inline, escape_js/1 }).
--compile({ inline, escape_unicode/1 }).
+-compile({ inline, escape_json/4 }).
+-compile({ inline, escape_html/4 }).
+-compile({ inline, escape_js/4 }).
+-compile({ inline, escape_unicode/4 }).
 -compile({ inline, handle_error/3 }).
 -compile({ inline, maps_get/3 }).
 -compile({ inline, maps_to_list/1 }).
--compile({ inline_size, 100 }).
 
 % By default, encode_unhandled/2 will raise unsupported_type exception,
 % so it is a function without a local return.
@@ -168,13 +166,13 @@ parse_opts(Opts) ->
         escaper =>
             case maps_get(escaper, Opts, json) of
                 json ->
-                    fun(X, _O) -> [$", escape_json(X), $"] end;
+                    fun(X, _O) -> [$", escape_json(X, [], X, 0), $"] end;
                 html ->
-                    fun(X, _O) -> [$", escape_html(X), $"] end;
+                    fun(X, _O) -> [$", escape_html(X, [], X, 0), $"] end;
                 javascript ->
-                    fun(X, _O) -> [$", escape_js(X), $"] end;
+                    fun(X, _O) -> [$", escape_js(X, [], X, 0), $"] end;
                 unicode ->
-                    fun(X, _O) -> [$", escape_unicode(X), $"] end;
+                    fun(X, _O) -> [$", escape_unicode(X, [], X, 0), $"] end;
                 Fun when is_function(Fun, 2) ->
                     Fun
             end,
@@ -311,6 +309,13 @@ escape_json_chunk(<<Byte/integer, Rest/bitstring>>, Acc0, Input, Pos, Len)
 escape_json_chunk(<<Byte/integer, Rest/bitstring>>, Acc, Input, Pos, Len)
   when Byte =< ?ONE_BYTE_LAST ->
     escape_json_chunk(Rest, Acc, Input, Pos, Len+1);
+escape_json_chunk(<<>>, Acc, Input, Pos, Len) ->
+    case Acc =:= [] of
+        true ->
+            binary_part(Input, Pos, Len);
+        false ->
+            [Acc, binary_part(Input, Pos, Len)]
+    end;
 escape_json_chunk(<<Char/utf8, Rest/bitstring>>, Acc, Input, Pos, Len)
   when Char =< ?TWO_BYTE_LAST ->
     escape_json_chunk(Rest, Acc, Input, Pos, Len+2);
@@ -319,10 +324,6 @@ escape_json_chunk(<<Char/utf8, Rest/bitstring>>, Acc, Input, Pos, Len)
     escape_json_chunk(Rest, Acc, Input, Pos, Len+3);
 escape_json_chunk(<<_Char/utf8, Rest/bitstring>>, Acc, Input, Pos, Len) ->
     escape_json_chunk(Rest, Acc, Input, Pos, Len+4);
-escape_json_chunk(<<>>, [], Input, Pos, Len) ->
-    binary_part(Input, Pos, Len);
-escape_json_chunk(<<>>, Acc, Input, Pos, Len) ->
-    [Acc, binary_part(Input, Pos, Len)];
 escape_json_chunk(<<Byte/integer, _Rest/bitstring>>, _Acc, Input, _Pos, _Len) ->
     throw_invalid_byte_error(Byte, Input).
 
@@ -363,6 +364,13 @@ escape_html_chunk(<<Byte/integer, Rest/bitstring>>, Acc, Input, Pos, Len)
 escape_html_chunk(<<Byte/integer, Rest/bitstring>>, Acc, Input, Pos, Len)
   when Byte =< ?ONE_BYTE_LAST ->
     escape_html_chunk(Rest, Acc, Input, Pos, Len+1);
+escape_html_chunk(<<>>, Acc, Input, Pos, Len) ->
+    case Acc =:= [] of
+        true ->
+            binary_part(Input, Pos, Len);
+        false ->
+            [Acc, binary_part(Input, Pos, Len)]
+    end;
 escape_html_chunk(<<Char/utf8, Rest/bitstring>>, Acc, Input, Pos, Len)
   when Char =< ?TWO_BYTE_LAST ->
     escape_html_chunk(Rest, Acc, Input, Pos, Len+2);
@@ -379,10 +387,6 @@ escape_html_chunk(<<Char/utf8, Rest/bitstring>>, Acc, Input, Pos, Len)
     escape_html_chunk(Rest, Acc, Input, Pos, Len+3);
 escape_html_chunk(<<_Char/utf8, Rest/bitstring>>, Acc, Input, Pos, Len) ->
     escape_html_chunk(Rest, Acc, Input, Pos, Len+4);
-escape_html_chunk(<<>>, [], Input, Pos, Len) ->
-    binary_part(Input, Pos, Len);
-escape_html_chunk(<<>>, Acc, Input, Pos, Len) ->
-    [Acc, binary_part(Input, Pos, Len)];
 escape_html_chunk(<<Byte/integer, _Rest/bitstring>>, _Acc, Input, _Pos, _Len) ->
     throw_invalid_byte_error(Byte, Input).
 
@@ -423,6 +427,13 @@ escape_js_chunk(<<Byte/integer, Rest/bitstring>>, Acc0, Input, Pos, Len)
 escape_js_chunk(<<Byte/integer, Rest/bitstring>>, Acc, Input, Pos, Len)
   when Byte =< ?ONE_BYTE_LAST ->
     escape_js_chunk(Rest, Acc, Input, Pos, Len+1);
+escape_js_chunk(<<>>, Acc, Input, Pos, Len) ->
+    case Acc =:= [] of
+        true ->
+            binary_part(Input, Pos, Len);
+        false ->
+            [Acc, binary_part(Input, Pos, Len)]
+    end;
 escape_js_chunk(<<Char/utf8, Rest/bitstring>>, Acc, Input, Pos, Len)
   when Char =< ?TWO_BYTE_LAST ->
     escape_js_chunk(Rest, Acc, Input, Pos, Len+2);
@@ -439,10 +450,6 @@ escape_js_chunk(<<Char/utf8, Rest/bitstring>>, Acc, Input, Pos, Len)
     escape_js_chunk(Rest, Acc, Input, Pos, Len+3);
 escape_js_chunk(<<_Char/utf8, Rest/bitstring>>, Acc, Input, Pos, Len) ->
     escape_js_chunk(Rest, Acc, Input, Pos, Len+4);
-escape_js_chunk(<<>>, [], Input, Pos, Len) ->
-    binary_part(Input, Pos, Len);
-escape_js_chunk(<<>>, Acc, Input, Pos, Len) ->
-    [Acc, binary_part(Input, Pos, Len)];
 escape_js_chunk(<<Byte/integer, _Rest/bitstring>>, _Acc, Input, _Pos, _Len) ->
     throw_invalid_byte_error(Byte, Input).
 
@@ -494,6 +501,13 @@ escape_unicode_chunk(<<Byte/integer, Rest/bitstring>>, Acc0, Input, Pos, Len)
 escape_unicode_chunk(<<Byte/integer, Rest/bitstring>>, Acc, Input, Pos, Len)
   when Byte =< ?ONE_BYTE_LAST ->
     escape_unicode_chunk(Rest, Acc, Input, Pos, Len+1);
+escape_unicode_chunk(<<>>, Acc, Input, Pos, Len) ->
+    case Acc =:= [] of
+        true ->
+            binary_part(Input, Pos, Len);
+        false ->
+            [Acc, binary_part(Input, Pos, Len)]
+    end;
 escape_unicode_chunk(<<Char/utf8, Rest/bitstring>>, Acc0, Input, Pos, Len)
   when Char < 256 ->
     Part = binary_part(Input, Pos, Len),
@@ -525,10 +539,6 @@ escape_unicode_chunk(<<Char0/utf8, Rest/bitstring>>, Acc0, Input, Pos, Len) ->
           , integer_to_binary(3072 bor Char band 1023, 16)
           ],
     escape_unicode(Rest, Acc, Input, Pos+Len+4);
-escape_unicode_chunk(<<>>, [], Input, Pos, Len) ->
-    binary_part(Input, Pos, Len);
-escape_unicode_chunk(<<>>, Acc, Input, Pos, Len) ->
-    [Acc, binary_part(Input, Pos, Len)];
 escape_unicode_chunk(<<Byte/integer, _Rest/bitstring>>, _Acc, Input, _Pos, _Len) ->
     throw_invalid_byte_error(Byte, Input).
 
