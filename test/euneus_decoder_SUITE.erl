@@ -33,7 +33,7 @@
         ]).
 
 %% Test cases
--export([ null_term/1, keys/1, values/1 ]).
+-export([ null_term/1, keys/1, values/1, arrays/1 ]).
 
 %%%=====================================================================
 %%% Callback functions
@@ -127,7 +127,7 @@ end_per_testcase(_TestCase, _Config) ->
     TestCase :: atom().
 
 all() ->
-    [ null_term, keys, values ].
+    [ null_term, keys, values, arrays ].
 
 %%%=====================================================================
 %%% Test cases
@@ -174,6 +174,14 @@ values(Config) when is_list(Config) ->
     {ok, #{<<"foo">> := bar}} = decode(<<"{\"foo\":\"bar\"}">>, #{
         values => fun(<<"bar">>, _Opts) ->
             bar
+        end
+    }).
+
+arrays(Config) when is_list(Config) ->
+    {ok, [<<"foo">>,true,0,undefined]} = decode(<<"[\"foo\",true,0,null]">>, #{}),
+    {ok, []} = decode(<<"[\"foo\",true,0,null]">>, #{
+        arrays => fun([<<"foo">>,true,0,undefined], _Opts) ->
+            []
         end
     }).
 
