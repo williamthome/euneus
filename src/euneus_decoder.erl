@@ -70,8 +70,16 @@
 
 -type input() :: binary() | iolist().
 -type options() :: #{ null_term => term()
-                    , keys => normalizer(Key :: binary())
-                    , values => normalizer(Value :: binary())
+                    , keys => copy
+                            | to_atom
+                            | to_existing_atom
+                            | to_integer
+                            | normalizer(Key :: binary())
+                    , values => copy
+                              | to_atom
+                              | to_existing_atom
+                              | to_integer
+                              | normalizer(Value :: binary())
                     , arrays => normalizer(Array :: list())
                     , objects => normalizer(Object :: map())
                     , error_handler => error_handler()
