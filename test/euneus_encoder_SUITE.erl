@@ -39,6 +39,7 @@
         , integer_encoder/1
         , float_encoder/1
         , list_encoder/1
+        , map_encoder/1
         ]).
 
 %%%=====================================================================
@@ -139,6 +140,7 @@ all() ->
     , integer_encoder
     , float_encoder
     , list_encoder
+    , map_encoder
     ].
 
 %%%=====================================================================
@@ -193,6 +195,14 @@ list_encoder(Config) when is_list(Config) ->
                 euneus_encoder:encode_map(Map, Opts);
             (List, Opts) ->
                 euneus_encoder:encode_list(List, Opts)
+        end
+    }).
+
+map_encoder(Config) when is_list(Config) ->
+    {ok, <<"{}">>} = encode(#{}, #{}),
+    {ok, [${, [$", <<"foo">>, $"], $:, [$", <<"bar">>, $"], $}]} =
+        encode(#{}, #{map_encoder => fun (_Map, Opts) ->
+            euneus_encoder:encode_map(#{foo => bar}, Opts)
         end
     }).
 
