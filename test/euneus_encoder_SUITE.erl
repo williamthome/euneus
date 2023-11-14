@@ -244,6 +244,19 @@ unhandled_encoder(Config) when is_list(Config) ->
     }).
 
 escaper(Config) when is_list(Config) ->
+    {ok, <<"\"foo\"">>} = encode_to_bin(foo, #{
+        escaper => json
+    }),
+    {ok, <<"\"<\\/script>\"">>} = encode_to_bin(<<"</script>">>, #{
+        escaper => html
+    }),
+    {ok, <<"\"\\u2028\\u2029\"">>} = encode_to_bin(
+        unicode:characters_to_binary([8232,8233]), #{
+        escaper => javascript
+    }),
+    {ok, <<"\"\\u2603\"">>} = encode_to_bin(<<"☃"/utf8>>, #{
+        escaper => unicode
+    }),
     {ok, <<"bar">>} = encode(foo, #{
         escaper => fun (<<"foo">>, _Opts) ->
             <<"bar">>
@@ -266,3 +279,11 @@ error_handler(Config) when is_list(Config) ->
 
 encode(Input, Opts) ->
     euneus_encoder:encode(Input, Opts).
+
+encode_to_bin(Input, Opts) ->
+    case encode(Input, Opts) of
+        {ok, JSON} ->
+            {ok, iolist_to_binary(JSON)};
+        {error, Reason} ->
+            {error, Reason}
+    end.
