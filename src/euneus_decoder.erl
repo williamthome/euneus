@@ -927,7 +927,13 @@ array(Data, Opts, Input, Pos, Buffer, Value) ->
 empty_array(Rest, Opts, Input, Pos, Buffer) ->
     case Buffer of
         [?array, [] | Buffer1] ->
-            continue(Rest, Opts, Input, Pos, Buffer1, []);
+            List = case Opts of
+                #{arrays := Normalize} ->
+                    Normalize([], Opts);
+                #{} ->
+                    []
+            end,
+            continue(Rest, Opts, Input, Pos, Buffer1, List);
         [_|_] ->
             throw_byte(Rest, Opts, Input, Pos - 1, Buffer)
     end.

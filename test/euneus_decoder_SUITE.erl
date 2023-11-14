@@ -189,9 +189,9 @@ values(Config) when is_list(Config) ->
 
 arrays(Config) when is_list(Config) ->
     {ok, [<<"foo">>,true,0,undefined]} = decode(<<"[\"foo\",true,0,null]">>, #{}),
-    {ok, []} = decode(<<"[\"foo\",true,0,null]">>, #{
-        arrays => fun([<<"foo">>,true,0,undefined], _Opts) ->
-            []
+    {ok, [foo]} = decode(<<"[]">>, #{
+        arrays => fun([], _Opts) ->
+            [foo]
         end
     }).
 
