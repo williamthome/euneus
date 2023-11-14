@@ -441,7 +441,8 @@ value(Data, Opts, Input, Pos, Buffer) ->
         <<"false", Rest/bitstring>> ->
             continue(Rest, Opts, Input, Pos + 5, Buffer, false);
         <<"null", Rest/bitstring>> ->
-            continue(Rest, Opts, Input, Pos + 4, Buffer, undefined);
+            Null = maps:get(null_term, Opts),
+            continue(Rest, Opts, Input, Pos + 4, Buffer, Null);
         <<"true", Rest/bitstring>> ->
             continue(Rest, Opts, Input, Pos + 4, Buffer, true);
         <<_/integer, Rest/bitstring>> ->
