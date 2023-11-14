@@ -42,6 +42,7 @@
         , map_encoder/1
         , datetime_encoder/1
         , timestamp_encoder/1
+        , unhandled_encoder/1
         ]).
 
 %%%=====================================================================
@@ -145,6 +146,7 @@ all() ->
     , map_encoder
     , datetime_encoder
     , timestamp_encoder
+    , unhandled_encoder
     ].
 
 %%%=====================================================================
@@ -223,6 +225,17 @@ timestamp_encoder(Config) when is_list(Config) ->
     {ok, [$", <<"2023-01-01T00:00:00.000Z">>, $"]} = encode({0,0,0}, #{
         timestamp_encoder => fun (_DateTime, Opts) ->
             euneus_encoder:encode_timestamp({1672,531200,0}, Opts)
+        end
+    }).
+
+unhandled_encoder(Config) when is_list(Config) ->
+    {error, {unsupported_type, {foo}}} = encode({foo}, #{}),
+    {ok, [$[, [$", <<"myrecord">>, $"], [$,,
+        [${, [$", <<"key">>, $"], $:, [$", <<"val">>, $"], $}],
+    $]]]} = encode({myrecord, val}, #{
+        unhandled_encoder => fun({myrecord, Val}, Opts) ->
+            Encode = maps:get(list_encoder, Opts),
+            Encode([myrecord, #{key => Val}], Opts)
         end
     }).
 
