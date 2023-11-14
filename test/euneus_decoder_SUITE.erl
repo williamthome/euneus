@@ -38,6 +38,7 @@
         , values/1
         , arrays/1
         , objects/1
+        , error_handler/1
         ]).
 
 %%%=====================================================================
@@ -137,6 +138,7 @@ all() ->
     , values
     , arrays
     , objects
+    , error_handler
     ].
 
 %%%=====================================================================
@@ -201,6 +203,16 @@ objects(Config) when is_list(Config) ->
     {ok, #{}} = decode(<<"{\"foo\":\"bar\",\"0\":null}">>, #{
         objects => fun(#{<<"foo">> := <<"bar">>, <<"0">> := undefined}, _Opts) ->
             #{}
+        end
+    }).
+
+error_handler(Config) when is_list(Config) ->
+    {error, bar} = decode(<<"[]">>, #{
+        arrays => fun([], _Opts) ->
+            throw(foo)
+        end,
+        error_handler => fun (throw, foo, _Stacktrace) ->
+            {error, bar}
         end
     }).
 
