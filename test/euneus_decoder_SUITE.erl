@@ -33,7 +33,7 @@
         ]).
 
 %% Test cases
--export([ null_term/1, keys/1 ]).
+-export([ null_term/1, keys/1, values/1 ]).
 
 %%%=====================================================================
 %%% Callback functions
@@ -127,7 +127,7 @@ end_per_testcase(_TestCase, _Config) ->
     TestCase :: atom().
 
 all() ->
-    [ null_term, keys ].
+    [ null_term, keys, values ].
 
 %%%=====================================================================
 %%% Test cases
@@ -154,6 +154,26 @@ keys(Config) when is_list(Config) ->
     {ok, #{foo := <<"bar">>}} = decode(<<"{\"foo\":\"bar\"}">>, #{
         keys => fun(<<"foo">>, _Opts) ->
             foo
+        end
+    }).
+
+values(Config) when is_list(Config) ->
+    {ok, #{<<"foo">> := <<"bar">>}} = decode(<<"{\"foo\":\"bar\"}">>, #{}),
+    {ok, #{<<"foo">> := <<"bar">>}} = decode(<<"{\"foo\":\"bar\"}">>, #{
+        values => copy
+    }),
+    {ok, #{<<"foo">> := bar}} = decode(<<"{\"foo\":\"bar\"}">>, #{
+        values => to_atom
+    }),
+    {ok, #{<<"foo">> := bar}} = decode(<<"{\"foo\":\"bar\"}">>, #{
+        values => to_existing_atom
+    }),
+    {ok, #{<<"0">> := 0}} = decode(<<"{\"0\":\"0\"}">>, #{
+        values => to_integer
+    }),
+    {ok, #{<<"foo">> := bar}} = decode(<<"{\"foo\":\"bar\"}">>, #{
+        values => fun(<<"bar">>, _Opts) ->
+            bar
         end
     }).
 
