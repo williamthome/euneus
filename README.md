@@ -384,6 +384,8 @@ Also, the parser is tested using [JSONTestSuite](https://github.com/nst/JSONTest
 
 ![JSON Test Suite](/assets/images/json-test-suite-result.png)
 
+See the [Euneus parser](https://github.com/nst/JSONTestSuite/tree/master/parsers/test_erlang_euneus) in JSONTestSuite.
+
 > **Note**
 >
 > All of the JSONTestSuite tests are embedded in Euneus tests.
