@@ -110,7 +110,7 @@ end
 | #{foo => bar}                	| #{}                                                                                                                                                       	| {"foo":"bar"}               	| #{}                                                                                                             	| #{<<"foo">> => <<"bar">>}    	|
 | #{foo => bar}                	| #{}                                                                                                                                                       	| {"foo":"bar"}               	| #{keys => to_existing_atom}                                                                                     	| #{foo => <<"bar">>}          	|
 | #{0 => 0}                    	| #{}                                                                                                                                                       	| {"0":0}                     	| #{keys => to_integer}                                                                                           	| #{0 => 0}                    	|
-| {myrecord, val}              	| #{unhandled_encoder => fun({myrecord, Val}, Opts) -><br>    Encode = maps:get(encode_list, Opts),<br>    Encode([myrecord, #{key => Val}], Opts)<br>end}) 	| ["myrecord", {"key":"val"}] 	| #{arrays => fun([<<"myrecord">>, #{<<"key">> := Val}], _Opts) -><br>    {myrecord, binary_to_atom(Val)}<br>end} 	| {myrecord, val}              	|
+| {myrecord, val}              	| #{unhandled_encoder => fun({myrecord, Val}, Opts) -><br>    Encode = maps:get(list_encoder, Opts),<br>    Encode([myrecord, #{key => Val}], Opts)<br>end}) 	| ["myrecord", {"key":"val"}] 	| #{arrays => fun([<<"myrecord">>, #{<<"key">> := Val}], _Opts) -><br>    {myrecord, binary_to_atom(Val)}<br>end} 	| {myrecord, val}              	|
 
 ### Why not more built-in types?
 
@@ -154,7 +154,7 @@ Available encode options:
 #{
     %% nulls defines what terms will be replaced with the null literal (default: ['undefined']).
     nulls => nonempty_list(),
-    %% encode_binary allow override the binary() encoding.
+    %% binary_encoder allow override the binary() encoding.
     binary_encoder => function((binary(), euneus_encoder:options()) -> iolist()),
     %% atom_encoder allow override the atom() encoding.
     atom_encoder => function((atom(), euneus_encoder:options()) -> iolist()),
