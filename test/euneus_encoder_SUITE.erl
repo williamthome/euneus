@@ -40,6 +40,7 @@
         , float_encoder/1
         , list_encoder/1
         , map_encoder/1
+        , datetime_encoder/1
         ]).
 
 %%%=====================================================================
@@ -141,6 +142,7 @@ all() ->
     , float_encoder
     , list_encoder
     , map_encoder
+    , datetime_encoder
     ].
 
 %%%=====================================================================
@@ -203,6 +205,14 @@ map_encoder(Config) when is_list(Config) ->
     {ok, [${, [$", <<"foo">>, $"], $:, [$", <<"bar">>, $"], $}]} =
         encode(#{}, #{map_encoder => fun (_Map, Opts) ->
             euneus_encoder:encode_map(#{foo => bar}, Opts)
+        end
+    }).
+
+datetime_encoder(Config) when is_list(Config) ->
+    {ok, [$", <<"1970-01-01T00:00:00Z">>, $"]} = encode({{1970,1,1},{0,0,0}}, #{}),
+    {ok, [$", <<"2023-01-01T00:00:00Z">>, $"]} = encode({{1970,1,1},{0,0,0}}, #{
+        datetime_encoder => fun (_DateTime, Opts) ->
+            euneus_encoder:encode_datetime({{2023,1,1},{0,0,0}}, Opts)
         end
     }).
 
