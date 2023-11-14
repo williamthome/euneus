@@ -33,7 +33,7 @@
         ]).
 
 %% Test cases
--export([ nulls/1, binary_encoder/1 ]).
+-export([ nulls/1, binary_encoder/1, atom_encoder/1 ]).
 
 %%%=====================================================================
 %%% Callback functions
@@ -127,7 +127,7 @@ end_per_testcase(_TestCase, _Config) ->
     TestCase :: atom().
 
 all() ->
-    [ nulls, binary_encoder ].
+    [ nulls, binary_encoder, atom_encoder ].
 
 %%%=====================================================================
 %%% Test cases
@@ -141,4 +141,12 @@ binary_encoder(Config) when is_list(Config) ->
     {ok, [$", <<"foo">>, $"]} = euneus_encoder:encode(<<"foo">>, #{}),
     {ok, <<"\"foo\"">>} = euneus_encoder:encode(<<"foo">>, #{
         binary_encoder => fun(Bin, _Opts) -> <<$", Bin/binary, $">> end
+    }).
+
+atom_encoder(Config) when is_list(Config) ->
+    {ok, <<"true">>} = euneus_encoder:encode(true, #{}),
+    {ok, <<"false">>} = euneus_encoder:encode(false, #{}),
+    {ok, [$", <<"foo">>, $"]} = euneus_encoder:encode(foo, #{}),
+    {ok, <<"\"foo\"">>} = euneus_encoder:encode(foo, #{
+        atom_encoder => fun(Atom, _Opts) -> <<$", (atom_to_binary(Atom))/binary, $">> end
     }).
