@@ -118,7 +118,7 @@ The goal of `Euneus` is to have built-in types that can be encoded and then deco
 
 ### Note about proplists
 
-Proplists are not handled by Euneus, you must override the `list_encoder` option in the encoder to handle them, for example:
+Proplists are not handled by Euneus, you must convert proplists to maps before the encoding or override the `list_encoder` option in the encoder to handle them, for example:
 
 ```erlang
 1> Options = #{
@@ -138,7 +138,7 @@ Proplists are not handled by Euneus, you must override the `list_encoder` option
 {ok,<<"{\"foo\":\"bar\",\"bar\":{\"0\":\"ok\"}}">>}
 ```
 
-Another option is to convert proplists to maps before the encoding. The reason is because it's impossible to know when a list is a proplist and also because a proplist cannot be decoded. Please see the [Why not more built-in types?](#why-not-more-built-in-types) section for more info about this decision.
+The reason for that is because it's impossible to know when a list is a proplist and also because a proplist cannot be decoded. Please see the [Why not more built-in types?](#why-not-more-built-in-types) section for more info about this decision.
 
 ## Differences to Thoas
 
