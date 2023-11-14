@@ -43,6 +43,7 @@
         , datetime_encoder/1
         , timestamp_encoder/1
         , unhandled_encoder/1
+        , escaper/1
         ]).
 
 %%%=====================================================================
@@ -147,6 +148,7 @@ all() ->
     , datetime_encoder
     , timestamp_encoder
     , unhandled_encoder
+    , escaper
     ].
 
 %%%=====================================================================
@@ -236,6 +238,13 @@ unhandled_encoder(Config) when is_list(Config) ->
         unhandled_encoder => fun({myrecord, Val}, Opts) ->
             Encode = maps:get(list_encoder, Opts),
             Encode([myrecord, #{key => Val}], Opts)
+        end
+    }).
+
+escaper(Config) when is_list(Config) ->
+    {ok, <<"bar">>} = encode(foo, #{
+        escaper => fun (<<"foo">>, _Opts) ->
+            <<"bar">>
         end
     }).
 
