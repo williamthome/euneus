@@ -44,6 +44,7 @@
         , timestamp_encoder/1
         , unhandled_encoder/1
         , escaper/1
+        , error_handler/1
         ]).
 
 %%%=====================================================================
@@ -149,6 +150,7 @@ all() ->
     , timestamp_encoder
     , unhandled_encoder
     , escaper
+    , error_handler
     ].
 
 %%%=====================================================================
@@ -245,6 +247,16 @@ escaper(Config) when is_list(Config) ->
     {ok, <<"bar">>} = encode(foo, #{
         escaper => fun (<<"foo">>, _Opts) ->
             <<"bar">>
+        end
+    }).
+
+error_handler(Config) when is_list(Config) ->
+    {error, bar} = encode(foo, #{
+        escaper => fun (<<"foo">>, _Opts) ->
+            throw(foo)
+        end,
+        error_handler => fun (throw, foo, _Stacktrace) ->
+            {error, bar}
         end
     }).
 
