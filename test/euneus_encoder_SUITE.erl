@@ -33,7 +33,7 @@
         ]).
 
 %% Test cases
--export([ nulls/1, binary_encoder/1, atom_encoder/1 ]).
+-export([ nulls/1, binary_encoder/1, atom_encoder/1, integer_encoder/1 ]).
 
 %%%=====================================================================
 %%% Callback functions
@@ -127,7 +127,7 @@ end_per_testcase(_TestCase, _Config) ->
     TestCase :: atom().
 
 all() ->
-    [ nulls, binary_encoder, atom_encoder ].
+    [ nulls, binary_encoder, atom_encoder, integer_encoder ].
 
 %%%=====================================================================
 %%% Test cases
@@ -152,6 +152,14 @@ atom_encoder(Config) when is_list(Config) ->
     {ok, <<"\"foo\"">>} = encode(foo, #{
         atom_encoder => fun(Atom, _Opts) ->
             <<$", (atom_to_binary(Atom))/binary, $">>
+        end
+    }).
+
+integer_encoder(Config) when is_list(Config) ->
+    {ok, <<"0">>} = encode(0, #{}),
+    {ok, <<"\"0\"">>} = encode(0, #{
+        integer_encoder => fun(Int, _Opts) ->
+            <<$", (integer_to_binary(Int))/binary, $">>
         end
     }).
 
