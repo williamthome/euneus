@@ -38,6 +38,7 @@
         , atom_encoder/1
         , integer_encoder/1
         , float_encoder/1
+        , list_encoder/1
         ]).
 
 %%%=====================================================================
@@ -137,6 +138,7 @@ all() ->
     , atom_encoder
     , integer_encoder
     , float_encoder
+    , list_encoder
     ].
 
 %%%=====================================================================
@@ -178,6 +180,19 @@ float_encoder(Config) when is_list(Config) ->
     {ok, <<"\"1.000e-02\"">>} = encode(0.010, #{
         float_encoder => fun(Float, _Opts) ->
             <<$", (float_to_binary(Float, [{scientific, 3}]))/binary, $">>
+        end
+    }).
+
+list_encoder(Config) when is_list(Config) ->
+    {ok, <<"[]">>} = encode([], #{}),
+    {ok, [${, [$", <<"foo">>, $"], $:, [$", <<"bar">>, $"], $}]} =
+        encode([{foo, bar}], #{list_encoder => fun
+            ([{K, _} | _] = Proplist, Opts)
+              when is_binary(K); is_atom(K); is_integer(K) ->
+                Map = proplists:to_map(Proplist),
+                euneus_encoder:encode_map(Map, Opts);
+            (List, Opts) ->
+                euneus_encoder:encode_list(List, Opts)
         end
     }).
 
