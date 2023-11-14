@@ -1,20 +1,24 @@
-%% @author William Fank Thomé <willilamthome@hotmail.com>
-%% @copyright 2023 William Fank Thomé
-%% @doc JSON parser.
-
-%% Copyright 2023 William Fank Thomé
-%%
-%% Licensed under the Apache License, Version 2.0 (the "License");
-%% you may not use this file except in compliance with the License.
-%% You may obtain a copy of the License at
-%%
-%%     http://www.apache.org/licenses/LICENSE-2.0
-%%
-%% Unless required by applicable law or agreed to in writing, software
-%% distributed under the License is distributed on an "AS IS" BASIS,
-%% WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-%% See the License for the specific language governing permissions and
-%% limitations under the License.
+%%%---------------------------------------------------------------------
+%%% @copyright 2023 William Fank Thomé
+%%% @author William Fank Thomé <willilamthome@hotmail.com>
+%%% @doc JSON parser.
+%%%
+%%% Copyright 2023 William Fank Thomé
+%%%
+%%% Licensed under the Apache License, Version 2.0 (the "License");
+%%% you may not use this file except in compliance with the License.
+%%% You may obtain a copy of the License at
+%%%
+%%%     http://www.apache.org/licenses/LICENSE-2.0
+%%%
+%%% Unless required by applicable law or agreed to in writing, software
+%%% distributed under the License is distributed on an "AS IS" BASIS,
+%%% WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+%%% See the License for the specific language governing permissions and
+%%% limitations under the License.
+%%%
+%%% @end
+%%%---------------------------------------------------------------------
 -module(euneus_decoder).
 
 -compile({ inline, string/6 }).
@@ -46,12 +50,16 @@
 -dialyzer({ no_return, throw_eof/4 }).
 -dialyzer( no_improper_lists ).
 
+%% API functions
+
 -export([ decode/2 ]).
--export([ decode_parsed/2 ]).
 -export([ parse_opts/1 ]).
--export([ handle_error/3 ]).
+-export([ decode_parsed/2 ]).
 -export([ resume/6 ]).
 -export([ resume/7 ]).
+-export([ handle_error/3 ]).
+
+%% Types
 
 -export_type([ input/0 ]).
 -export_type([ options/0 ]).
@@ -59,8 +67,6 @@
 -export_type([ normalizer/1 ]).
 -export_type([ error_reason/0 ]).
 -export_type([ error_handler/0 ]).
-
-%% Types
 
 -type input() :: binary() | iolist().
 -type options() :: #{ null_term => term()
@@ -89,7 +95,8 @@
 
 %% Macros
 
-% Use integers instead of atoms to take advantage of the jump table optimization.
+% NOTE: We use integers instead of atoms to take advantage of
+%       the jump table optimization.
 -define(terminate, 0).
 -define(array, 1).
 -define(key, 2).
@@ -106,29 +113,32 @@
 %%% API functions
 %%%=====================================================================
 
+%%----------------------------------------------------------------------
+%% @doc Parses JSON to Erlang term.
+%%
+%% @param Input :: {@link euneus_decoder:input()}.
+%% @param Opts :: {@link erlang:map()}.
+%%
+%% @returns {@link euneus_decoder:result()}.
+%%
+%% @end
+%%----------------------------------------------------------------------
 -spec decode(input(), map()) -> result().
 
-decode(Bin, Opts) when is_map(Opts) ->
-    decode_parsed(Bin, parse_opts(Opts)).
+decode(Input, Opts) when is_map(Opts) ->
+    decode_parsed(Input, parse_opts(Opts)).
 
--spec decode_parsed(input(), options()) -> result().
-
-decode_parsed(Bin, Opts) when is_binary(Bin) ->
-    try
-        {ok, value(Bin, Opts, Bin, 0, [?terminate])}
-    catch
-        Class:Reason:Stacktrace ->
-            Handle = maps:get(error_handler, Opts),
-            Handle(Class, Reason, Stacktrace)
-    end;
-decode_parsed(IOList, Opts) ->
-    try
-        decode_parsed(iolist_to_binary(IOList), Opts)
-    catch
-        error:badarg ->
-            {error, not_an_iodata}
-    end.
-
+%%----------------------------------------------------------------------
+%% @doc Parses {@link erlang:map()} to {@link euneus_encoder:options()}.
+%%
+%% The parsed map can be expanded in compile time or stored to be
+%% reused, avoiding parsing the options in every encoding.
+%%
+%% @see euneus_encoder:parse_opts/1
+%% @see euneus_encoder:encode_parsed/2
+%%
+%% @end
+%%----------------------------------------------------------------------
 -spec parse_opts(map()) -> options().
 
 parse_opts(Opts) ->
@@ -163,8 +173,87 @@ normalize_option({K, V})
 normalize_option({K, _}) ->
     throw({invalid_option, K}).
 
+%%----------------------------------------------------------------------
+%% @doc Parses JSON to Erlang term.
+%%
+%% @param JSON :: {@link erlang:binary()}.
+%% @param IOList :: {@link erlang:iolist()}.
+%% @param Opts :: {@link euneus_decoder:options()}.
+%%
+%% @returns {@link euneus_decoder:result()}.
+%%
+%% @end
+%%----------------------------------------------------------------------
+-spec decode_parsed(input(), options()) -> result().
+
+decode_parsed(JSON, Opts) when is_binary(JSON) ->
+    try
+        {ok, value(JSON, Opts, JSON, 0, [?terminate])}
+    catch
+        Class:Reason:Stacktrace ->
+            Handle = maps:get(error_handler, Opts),
+            Handle(Class, Reason, Stacktrace)
+    end;
+decode_parsed(IOList, Opts) ->
+    try
+        decode_parsed(iolist_to_binary(IOList), Opts)
+    catch
+        error:badarg ->
+            {error, not_an_iodata}
+    end.
+
+%%----------------------------------------------------------------------
+%% @doc Resumes the decoding after a token error.
+%%
+%% Passes the null_term option as the Replacement argument of {@link euneus_decoder:resume/7}.
+%%
+%% @param Token :: {@link erlang:binary()}.
+%% @param Rest :: {@link erlang:bitstring()}.
+%% @param Opts :: {@link euneus_decoder:options()}.
+%% @param Input :: {@link erlang:binary()}.
+%% @param Pos :: {@link erlang:non_neg_integer()}.
+%% @param Buffer :: {@link erlang:list()}.
+%%
+%% @returns {@link euneus_decoder:result()}.
+%%
+%% @end
+%%----------------------------------------------------------------------
+-spec resume(Token, Rest, Opts, Input, Pos, Buffer) -> Result when
+    Token :: binary(),
+    Rest :: bitstring(),
+    Opts :: options(),
+    Input :: binary(),
+    Pos :: non_neg_integer(),
+    Buffer :: list(),
+    Result :: result().
+
 resume(Token, Rest0, #{null_term := Null} = Opts, Input, Pos0, Buffer) ->
     resume(Token, Null, Rest0, Opts, Input, Pos0, Buffer).
+
+%%----------------------------------------------------------------------
+%% @doc Resumes the decoding after a token error.
+%%
+%% @param :: Token {@link erlang:binary()}.
+%% @param :: Replacement {@link erlang:term()}.
+%% @param :: Rest {@link erlang:bitstring()}.
+%% @param :: Opts {@link euneus_decoder:options()}.
+%% @param :: Input {@link erlang:binary()}.
+%% @param :: Pos {@link erlang:non_neg_integer()}.
+%% @param :: Buffer {@link erlang:list()}.
+%%
+%% @returns {@link euneus_decoder:result()}.
+%%
+%% @end
+%%----------------------------------------------------------------------
+-spec resume(Token, Replacement, Rest, Opts, Input, Pos, Buffer) -> Result when
+    Token :: binary(),
+    Replacement :: term(),
+    Rest :: bitstring(),
+    Opts :: options(),
+    Input :: binary(),
+    Pos :: non_neg_integer(),
+    Buffer :: list(),
+    Result :: result().
 
 resume(Token, Replacement, Rest0, Opts, Input, Pos0, Buffer) ->
     Pos = Pos0 + byte_size(Token),
@@ -175,6 +264,44 @@ resume(Token, Replacement, Rest0, Opts, Input, Pos0, Buffer) ->
             Handle = maps:get(error_handler, Opts),
             Handle(Class, Reason, Stacktrace)
     end.
+
+%%----------------------------------------------------------------------
+%% @doc Handles decoding errors.
+%%
+%% @param Class :: 'error' | 'exit' | 'throw'.
+%% @param Reason :: {@link erlang:term()}.
+%% @param Stacktrace :: {@link erlang:stacktrace()}.
+%%
+%% @returns {error, {@link erlang:term()}} | {@link erlang:no_return()}.
+%%
+%% @end
+%%----------------------------------------------------------------------
+-spec handle_error(Class, Reason, Stacktrace) -> Result when
+    Class :: error | exit | throw,
+    Reason :: term(),
+    Stacktrace :: erlang:stacktrace(),
+    Result :: {error, term()} | no_return().
+
+handle_error(throw, Reason, _Stacktrace) ->
+    case Reason of
+        {eof, _Opts, _Input, _Pos, _Buffer} ->
+            {error, unexpected_end_of_input};
+        {{byte, Byte}, _Rest, _Opts, _Input, Pos, _Buffer} ->
+            Hex = <<"0x"/utf8,(integer_to_binary(Byte, 16))/binary>>,
+            {error, {unexpected_byte, Hex, Pos}};
+        {{token, Token}, _Rest, _Opts, _Input, Pos, _Buffer} ->
+            {error, {unexpected_sequence, Token, Pos}};
+        {invalid_option, Key} ->
+            {error, {invalid_option, Key}};
+        _ ->
+            {error, Reason}
+    end;
+handle_error(Class, Reason, Stacktrace) ->
+    erlang:raise(Class, Reason, Stacktrace).
+
+%%%=====================================================================
+%%% Internal functions
+%%%=====================================================================
 
 key(Data, Opts, Input, Pos, Buffer) ->
     case Data of
@@ -1560,23 +1687,6 @@ escape_surrogate(Data, Opts, Input, Pos, Buffer, Acc, Hi) ->
         <<_/bitstring>> ->
             throw_eof(Opts, Input, Pos, Buffer)
     end.
-
-handle_error(throw, Reason, _Stacktrace) ->
-    case Reason of
-        {eof, _Opts, _Input, _Pos, _Buffer} ->
-            {error, unexpected_end_of_input};
-        {{byte, Byte}, _Rest, _Opts, _Input, Pos, _Buffer} ->
-            Hex = <<"0x"/utf8,(integer_to_binary(Byte, 16))/binary>>,
-            {error, {unexpected_byte, Hex, Pos}};
-        {{token, Token}, _Rest, _Opts, _Input, Pos, _Buffer} ->
-            {error, {unexpected_sequence, Token, Pos}};
-        {invalid_option, Key} ->
-            {error, {invalid_option, Key}};
-        _ ->
-            {error, Reason}
-    end;
-handle_error(Class, Reason, Stacktrace) ->
-    erlang:raise(Class, Reason, Stacktrace).
 
 throw_byte(<<Rest/bitstring>>, Opts, Input, Pos, Buffer) ->
     Byte = binary:at(Input, Pos),

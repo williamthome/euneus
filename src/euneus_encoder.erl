@@ -1,20 +1,24 @@
-%% @author William Fank Thomé <willilamthome@hotmail.com>
-%% @copyright 2023 William Fank Thomé
-%% @doc JSON generator.
-
-%% Copyright 2023 William Fank Thomé
-%%
-%% Licensed under the Apache License, Version 2.0 (the "License");
-%% you may not use this file except in compliance with the License.
-%% You may obtain a copy of the License at
-%%
-%%     http://www.apache.org/licenses/LICENSE-2.0
-%%
-%% Unless required by applicable law or agreed to in writing, software
-%% distributed under the License is distributed on an "AS IS" BASIS,
-%% WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-%% See the License for the specific language governing permissions and
-%% limitations under the License.
+%%%---------------------------------------------------------------------
+%%% @copyright 2023 William Fank Thomé
+%%% @author William Fank Thomé <willilamthome@hotmail.com>
+%%% @doc JSON generator.
+%%%
+%%% Copyright 2023 William Fank Thomé
+%%%
+%%% Licensed under the Apache License, Version 2.0 (the "License");
+%%% you may not use this file except in compliance with the License.
+%%% You may obtain a copy of the License at
+%%%
+%%%     http://www.apache.org/licenses/LICENSE-2.0
+%%%
+%%% Unless required by applicable law or agreed to in writing, software
+%%% distributed under the License is distributed on an "AS IS" BASIS,
+%%% WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+%%% See the License for the specific language governing permissions and
+%%% limitations under the License.
+%%%
+%%% @end
+%%%---------------------------------------------------------------------
 -module(euneus_encoder).
 
 -compile({ inline, encode_binary/2 }).
@@ -39,16 +43,17 @@
 -compile({ inline, maps_to_list/1 }).
 
 % By default, encode_unhandled/2 will raise unsupported_type exception,
-% so it is a function without a local return.
-% Note that parse_opts/1 is included because unhandled_encoder option
-% has no local return.
+% so it is a function without a local return. Note that parse_opts/1
+% is included because unhandled_encoder option has no local return.
 -dialyzer({ no_return, parse_opts/1 }).
 -dialyzer({ no_return, encode_unhandled/2 }).
 -dialyzer( no_improper_lists ).
 
+%% API functions
+
 -export([ encode/2 ]).
--export([ encode_parsed/2 ]).
 -export([ parse_opts/1 ]).
+-export([ encode_parsed/2 ]).
 -export([ encode_binary/2 ]).
 -export([ encode_atom/2 ]).
 -export([ encode_integer/2 ]).
@@ -67,6 +72,8 @@
 -export([ throw_unsupported_type_error/1 ]).
 -export([ handle_error/3 ]).
 
+%% Types
+
 -export_type([ input/0 ]).
 -export_type([ options/0 ]).
 -export_type([ result/0 ]).
@@ -74,8 +81,6 @@
 -export_type([ escaper/1 ]).
 -export_type([ error_handler/0 ]).
 -export_type([ error_reason/0 ]).
-
-%% Types
 
 -type input() :: term().
 -type options() :: #{ nulls => list()
@@ -117,26 +122,39 @@
 %%% API functions
 %%%=====================================================================
 
+%%----------------------------------------------------------------------
+%% @doc Generates a JSON from Erlang term.
+%%
+%% @param Term :: {@link euneus_encoder:input()}.
+%% @param Opts :: {@link erlang:map()}.
+%%
+%% @returns {@link euneus_encoder:result()}.
+%%
+%% @end
+%%----------------------------------------------------------------------
 -spec encode(input(), map()) -> result().
 
 encode(Term, Opts) ->
     encode_parsed(Term, parse_opts(Opts)).
 
--spec encode_parsed(input(), options()) -> result().
-
-encode_parsed(Term, Opts) ->
-    try
-        {ok, value(Term, Opts)}
-    catch
-        Class:Reason:Stacktrace ->
-            Handle = maps:get(error_handler, Opts),
-            Handle(Class, Reason, Stacktrace)
-    end.
-
+%%----------------------------------------------------------------------
+%% @doc Parses {@link erlang:map()} to {@link euneus_encoder:options()}.
+%%
+%% The parsed map can be expanded in compile time or stored to be
+%% reused, avoiding parsing the options in every encoding.
+%%
+%% @end
+%%
+%% NOTE: The explicit call of functions wrapped in another function is
+%% required for the inline optimization.
+%%
+%% @see euneus_encoder:parse_opts/1
+%% @see euneus_encoder:encode_parsed/2
+%%
+%% @end
+%%----------------------------------------------------------------------
 -spec parse_opts(map()) -> options().
 
-% The explicit call of the functions wrapped in a function is required
-% for the inline optimization.
 parse_opts(Opts) ->
     #{
         nulls => maps_get(nulls, Opts, [undefined]),
@@ -185,36 +203,28 @@ parse_opts(Opts) ->
         end)
     }.
 
-key(Atom, #{binary_encoder := Encode} = Opts) when is_atom(Atom) ->
-    Encode(atom_to_binary(Atom, utf8), Opts);
-key(Bin, #{binary_encoder := Encode} = Opts) when is_binary(Bin) ->
-    Encode(Bin, Opts);
-key(Int, #{binary_encoder := Encode} = Opts) when is_integer(Int) ->
-    Encode(integer_to_binary(Int), Opts);
-key(String, #{binary_encoder := Encode} = Opts) when is_list(String) ->
-    Encode(list_to_binary(String), Opts).
+%%----------------------------------------------------------------------
+%% @doc Generates a JSON from Erlang term.
+%%
+%% @param Term :: {@link euneus_encoder:input()}.
+%% @param Opts :: {@link euneus_encoder:options()}.
+%%
+%% @returns {@link euneus_encoder:result()}.
+%%
+%% @see euneus_encoder:parse_opts/1
+%%
+%% @end
+%%----------------------------------------------------------------------
+-spec encode_parsed(input(), options()) -> result().
 
-value(Bin, #{binary_encoder := Encode} = Opts) when is_binary(Bin) ->
-    Encode(Bin, Opts);
-value(Atom, #{atom_encoder := Encode} = Opts) when is_atom(Atom) ->
-    Encode(Atom, Opts);
-value(Int, #{integer_encoder := Encode} = Opts) when is_integer(Int) ->
-    Encode(Int, Opts);
-value(Float, #{float_encoder := Encode} = Opts) when is_float(Float) ->
-    Encode(Float, Opts);
-value(List, #{list_encoder := Encode} = Opts) when is_list(List) ->
-    Encode(List, Opts);
-value(Map, #{map_encoder := Encode} = Opts) when is_map(Map) ->
-    Encode(Map, Opts);
-value({{YYYY,MM,DD},{H,M,S}} = DateTime, #{datetime_encoder := Encode} = Opts)
-  when ?min(YYYY, 0), ?range(MM, 1, 12), ?range(DD, 1, 31)
-     , ?range(H, 0, 23), ?range(M, 0, 59), ?range(S, 0, 59) ->
-    Encode(DateTime, Opts);
-value({MegaSecs,Secs,MicroSecs} = Timestamp, #{timestamp_encoder := Encode} = Opts)
-  when ?min(MegaSecs, 0), ?min(Secs, 0), ?min(MicroSecs, 0) ->
-    Encode(Timestamp, Opts);
-value(Term, #{unhandled_encoder := Encode} = Opts) ->
-    Encode(Term, Opts).
+encode_parsed(Term, Opts) ->
+    try
+        {ok, value(Term, Opts)}
+    catch
+        Class:Reason:Stacktrace ->
+            Handle = maps:get(error_handler, Opts),
+            Handle(Class, Reason, Stacktrace)
+    end.
 
 encode_binary(Bin, Opts) ->
     escape(Bin, Opts).
@@ -654,6 +664,41 @@ handle_error(Class, Reason, Stacktrace) ->
     erlang:raise(Class, Reason, Stacktrace).
 
 %%%=====================================================================
+%%% Internal functions
+%%%=====================================================================
+
+key(Atom, #{binary_encoder := Encode} = Opts) when is_atom(Atom) ->
+    Encode(atom_to_binary(Atom, utf8), Opts);
+key(Bin, #{binary_encoder := Encode} = Opts) when is_binary(Bin) ->
+    Encode(Bin, Opts);
+key(Int, #{binary_encoder := Encode} = Opts) when is_integer(Int) ->
+    Encode(integer_to_binary(Int), Opts);
+key(String, #{binary_encoder := Encode} = Opts) when is_list(String) ->
+    Encode(list_to_binary(String), Opts).
+
+value(Bin, #{binary_encoder := Encode} = Opts) when is_binary(Bin) ->
+    Encode(Bin, Opts);
+value(Atom, #{atom_encoder := Encode} = Opts) when is_atom(Atom) ->
+    Encode(Atom, Opts);
+value(Int, #{integer_encoder := Encode} = Opts) when is_integer(Int) ->
+    Encode(Int, Opts);
+value(Float, #{float_encoder := Encode} = Opts) when is_float(Float) ->
+    Encode(Float, Opts);
+value(List, #{list_encoder := Encode} = Opts) when is_list(List) ->
+    Encode(List, Opts);
+value(Map, #{map_encoder := Encode} = Opts) when is_map(Map) ->
+    Encode(Map, Opts);
+value({{YYYY,MM,DD},{H,M,S}} = DateTime, #{datetime_encoder := Encode} = Opts)
+  when ?min(YYYY, 0), ?range(MM, 1, 12), ?range(DD, 1, 31)
+     , ?range(H, 0, 23), ?range(M, 0, 59), ?range(S, 0, 59) ->
+    Encode(DateTime, Opts);
+value({MegaSecs,Secs,MicroSecs} = Timestamp, #{timestamp_encoder := Encode} = Opts)
+  when ?min(MegaSecs, 0), ?min(Secs, 0), ?min(MicroSecs, 0) ->
+    Encode(Timestamp, Opts);
+value(Term, #{unhandled_encoder := Encode} = Opts) ->
+    Encode(Term, Opts).
+
+%%%=====================================================================
 %%% Support functions
 %%%=====================================================================
 
@@ -687,7 +732,7 @@ encode_test() ->
         {{ok, <<"\"foo\"">>}, <<"foo">>, #{}},
         {{ok, <<"0">>}, 0, #{}},
         {{ok, <<"123.456789">>}, 123.45678900, #{}},
-        {{ok, <<"[true,0,null]">>}, [true, 0, undefined], #{}},
+        {{ok, <<"[true,0,null]">>}, [true,0,undefined], #{}},
         {{ok, <<"{\"foo\":\"bar\"}">>}, #{foo => bar}, #{}},
         {{ok, <<"{\"0\":0}">>}, #{0 => 0}, #{}},
         {{ok, <<"\"1970-01-01T00:00:00Z\"">>}, {{1970,1,1},{0,0,0}}, #{}},
