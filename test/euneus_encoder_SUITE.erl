@@ -134,19 +134,30 @@ all() ->
 %%%=====================================================================
 
 nulls(Config) when is_list(Config) ->
-    {ok, <<"null">>} = euneus_encoder:encode(undefined, #{}),
-    {ok, <<"null">>} = euneus_encoder:encode(nil, #{nulls => [nil]}).
+    {ok, <<"null">>} = encode(undefined, #{}),
+    {ok, <<"null">>} = encode(nil, #{nulls => [nil]}).
 
 binary_encoder(Config) when is_list(Config) ->
-    {ok, [$", <<"foo">>, $"]} = euneus_encoder:encode(<<"foo">>, #{}),
-    {ok, <<"\"foo\"">>} = euneus_encoder:encode(<<"foo">>, #{
-        binary_encoder => fun(Bin, _Opts) -> <<$", Bin/binary, $">> end
+    {ok, [$", <<"foo">>, $"]} = encode(<<"foo">>, #{}),
+    {ok, <<"\"foo\"">>} = encode(<<"foo">>, #{
+        binary_encoder => fun(Bin, _Opts) ->
+            <<$", Bin/binary, $">>
+        end
     }).
 
 atom_encoder(Config) when is_list(Config) ->
-    {ok, <<"true">>} = euneus_encoder:encode(true, #{}),
-    {ok, <<"false">>} = euneus_encoder:encode(false, #{}),
-    {ok, [$", <<"foo">>, $"]} = euneus_encoder:encode(foo, #{}),
-    {ok, <<"\"foo\"">>} = euneus_encoder:encode(foo, #{
-        atom_encoder => fun(Atom, _Opts) -> <<$", (atom_to_binary(Atom))/binary, $">> end
+    {ok, <<"true">>} = encode(true, #{}),
+    {ok, <<"false">>} = encode(false, #{}),
+    {ok, [$", <<"foo">>, $"]} = encode(foo, #{}),
+    {ok, <<"\"foo\"">>} = encode(foo, #{
+        atom_encoder => fun(Atom, _Opts) ->
+            <<$", (atom_to_binary(Atom))/binary, $">>
+        end
     }).
+
+%%%=====================================================================
+%%% Support functions
+%%%=====================================================================
+
+encode(Input, Opts) ->
+    euneus_encoder:encode(Input, Opts).
