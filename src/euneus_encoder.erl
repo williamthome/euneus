@@ -93,7 +93,11 @@
                     , datetime_encoder => encoder(calendar:datetime())
                     , timestamp_encoder => encoder(erlang:timestamp())
                     , unhandled_encoder => encoder(term())
-                    , escaper => escaper(binary())
+                    , escaper => json
+                               | html
+                               | javascript
+                               | unicode
+                               | escaper(binary())
                     , error_handler => error_handler()
                     }.
 -type result() :: {ok, iolist()} | {error, error_reason()}.

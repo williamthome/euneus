@@ -70,8 +70,16 @@
 
 -type input() :: binary() | iolist().
 -type options() :: #{ null_term => term()
-                    , keys => normalizer(Key :: binary())
-                    , values => normalizer(Value :: binary())
+                    , keys => copy
+                            | to_atom
+                            | to_existing_atom
+                            | to_integer
+                            | normalizer(Key :: binary())
+                    , values => copy
+                              | to_atom
+                              | to_existing_atom
+                              | to_integer
+                              | normalizer(Value :: binary())
                     , arrays => normalizer(Array :: list())
                     , objects => normalizer(Object :: map())
                     , error_handler => error_handler()
@@ -441,7 +449,8 @@ value(Data, Opts, Input, Pos, Buffer) ->
         <<"false", Rest/bitstring>> ->
             continue(Rest, Opts, Input, Pos + 5, Buffer, false);
         <<"null", Rest/bitstring>> ->
-            continue(Rest, Opts, Input, Pos + 4, Buffer, undefined);
+            Null = maps:get(null_term, Opts),
+            continue(Rest, Opts, Input, Pos + 4, Buffer, Null);
         <<"true", Rest/bitstring>> ->
             continue(Rest, Opts, Input, Pos + 4, Buffer, true);
         <<_/integer, Rest/bitstring>> ->
@@ -918,7 +927,13 @@ array(Data, Opts, Input, Pos, Buffer, Value) ->
 empty_array(Rest, Opts, Input, Pos, Buffer) ->
     case Buffer of
         [?array, [] | Buffer1] ->
-            continue(Rest, Opts, Input, Pos, Buffer1, []);
+            List = case Opts of
+                #{arrays := Normalize} ->
+                    Normalize([], Opts);
+                #{} ->
+                    []
+            end,
+            continue(Rest, Opts, Input, Pos, Buffer1, List);
         [_|_] ->
             throw_byte(Rest, Opts, Input, Pos - 1, Buffer)
     end.

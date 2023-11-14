@@ -110,7 +110,7 @@ end
 | #{foo => bar}                	| #{}                                                                                                                                                       	| {"foo":"bar"}               	| #{}                                                                                                             	| #{<<"foo">> => <<"bar">>}    	|
 | #{foo => bar}                	| #{}                                                                                                                                                       	| {"foo":"bar"}               	| #{keys => to_existing_atom}                                                                                     	| #{foo => <<"bar">>}          	|
 | #{0 => 0}                    	| #{}                                                                                                                                                       	| {"0":0}                     	| #{keys => to_integer}                                                                                           	| #{0 => 0}                    	|
-| {myrecord, val}              	| #{unhandled_encoder => fun({myrecord, Val}, Opts) -><br>    Encode = maps:get(encode_list, Opts),<br>    Encode([myrecord, #{key => Val}], Opts)<br>end}) 	| ["myrecord", {"key":"val"}] 	| #{arrays => fun([<<"myrecord">>, #{<<"key">> := Val}], _Opts) -><br>    {myrecord, binary_to_atom(Val)}<br>end} 	| {myrecord, val}              	|
+| {myrecord, val}              	| #{unhandled_encoder => fun({myrecord, Val}, Opts) -><br>    Encode = maps:get(list_encoder, Opts),<br>    Encode([myrecord, #{key => Val}], Opts)<br>end}) 	| ["myrecord", {"key":"val"}] 	| #{arrays => fun([<<"myrecord">>, #{<<"key">> := Val}], _Opts) -><br>    {myrecord, binary_to_atom(Val)}<br>end} 	| {myrecord, val}              	|
 
 ### Why not more built-in types?
 
@@ -118,7 +118,7 @@ The goal of `Euneus` is to have built-in types that can be encoded and then deco
 
 ### Note about proplists
 
-Proplists are not handled by Euneus, you must override the `list_encoder` option in the encoder to handle them, for example:
+Proplists are not handled by Euneus, you must convert proplists to maps before the encoding or override the `list_encoder` option in the encoder to handle them, for example:
 
 ```erlang
 1> Options = #{
@@ -138,7 +138,7 @@ Proplists are not handled by Euneus, you must override the `list_encoder` option
 {ok,<<"{\"foo\":\"bar\",\"bar\":{\"0\":\"ok\"}}">>}
 ```
 
-Another option is to convert proplists to maps before the encoding. The reason is because it's impossible to know when a list is a proplist and also because a proplist cannot be decoded. Please see the [Why not more built-in types?](#why-not-more-built-in-types) section for more info about this decision.
+The reason for that is because it's impossible to know when a list is a proplist and also because a proplist cannot be decoded. Please see the [Why not more built-in types?](#why-not-more-built-in-types) section for more info about this decision.
 
 ## Differences to Thoas
 
@@ -154,7 +154,7 @@ Available encode options:
 #{
     %% nulls defines what terms will be replaced with the null literal (default: ['undefined']).
     nulls => nonempty_list(),
-    %% encode_binary allow override the binary() encoding.
+    %% binary_encoder allow override the binary() encoding.
     binary_encoder => function((binary(), euneus_encoder:options()) -> iolist()),
     %% atom_encoder allow override the atom() encoding.
     atom_encoder => function((atom(), euneus_encoder:options()) -> iolist()),
