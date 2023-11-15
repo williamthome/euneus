@@ -39,6 +39,7 @@
         , arrays/1
         , objects/1
         , error_handler/1
+        , plugins/1
         ]).
 
 %%%=====================================================================
@@ -139,6 +140,7 @@ all() ->
     , arrays
     , objects
     , error_handler
+    , plugins
     ].
 
 %%%=====================================================================
@@ -215,6 +217,14 @@ error_handler(Config) when is_list(Config) ->
             {error, bar}
         end
     }).
+
+plugins(Config) when is_list(Config) ->
+    {halt, {test, foo}} =
+        euneus_test_plugin:decode(<<"test::foo">>, euneus_decoder:parse_opts(#{})),
+    next =
+        euneus_test_plugin:decode(<<"test::bar">>, euneus_decoder:parse_opts(#{})),
+    {ok, {test, foo}} =
+        euneus_decoder:decode(<<"\"test::foo\"">>, #{plugins => [euneus_test_plugin]}).
 
 %%%=====================================================================
 %%% Support functions

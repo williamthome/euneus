@@ -9,7 +9,7 @@ bench.decode:
 .PHONY: test
 
 test.rebar3:
-	rebar3 do ct, eunit
+	rebar3 as test do ct, eunit
 
 test.mix:
 	cd euneus_test && mix test

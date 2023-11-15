@@ -45,6 +45,7 @@
         , unhandled_encoder/1
         , escaper/1
         , error_handler/1
+        , plugins/1
         ]).
 
 %%%=====================================================================
@@ -151,6 +152,7 @@ all() ->
     , unhandled_encoder
     , escaper
     , error_handler
+    , plugins
     ].
 
 %%%=====================================================================
@@ -272,6 +274,16 @@ error_handler(Config) when is_list(Config) ->
             {error, bar}
         end
     }).
+
+plugins(Config) when is_list(Config) ->
+    {halt, [$", <<"test::foo">>, $"]} =
+        euneus_test_plugin:encode({test, foo}, euneus_encoder:parse_opts(#{})),
+    next =
+        euneus_test_plugin:encode({test, bar}, euneus_encoder:parse_opts(#{})),
+    {error, {unsupported_type, {test, foo}}} =
+        euneus_encoder:encode({test, foo}, #{}),
+    {ok, [$", <<"test::foo">>, $"]} =
+        euneus_encoder:encode({test, foo}, #{plugins => [euneus_test_plugin]}).
 
 %%%=====================================================================
 %%% Support functions

@@ -154,7 +154,8 @@ parse_opts(Opts) ->
         null_term => maps_get(null_term, Opts, undefined),
         error_handler => maps_get(error_handler, Opts, fun(C, R, S) ->
             handle_error(C, R, S)
-        end)
+        end),
+        plugins => maps_get(plugins, Opts, [])
     },
     Normalized = lists:map(fun normalize_option/1, maps_to_list(WithDefaults)),
     maps:from_list(Normalized).
@@ -178,6 +179,8 @@ normalize_option({K, V})
          K =:= arrays orelse
          K =:= objects ) ->
     {K, V};
+normalize_option({plugins, V}) when is_list(V) ->
+    {plugins, V};
 normalize_option({K, _}) ->
     throw({invalid_option, K}).
 
@@ -472,23 +475,30 @@ string(Data, Opts, Input, Pos, Buffer, Len) ->
     case Data of
         <<$"/integer, Rest/bitstring>> ->
             Last = binary_part(Input, Pos, Len),
-            String = case Buffer of
-                [?key | _] ->
-                    case Opts of
-                        #{keys := Normalize} ->
-                            Normalize(Last, Opts);
-                        #{} ->
-                            Last
-                    end;
-                [_|_] ->
-                    case Opts of
-                        #{values := Normalize} ->
-                            Normalize(Last, Opts);
-                        #{} ->
-                            Last
-                    end
-            end,
-            continue(Rest, Opts, Input, Pos + Len + 1, Buffer, String);
+            Value =
+                case Buffer of
+                    [?key | _] ->
+                        case Opts of
+                            #{keys := Normalize} ->
+                                Normalize(Last, Opts);
+                            #{} ->
+                                Last
+                        end;
+                    [_|_] ->
+                        Plugins = maps:get(plugins, Opts),
+                        case plugins(Plugins, Last, Opts) of
+                            next ->
+                                case Opts of
+                                    #{values := Normalize} ->
+                                        Normalize(Last, Opts);
+                                    #{} ->
+                                        Last
+                                end;
+                            {halt, Term} ->
+                                Term
+                        end
+                end,
+            continue(Rest, Opts, Input, Pos + Len + 1, Buffer, Value);
         <<$\\/integer, Rest/bitstring>> ->
             Part = binary_part(Input, Pos, Len),
             escape(Rest, Opts, Input, Pos + Len, Buffer, Part);
@@ -507,6 +517,16 @@ string(Data, Opts, Input, Pos, Buffer, Len) ->
         <<_/bitstring>> ->
             throw_eof(Opts, Input, Pos, Buffer)
     end.
+
+plugins([Plugin | T], Bin, Opts) ->
+    case Plugin:decode(Bin, Opts) of
+        next ->
+            plugins(T, Bin, Opts);
+        {halt, Term} ->
+            {halt, Term}
+    end;
+plugins([], _Bin, _Opts) ->
+    next.
 
 string(Data, Opts, Input, Pos, Buffer, Acc, Len) ->
     case Data of

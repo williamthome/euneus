@@ -99,6 +99,7 @@
                                | unicode
                                | escaper(binary())
                     , error_handler => error_handler()
+                    , plugins => [module()]
                     }.
 -type result() :: {ok, iolist()} | {error, error_reason()}.
 -type encoder(Input) :: fun((Input, options()) -> iolist()).
@@ -204,7 +205,8 @@ parse_opts(Opts) ->
             end,
         error_handler => maps_get(error_handler, Opts, fun(C, R, S) ->
             handle_error(C, R, S)
-        end)
+        end),
+        plugins => maps_get(plugins, Opts, [])
     }.
 
 %%----------------------------------------------------------------------
@@ -699,8 +701,24 @@ value({{YYYY,MM,DD},{H,M,S}} = DateTime, #{datetime_encoder := Encode} = Opts)
 value({MegaSecs,Secs,MicroSecs} = Timestamp, #{timestamp_encoder := Encode} = Opts)
   when ?min(MegaSecs, 0), ?min(Secs, 0), ?min(MicroSecs, 0) ->
     Encode(Timestamp, Opts);
-value(Term, #{unhandled_encoder := Encode} = Opts) ->
-    Encode(Term, Opts).
+value(Term, #{plugins := Plugins} = Opts) ->
+    case plugins(Plugins, Term, Opts) of
+        next ->
+            Encode = maps:get(unhandled_encoder, Opts),
+            Encode(Term, Opts);
+        {halt, IOData} ->
+            IOData
+    end.
+
+plugins([Plugin | T], Term, Opts) ->
+    case Plugin:encode(Term, Opts) of
+        next ->
+            plugins(T, Term, Opts);
+        {halt, IOData} when is_binary(IOData); is_list(IOData) ->
+            {halt, IOData}
+    end;
+plugins([], _Term, _Opts) ->
+    next.
 
 %%%=====================================================================
 %%% Support functions
