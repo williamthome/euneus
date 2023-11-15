@@ -15,7 +15,9 @@ defmodule EuneusBench.MixProject do
   defp aliases() do
     [
       encode: ["run script/encode.exs"],
-      decode: ["run script/decode.exs"]
+      encode_opts: ["run script/encode_opts.exs"],
+      decode: ["run script/decode.exs"],
+      decode_opts: ["run script/decode_opts.exs"]
     ]
   end
 

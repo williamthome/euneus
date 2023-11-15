@@ -3,8 +3,14 @@ all:
 bench.encode:
 	cd euneus_bench && mix encode
 
+bench.encode_opts:
+	cd euneus_bench && mix encode_opts
+
 bench.decode:
 	cd euneus_bench && mix decode
+
+bench.decode_opts:
+	cd euneus_bench && mix decode_opts
 
 .PHONY: test
 
