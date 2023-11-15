@@ -396,12 +396,12 @@ Euneus has modules that permit customizations and others that use the default op
 
 If you are good to go with the default options, please use the smart versions:
 - Encode:
-    - `euneus:encode/1` or `euneus_smart_json_encoder:encode/1`;
-    - `euneus:encode_js/1` or `euneus_smart_js_encoder:encode/1`;
-    - `euneus:encode_html/1` or `euneus_smart_html_encoder:encode/1`;
-    - `euneus:encode_unicode/1` or `euneus_smart_unicode_encoder:encode/1`;
+    - `euneus:encode/1` or `euneus_encoder_smart_json:encode/1`;
+    - `euneus:encode_js/1` or `euneus_encoder_smart_javascript:encode/1`;
+    - `euneus:encode_html/1` or `euneus_encoder_smart_html:encode/1`;
+    - `euneus:encode_unicode/1` or `euneus_encoder_smart_unicode:encode/1`;
 - Decode:
-    - `euneus:decode/1` or `euneus_smart_decoder:decode/1`.
+    - `euneus:decode/1` or `euneus_decoder_smart:decode/1`.
 
 ## Credits
 

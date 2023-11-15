@@ -19,7 +19,7 @@
 %%%
 %%% @end
 %%%---------------------------------------------------------------------
--module(euneus_proplist_plugin).
+-module(euneus_plugin_proplist).
 
 -behaviour(euneus_plugin).
 

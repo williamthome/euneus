@@ -19,7 +19,7 @@
 %%%
 %%% @end
 %%%---------------------------------------------------------------------
--module(euneus_smart_decoder).
+-module(euneus_decoder_smart).
 
 % NOTE: Inlining escapeu_last/5 reduces the memory consumption,
 %       but huge increases the deviation and reduces the IPS.

@@ -19,7 +19,7 @@
 %%%
 %%% @end
 %%%---------------------------------------------------------------------
--module(euneus_inet_plugin).
+-module(euneus_plugin_inet).
 
 -behaviour(euneus_plugin).
 
