@@ -682,43 +682,45 @@ key(Int, #{binary_encoder := Encode} = Opts) when is_integer(Int) ->
 key(String, #{binary_encoder := Encode} = Opts) when is_list(String) ->
     Encode(list_to_binary(String), Opts).
 
-value(Bin, #{binary_encoder := Encode} = Opts) when is_binary(Bin) ->
-    Encode(Bin, Opts);
-value(Atom, #{atom_encoder := Encode} = Opts) when is_atom(Atom) ->
-    Encode(Atom, Opts);
-value(Int, #{integer_encoder := Encode} = Opts) when is_integer(Int) ->
-    Encode(Int, Opts);
-value(Float, #{float_encoder := Encode} = Opts) when is_float(Float) ->
-    Encode(Float, Opts);
-value(List, #{list_encoder := Encode} = Opts) when is_list(List) ->
-    Encode(List, Opts);
-value(Map, #{map_encoder := Encode} = Opts) when is_map(Map) ->
-    Encode(Map, Opts);
-value({{YYYY,MM,DD},{H,M,S}} = DateTime, #{datetime_encoder := Encode} = Opts)
-  when ?min(YYYY, 0), ?range(MM, 1, 12), ?range(DD, 1, 31)
-     , ?range(H, 0, 23), ?range(M, 0, 59), ?range(S, 0, 59) ->
-    Encode(DateTime, Opts);
-value({MegaSecs,Secs,MicroSecs} = Timestamp, #{timestamp_encoder := Encode} = Opts)
-  when ?min(MegaSecs, 0), ?min(Secs, 0), ?min(MicroSecs, 0) ->
-    Encode(Timestamp, Opts);
 value(Term, #{plugins := Plugins} = Opts) ->
     case plugins(Plugins, Term, Opts) of
         next ->
-            Encode = maps:get(unhandled_encoder, Opts),
-            Encode(Term, Opts);
+            encode_term(Term, Opts);
         {halt, IOData} ->
             IOData
     end.
 
+plugins([], _Term, _Opts) ->
+    next;
 plugins([Plugin | T], Term, Opts) ->
     case Plugin:encode(Term, Opts) of
         next ->
             plugins(T, Term, Opts);
         {halt, IOData} when is_binary(IOData); is_list(IOData) ->
             {halt, IOData}
-    end;
-plugins([], _Term, _Opts) ->
-    next.
+    end.
+
+encode_term(Bin, #{binary_encoder := Encode} = Opts) when is_binary(Bin) ->
+    Encode(Bin, Opts);
+encode_term(Atom, #{atom_encoder := Encode} = Opts) when is_atom(Atom) ->
+    Encode(Atom, Opts);
+encode_term(Int, #{integer_encoder := Encode} = Opts) when is_integer(Int) ->
+    Encode(Int, Opts);
+encode_term(Float, #{float_encoder := Encode} = Opts) when is_float(Float) ->
+    Encode(Float, Opts);
+encode_term(List, #{list_encoder := Encode} = Opts) when is_list(List) ->
+    Encode(List, Opts);
+encode_term(Map, #{map_encoder := Encode} = Opts) when is_map(Map) ->
+    Encode(Map, Opts);
+encode_term({{YYYY,MM,DD},{H,M,S}} = DateTime, #{datetime_encoder := Encode} = Opts)
+  when ?min(YYYY, 0), ?range(MM, 1, 12), ?range(DD, 1, 31)
+     , ?range(H, 0, 23), ?range(M, 0, 59), ?range(S, 0, 59) ->
+    Encode(DateTime, Opts);
+encode_term({MegaSecs,Secs,MicroSecs} = Timestamp, #{timestamp_encoder := Encode} = Opts)
+  when ?min(MegaSecs, 0), ?min(Secs, 0), ?min(MicroSecs, 0) ->
+    Encode(Timestamp, Opts);
+encode_term(Term, #{unhandled_encoder := Encode} = Opts) ->
+    Encode(Term, Opts).
 
 %%%=====================================================================
 %%% Support functions

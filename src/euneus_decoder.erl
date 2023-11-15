@@ -478,11 +478,17 @@ string(Data, Opts, Input, Pos, Buffer, Len) ->
             Value =
                 case Buffer of
                     [?key | _] ->
-                        case Opts of
-                            #{keys := Normalize} ->
-                                Normalize(Last, Opts);
-                            #{} ->
-                                Last
+                        Plugins = maps:get(plugins, Opts),
+                        case plugins(Plugins, Last, Opts) of
+                            next ->
+                                case Opts of
+                                    #{keys := Normalize} ->
+                                        Normalize(Last, Opts);
+                                    #{} ->
+                                        Last
+                                end;
+                            {halt, Term} ->
+                                Term
                         end;
                     [_|_] ->
                         Plugins = maps:get(plugins, Opts),
@@ -517,16 +523,6 @@ string(Data, Opts, Input, Pos, Buffer, Len) ->
         <<_/bitstring>> ->
             throw_eof(Opts, Input, Pos, Buffer)
     end.
-
-plugins([Plugin | T], Bin, Opts) ->
-    case Plugin:decode(Bin, Opts) of
-        next ->
-            plugins(T, Bin, Opts);
-        {halt, Term} ->
-            {halt, Term}
-    end;
-plugins([], _Bin, _Opts) ->
-    next.
 
 string(Data, Opts, Input, Pos, Buffer, Acc, Len) ->
     case Data of
@@ -902,14 +898,21 @@ object(Data, Opts, Input, Pos, Buffer, Value) ->
             key(Rest, Opts, Input, Pos + 1, [Acc2 | Buffer2]);
         <<$}/integer, Rest/bitstring>> ->
             [Key, Acc2 | Buffer2] = Buffer,
-            Final = [{Key, Value} | Acc2],
-            Map = case Opts of
-                #{objects := Normalize} ->
-                    Normalize(maps:from_list(Final), Opts);
-                #{} ->
-                    maps:from_list(Final)
-            end,
-            continue(Rest, Opts, Input, Pos + 1, Buffer2, Map);
+            Plugins = maps:get(plugins, Opts),
+            Map = maps:from_list([{Key, Value} | Acc2]),
+            Value1 =
+                case plugins(Plugins, Map, Opts) of
+                    next ->
+                        case Opts of
+                            #{objects := Normalize} ->
+                                Normalize(Map, Opts);
+                            #{} ->
+                                Map
+                        end;
+                    {halt, Term} ->
+                        Term
+                end,
+            continue(Rest, Opts, Input, Pos + 1, Buffer2, Value1);
         <<_/integer, _/bitstring>> ->
             throw_byte(Data, Opts, Input, Pos, Buffer);
         <<_/bitstring>> ->
@@ -931,13 +934,21 @@ array(Data, Opts, Input, Pos, Buffer, Value) ->
             value(Rest, Opts, Input, Pos + 1, [?array, [Value | Acc] | Buffer2]);
         <<$]/integer, Rest/bitstring>> ->
             [Acc | Buffer2] = Buffer,
-            List = case Opts of
-                #{arrays := Normalize} ->
-                    Normalize(lists:reverse(Acc, [Value]), Opts);
-                #{} ->
-                    lists:reverse(Acc, [Value])
-            end,
-            continue(Rest, Opts, Input, Pos + 1, Buffer2, List);
+            Plugins = maps:get(plugins, Opts),
+            List = lists:reverse(Acc, [Value]),
+            Value1 =
+                case plugins(Plugins, List, Opts) of
+                    next ->
+                        case Opts of
+                            #{arrays := Normalize} ->
+                                Normalize(List, Opts);
+                            #{} ->
+                                List
+                        end;
+                    {halt, Term} ->
+                        Term
+                end,
+            continue(Rest, Opts, Input, Pos + 1, Buffer2, Value1);
         <<_/integer, _/bitstring>> ->
             throw_byte(Data, Opts, Input, Pos, Buffer);
         <<_/bitstring>> ->
@@ -957,6 +968,16 @@ empty_array(Rest, Opts, Input, Pos, Buffer) ->
         [_|_] ->
             throw_byte(Rest, Opts, Input, Pos - 1, Buffer)
     end.
+
+plugins([Plugin | T], Term, Opts) ->
+    case Plugin:decode(Term, Opts) of
+        next ->
+            plugins(T, Term, Opts);
+        {halt, TermDecoded} ->
+            {halt, TermDecoded}
+    end;
+plugins([], _Term, _Opts) ->
+    next.
 
 continue(Rest, Opts, Input, Pos, [Continue | Buffer], Value) ->
     case Continue of
