@@ -27,8 +27,12 @@ defmodule EuneusBench.MixProject do
       {:euneus, path: "../"},
       {:thoas, "~> 1.2"},
       {:jason, "~> 1.4"},
+      {:jsone, "~> 1.6"},
+      {:jsx, "~> 3.1"},
+      {:jiffy, "~> 1.1"},
       {:benchee, "~> 1.1"},
-      {:benchee_html, "~> 1.0"}
+      {:benchee_html, "~> 1.0"},
+      {:benchee_markdown, "~> 0.3"}
     ]
   end
 end

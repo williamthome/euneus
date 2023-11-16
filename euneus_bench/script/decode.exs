@@ -3,20 +3,23 @@ Code.eval_file("helper.exs", "./script")
 jobs = %{
   "euneus" => &:euneus.decode/1,
   "thoas" => &:thoas.decode/1,
+  "jsone" => &:jsone.decode/1,
+  "jsx" => &:jsx.decode/1,
+  "jiffy" => &:jiffy.decode/1
   # "Jason" => &Jason.decode!/1,
 }
 
 data = [
   "Blockchain",
-  # "Giphy",
-  # "GitHub",
-  # "GovTrack",
-  # "Issue 90",
-  # "JSON Generator (Pretty)",
-  # "JSON Generator",
-  # "Pokedex",
-  # "UTF-8 escaped",
-  # "UTF-8 unescaped"
+  "Giphy",
+  "GitHub",
+  "GovTrack",
+  "Issue 90",
+  "JSON Generator (Pretty)",
+  "JSON Generator",
+  "Pokedex",
+  "UTF-8 escaped",
+  "UTF-8 unescaped"
 ]
 
 inputs =
@@ -31,7 +34,9 @@ EuneusBench.Helper.run(
   jobs,
   inputs,
   %{
+    # markdown: true,
     # graph: true,
+    # save: true,
     # parallel: 1,
     # warmup: 5,
     # time: 5,
