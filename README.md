@@ -101,7 +101,7 @@ end
 
 ## Data Mapping
 
-> [!NOTE]
+> [!TIP]
 >
 > More types can be handled by using custom plugins. Please see the [Plugins](#plugins) section for more info.
 
