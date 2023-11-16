@@ -919,8 +919,8 @@ empty_array(Rest, Opts, Input, Pos, Buffer) ->
 
 plugins([], _Bin, _Opts) ->
     next;
-plugins([datetime | T], Bin, Opts) ->
-    case Bin of
+plugins([datetime | T], Term, Opts) ->
+    case Term of
         << Y4/integer, Y3/integer, Y2/integer, Y1/integer, $-/integer
          , M2/integer, M1/integer, $-/integer
          , D2/integer, D1/integer
@@ -944,41 +944,61 @@ plugins([datetime | T], Bin, Opts) ->
             DateTime = {Date, Time},
             {halt, DateTime};
         _ ->
-            plugins(T, Bin, Opts)
+            plugins(T, Term, Opts)
     end;
-plugins([inet | T], Bin, Opts) ->
-    case inet:parse_address(binary_to_list(Bin)) of
-        {ok, Ip} ->
-            {halt, Ip};
-        {error, einval} ->
-            plugins(T, Bin, Opts)
+plugins([inet | T], Term, Opts) ->
+    case is_binary(Term) of
+        true ->
+            case inet:parse_address(binary_to_list(Term)) of
+                {ok, Ip} ->
+                    {halt, Ip};
+                {error, einval} ->
+                    plugins(T, Term, Opts)
+            end;
+        false ->
+            plugins(T, Term, Opts)
     end;
-plugins([pid | T], Bin, Opts) ->
-    try
-        Pid = list_to_pid(binary_to_list(Bin)),
-        {halt, Pid}
-    catch
-        error:badarg ->
-            plugins(T, Bin, Opts)
+plugins([pid | T], Term, Opts) ->
+    case is_binary(Term) of
+        true ->
+            try
+                Pid = list_to_pid(binary_to_list(Term)),
+                {halt, Pid}
+            catch
+                error:badarg ->
+                    plugins(T, Term, Opts)
+            end;
+        false ->
+            plugins(T, Term, Opts)
     end;
-plugins([port | T], Bin, Opts) ->
-    try
-        Port = list_to_port(binary_to_list(Bin)),
-        {halt, Port}
-    catch
-        error:badarg ->
-            plugins(T, Bin, Opts)
+plugins([port | T], Term, Opts) ->
+    case is_binary(Term) of
+        true ->
+            try
+                Port = list_to_port(binary_to_list(Term)),
+                {halt, Port}
+            catch
+                error:badarg ->
+                    plugins(T, Term, Opts)
+            end;
+        false ->
+            plugins(T, Term, Opts)
     end;
-plugins([reference | T], Bin, Opts) ->
-    try
-        Ref = list_to_ref(binary_to_list(Bin)),
-        {halt, Ref}
-    catch
-        error:badarg ->
-            plugins(T, Bin, Opts)
+plugins([reference | T], Term, Opts) ->
+    case is_binary(Term) of
+        true ->
+            try
+                Ref = list_to_ref(binary_to_list(Term)),
+                {halt, Ref}
+            catch
+                error:badarg ->
+                    plugins(T, Term, Opts)
+            end;
+        false ->
+            plugins(T, Term, Opts)
     end;
-plugins([timestamp | T], Bin, Opts) ->
-    case Bin of
+plugins([timestamp | T], Term, Opts) ->
+    case Term of
         << Y4/integer, Y3/integer, Y2/integer, Y1/integer, $-/integer
          , M2/integer, M1/integer, $-/integer
          , D2/integer, D1/integer
@@ -1011,14 +1031,14 @@ plugins([timestamp | T], Bin, Opts) ->
                         , MilliSeconds * 1000 },
             {halt, Timestamp};
         _ ->
-            plugins(T, Bin, Opts)
+            plugins(T, Term, Opts)
     end;
-plugins([Plugin | T], Bin, Opts) ->
-    case Plugin:decode(Bin, Opts) of
+plugins([Plugin | T], Term, Opts) ->
+    case Plugin:decode(Term, Opts) of
         next ->
-            plugins(T, Bin, Opts);
-        {halt, Term} ->
-            {halt, Term}
+            plugins(T, Term, Opts);
+        {halt, Decoded} ->
+            {halt, Decoded}
     end.
 
 continue(Rest, Opts, Input, Pos, [Continue | Buffer], Value) ->
