@@ -54,7 +54,7 @@ Like Thoas, both the parser and generator fully conform to
 
 ```erlang
 % rebar.config
-{deps, [{euneus, "1.0.0"}]}
+{deps, [{euneus, "1.0.1"}]}
 ```
 
 ### Elixir
