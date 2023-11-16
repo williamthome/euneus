@@ -155,10 +155,10 @@ parse_opts(Opts) ->
     Normalized = lists:map(fun normalize_option/1, maps_to_list(WithDefaults)),
     maps:from_list(Normalized).
 
-normalize_option({null_term, V}) ->
-    {null_term, V};
-normalize_option({error_handler, V}) when is_function(V, 3) ->
-    {error_handler, V};
+normalize_option({null_term, Term}) ->
+    {null_term, Term};
+normalize_option({error_handler, Handler}) when is_function(Handler, 3) ->
+    {error_handler, Handler};
 normalize_option({K, copy}) when K =:= keys; K =:= values ->
     {K, fun(X, _O) -> binary:copy(X) end};
 normalize_option({K, to_atom}) when K =:= keys; K =:= values ->
@@ -174,8 +174,8 @@ normalize_option({K, V})
          K =:= arrays orelse
          K =:= objects ) ->
     {K, V};
-normalize_option({plugins, V}) when is_list(V) ->
-    {plugins, euneus_plugin:normalize_modules_list(V)};
+normalize_option({plugins, Plugins}) when is_list(Plugins) ->
+    {plugins, euneus_plugin:normalize_modules_list(Plugins)};
 normalize_option({K, _}) ->
     throw({invalid_option, K}).
 
