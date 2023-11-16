@@ -171,6 +171,9 @@ Euneus has a mechanism to easily plug in encoders and decoders. You can use the 
 
 If you have a built-in plugin suggestion, feel free to open a [new issue](https://github.com/williamthome/euneus/issues/new) to discuss it.
 
+> [!IMPORTANT]
+> The plugins mechanism deprecated the `datetime_encoder` and the `timestamp_encoder` option in favor of the `datetime` and `timestamp` plugins.
+
 ### Usage
 
 #### Encode
