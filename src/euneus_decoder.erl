@@ -175,7 +175,7 @@ normalize_option({K, V})
          K =:= objects ) ->
     {K, V};
 normalize_option({plugins, V}) when is_list(V) ->
-    {plugins, V};
+    {plugins, euneus_plugin:normalize_modules_list(V)};
 normalize_option({K, _}) ->
     throw({invalid_option, K}).
 

@@ -21,6 +21,16 @@
 %%%---------------------------------------------------------------------
 -module(euneus_plugin).
 
+-compile({ inline_list_funcs, true }).
+
+%% API functions
+
+-export([ normalize_modules_list/1, to_module/1 ]).
+
+%%%=====================================================================
+%%% Callbacks
+%%%=====================================================================
+
 -callback encode(Input, Opts) -> Output when
     Input :: term(),
     Opts :: euneus_encoder:options(),
@@ -30,3 +40,49 @@
     Input :: binary(),
     Opts :: euneus_decoder:options(),
     Output :: {halt, term()} | next.
+
+%%%=====================================================================
+%%% API functions
+%%%=====================================================================
+
+normalize_modules_list(Plugins) ->
+    lists:map(fun(Plugin) ->
+        case to_module(Plugin) of
+            {ok, Module} ->
+                Module;
+            error ->
+                Plugin
+        end
+    end, Plugins).
+
+to_module(datetime) -> {ok, euneus_plugin_datetime_iso8601};
+to_module(inet) -> {ok, euneus_plugin_inet};
+to_module(pid) -> {ok, euneus_plugin_pid};
+to_module(port) -> {ok, euneus_plugin_port};
+to_module(proplist) -> {ok, euneus_plugin_proplist};
+to_module(reference) -> {ok, euneus_plugin_reference};
+to_module(timestamp) -> {ok, euneus_plugin_timestamp_iso8601};
+to_module(_) -> error.
+
+%%%=====================================================================
+%%% Eunit tests
+%%%=====================================================================
+
+-ifdef(TEST).
+
+-include_lib("eunit/include/eunit.hrl").
+
+to_module_test() ->
+    [ ?assertMatch(Expect, to_module(Input))
+      || {Expect, Input} <- [
+        {{ok, euneus_plugin_datetime_iso8601}, datetime},
+        {{ok, euneus_plugin_inet}, inet},
+        {{ok, euneus_plugin_pid}, pid},
+        {{ok, euneus_plugin_port}, port},
+        {{ok, euneus_plugin_proplist}, proplist},
+        {{ok, euneus_plugin_reference}, reference},
+        {{ok, euneus_plugin_timestamp_iso8601}, timestamp},
+        {error, foo}
+    ]].
+
+-endif.

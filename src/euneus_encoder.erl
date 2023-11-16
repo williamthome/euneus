@@ -191,7 +191,9 @@ parse_opts(Opts) ->
         error_handler => maps_get(error_handler, Opts, fun(C, R, S) ->
             handle_error(C, R, S)
         end),
-        plugins => maps_get(plugins, Opts, [])
+        plugins => euneus_plugin:normalize_modules_list(
+            maps_get(plugins, Opts, [])
+        )
     }.
 
 %%----------------------------------------------------------------------
