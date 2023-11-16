@@ -601,7 +601,7 @@ $ make test
 $ make check
 ```
 
-> [!NOTE]:
+> [!NOTE]
 >
 > Open the [Makefile](Makefile) to see all commands.
 
@@ -609,7 +609,7 @@ $ make check
 
 Euneus is released under the [Apache License 2.0](LICENSE.md).
 
-Euneus is based off of [Thoas][thoas], which is also Apache 2.0 licensed.
+Euneus is based on [Thoas][thoas], which is also Apache 2.0 licensed.
 
 Some elements have their origins in the [Poison library][poison] and were initially licensed under [CC0-1.0](https://creativecommons.org/publicdomain/zero/1.0/).
 
