@@ -27,6 +27,6 @@
     Output :: {halt, iolist()} | next.
 
 -callback decode(Input, Opts) -> Output when
-    Input :: binary(),
+    Input :: term(),
     Opts :: euneus_decoder:options(),
     Output :: {halt, term()} | next.
