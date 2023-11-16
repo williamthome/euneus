@@ -21,6 +21,7 @@
 %%%---------------------------------------------------------------------
 -module(euneus_encoder).
 
+-compile({ inline, plugins/3 }).
 -compile({ inline, encode_binary/2 }).
 -compile({ inline, encode_atom/2 }).
 -compile({ inline, encode_integer/2 }).
@@ -93,7 +94,7 @@
                                | unicode
                                | escaper(binary())
                     , error_handler => error_handler()
-                    , plugins => [module()]
+                    , plugins => [plugin()]
                     }.
 -type result() :: {ok, iolist()} | {error, error_reason()}.
 -type encoder(Input) :: fun((Input, options()) -> iolist()).
@@ -106,8 +107,21 @@
 -type error_handler() :: fun(( error_class()
                              , error_reason()
                              , error_stacktrace() ) -> error_stacktrace()).
+-type plugin() :: datetime
+                | inet
+                | pid
+                | port
+                | proplist
+                | reference
+                | timestamp
+                | module()
+                .
 
 %% Macros
+
+-define(min(X, Min), is_integer(X) andalso X >= Min).
+-define(range(X, Min, Max), is_integer(X) andalso X >= Min andalso X =< Max).
+-define(is_proplist_key(X), is_binary(X) orelse is_atom(X) orelse is_integer(X)).
 
 -define(NON_PRINTABLE_LAST, 31).
 -define(ONE_BYTE_LAST, 127).
@@ -191,9 +205,7 @@ parse_opts(Opts) ->
         error_handler => maps_get(error_handler, Opts, fun(C, R, S) ->
             handle_error(C, R, S)
         end),
-        plugins => euneus_plugin:normalize_modules_list(
-            maps_get(plugins, Opts, [])
-        )
+        plugins => maps_get(plugins, Opts, [])
     }.
 
 %%----------------------------------------------------------------------
@@ -663,6 +675,72 @@ value(Term, #{plugins := Plugins} = Opts) ->
 
 plugins([], _Term, _Opts) ->
     next;
+plugins([datetime | T], Term, Opts) ->
+    case Term of
+        {{YYYY,MM,DD},{H,M,S}}
+          when ?min(YYYY, 0), ?range(MM, 1, 12), ?range(DD, 1, 31)
+             , ?range(H, 0, 23), ?range(M, 0, 59), ?range(S, 0, 59) ->
+            DateTime = iolist_to_binary(io_lib:format(
+                "~4.10.0B-~2.10.0B-~2.10.0BT~2.10.0B:~2.10.0B:~2.10.0BZ",
+                [YYYY,MM,DD,H,M,S])
+            ),
+            {halt, escape(DateTime, Opts)};
+        _ ->
+            plugins(T, Term, Opts)
+    end;
+plugins([inet | T], Term, Opts) ->
+    case inet:ntoa(Term) of
+        {error, einval} ->
+            plugins(T, Term, Opts);
+        Ip ->
+            {halt, escape(list_to_binary(Ip), Opts)}
+    end;
+plugins([pid | T], Term, Opts) ->
+    case is_pid(Term) of
+        true ->
+            Pid = iolist_to_binary(pid_to_list(Term)),
+            {halt, escape(Pid, Opts)};
+        false ->
+            plugins(T, Term, Opts)
+    end;
+plugins([port | T], Term, Opts) ->
+    case is_port(Term) of
+        true ->
+            Pid = iolist_to_binary(port_to_list(Term)),
+            {halt, escape(Pid, Opts)};
+        false ->
+            plugins(T, Term, Opts)
+    end;
+plugins([proplist | T], Term, Opts) ->
+    case Term of
+        [{X, _} | _] = Proplist when ?is_proplist_key(X) ->
+            Map = proplists:to_map(Proplist),
+            {halt, encode_map(Map, Opts)};
+        _ ->
+            plugins(T, Term, Opts)
+    end;
+plugins([reference | T], Term, Opts) ->
+    case is_reference(Term) of
+        true ->
+            Ref = iolist_to_binary(ref_to_list(Term)),
+            {halt, escape(Ref, Opts)};
+        false ->
+            plugins(T, Term, Opts)
+    end;
+plugins([timestamp | T], Term, Opts) ->
+    case Term of
+        {MegaSecs, Secs, MicroSecs} = Timestamp
+          when ?min(MegaSecs, 0), ?min(Secs, 0), ?min(MicroSecs, 0) ->
+            MilliSecs = MicroSecs div 1000,
+            {{YYYY,MM,DD},{H,M,S}} = calendar:now_to_datetime(Timestamp),
+            DateTime = iolist_to_binary(io_lib:format(
+                "~4.10.0B-~2.10.0B-~2.10.0BT~2.10.0B:~2.10.0B:~2.10.0B.~3.10.0BZ",
+                [YYYY,MM,DD,H,M,S,MilliSecs])
+            ),
+            {halt, escape(DateTime, Opts)};
+        _ ->
+            plugins(T, Term, Opts)
+    end;
 plugins([Plugin | T], Term, Opts) ->
     case Plugin:encode(Term, Opts) of
         next ->
@@ -712,8 +790,16 @@ do_maps_to_list(Acc) ->
 
 -include_lib("eunit/include/eunit.hrl").
 
+encode_to_bin(Input, Opts) ->
+    case encode(Input, Opts) of
+        {ok, IOList} ->
+            {ok, iolist_to_binary(IOList)};
+        {error, Reason} ->
+            {error, Reason}
+    end.
+
 encode_test() ->
-    [ ?assertEqual(Expect, euneus:encode_to_binary(Input, Opts))
+    [ ?assertEqual(Expect, encode_to_bin(Input, Opts))
       || {Expect, Input, Opts} <- [
         {{ok, <<"true">>}, true, #{}},
         {{ok, <<"\"foo\"">>}, foo, #{}},
@@ -723,6 +809,103 @@ encode_test() ->
         {{ok, <<"[true,0,null]">>}, [true,0,undefined], #{}},
         {{ok, <<"{\"foo\":\"bar\"}">>}, #{foo => bar}, #{}},
         {{ok, <<"{\"0\":0}">>}, #{0 => 0}, #{}}
+    ]].
+
+datetime_plugin_test() ->
+    [ ?assertEqual(Expect, encode_to_bin(Input, Opts))
+        || {Expect, Input, Opts} <- [
+        { {error, {unsupported_type, {{1970,1,1},{0,0,0}}}}
+        , {{1970,1,1},{0,0,0}}
+        , #{}
+        },
+        { {ok, <<"\"1970-01-01T00:00:00Z\"">>}
+        , {{1970,1,1},{0,0,0}}
+        , #{plugins => [datetime]}
+        }
+    ]].
+
+inet_plugin_test() ->
+    [ ?assertEqual(Expect, encode_to_bin(Input, Opts))
+      || {Expect, Input, Opts} <- [
+        % ipv4
+        {{error, {unsupported_type, {0,0,0,0}}}, {0,0,0,0}, #{} },
+        {{ok, <<"\"0.0.0.0\"">>}, {0,0,0,0}, #{plugins => [inet]}},
+        % ipv6
+        {{error, {unsupported_type, {0,0,0,0,0,0,0,0}}}, {0,0,0,0,0,0,0,0}, #{} },
+        {{ok, <<"\"::\"">>}, {0,0,0,0,0,0,0,0}, #{plugins => [inet]} },
+        {{ok, <<"\"::1\"">>}, {0,0,0,0,0,0,0,1}, #{plugins => [inet]}},
+        { {ok, <<"\"::192.168.42.2\"">>}
+        , {0,0,0,0,0,0,(192 bsl 8) bor 168,(42 bsl 8) bor 2}
+        , #{plugins => [inet]}
+        },
+        { {ok, <<"\"::ffff:192.168.42.2\"">>}
+        , {0,0,0,0,0,16#FFFF,(192 bsl 8) bor 168,(42 bsl 8) bor 2}
+        , #{plugins => [inet]}
+        },
+        { {ok, <<"\"3ffe:b80:1f8d:2:204:acff:fe17:bf38\"">>}
+        , {16#3ffe,16#b80,16#1f8d,16#2,16#204,16#acff,16#fe17,16#bf38}
+        , #{plugins => [inet]}
+        },
+        { {ok, <<"\"fe80::204:acff:fe17:bf38\"">>}
+        , {16#fe80,0,0,0,16#204,16#acff,16#fe17,16#bf38}
+        , #{plugins => [inet]}
+        }
+    ]].
+
+pid_plugin_test() ->
+    [ ?assertEqual(Expect, encode_to_bin(Input, Opts))
+        || {Expect, Input, Opts} <- [
+        { {error, {unsupported_type, list_to_pid("<0.92.0>")}}
+        , list_to_pid("<0.92.0>")
+        , #{}
+        },
+        { {ok, <<"\"<0.92.0>\"">>}
+        , list_to_pid("<0.92.0>")
+        , #{plugins => [pid]}
+        }
+    ]].
+
+port_plugin_test() ->
+    [ ?assertEqual(Expect, encode_to_bin(Input, Opts))
+        || {Expect, Input, Opts} <- [
+        { {error, {unsupported_type, list_to_port("#Port<0.1>")}}
+        , list_to_port("#Port<0.1>")
+        , #{}
+        },
+        { {ok, <<"\"#Port<0.1>\"">>}
+        , list_to_port("#Port<0.1>")
+        , #{plugins => [port]}
+        }
+    ]].
+
+proplist_plugin_test() ->
+    [ ?assertEqual(Expect, encode_to_bin(Input, Opts))
+        || {Expect, Input, Opts} <- [
+        { {error, {unsupported_type, {foo, bar}}}, [{foo, bar}], #{}},
+        { {ok, <<"{\"foo\":\"bar\"}">>}, [{foo, bar}], #{plugins => [proplist]}}
+    ]].
+
+reference_plugin_test() ->
+    [ ?assertEqual(Expect, encode_to_bin(Input, Opts))
+        || {Expect, Input, Opts} <- [
+        { {error, {unsupported_type, list_to_ref("#Ref<0.314572725.1088159747.110918>")}}
+        , list_to_ref("#Ref<0.314572725.1088159747.110918>")
+        , #{}
+        },
+        { {ok, <<"\"#Ref<0.314572725.1088159747.110918>\"">>}
+        , list_to_ref("#Ref<0.314572725.1088159747.110918>")
+        , #{plugins => [reference]}
+        }
+    ]].
+
+timestamp_plugin_test() ->
+    [ ?assertEqual(Expect, encode_to_bin(Input, Opts))
+        || {Expect, Input, Opts} <- [
+        {{error, {unsupported_type, {0,0,0}}}, {0,0,0}, #{}},
+        { {ok, <<"\"1970-01-01T00:00:00.000Z\"">>}
+        , {0,0,0}
+        , #{plugins => [timestamp]}
+        }
     ]].
 
 -endif.

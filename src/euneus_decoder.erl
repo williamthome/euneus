@@ -38,6 +38,9 @@
 -compile({ inline, empty_array/5 }).
 -compile({ inline, escape/6 }).
 -compile({ inline, continue/6 }).
+-compile({ inline, chars_to_integer/2 }).
+-compile({ inline, chars_to_integer/3 }).
+-compile({ inline, chars_to_integer/4 }).
 -compile({ inline, maps_get/3 }).
 -compile({ inline, maps_to_list/1 }).
 -compile({ inline_list_funcs, true }).
@@ -80,6 +83,7 @@
                     , arrays => normalizer(Array :: list())
                     , objects => normalizer(Object :: map())
                     , error_handler => error_handler()
+                    , plugins => [plugin()]
                     }.
 -type position() :: non_neg_integer().
 -type result() :: {ok, term()} | {error, error_reason()}.
@@ -97,6 +101,14 @@
 -type error_handler() :: fun(( error_class()
                              , error_reason()
                              , error_stacktrace() ) -> error_stacktrace()).
+-type plugin() :: datetime
+                | inet
+                | pid
+                | port
+                | reference
+                | timestamp
+                | module()
+                .
 
 %% Macros
 
@@ -106,6 +118,8 @@
 -define(array, 1).
 -define(key, 2).
 -define(object, 3).
+
+-define(is_number(X), X >= $0, X =< $9).
 
 -define(NON_PRINTABLE_LAST, 31).
 -define(ONE_BYTE_LAST, 127).
@@ -175,7 +189,7 @@ normalize_option({K, V})
          K =:= objects ) ->
     {K, V};
 normalize_option({plugins, Plugins}) when is_list(Plugins) ->
-    {plugins, euneus_plugin:normalize_modules_list(Plugins)};
+    {plugins, Plugins};
 normalize_option({K, _}) ->
     throw({invalid_option, K}).
 
@@ -903,15 +917,109 @@ empty_array(Rest, Opts, Input, Pos, Buffer) ->
             throw_byte(Rest, Opts, Input, Pos - 1, Buffer)
     end.
 
-plugins([Plugin | T], Term, Opts) ->
-    case Plugin:decode(Term, Opts) of
-        next ->
-            plugins(T, Term, Opts);
-        {halt, TermDecoded} ->
-            {halt, TermDecoded}
+plugins([], _Bin, _Opts) ->
+    next;
+plugins([datetime | T], Bin, Opts) ->
+    case Bin of
+        << Y4/integer, Y3/integer, Y2/integer, Y1/integer, $-/integer
+         , M2/integer, M1/integer, $-/integer
+         , D2/integer, D1/integer
+         , $T/integer
+         , H2/integer, H1/integer, $:/integer
+         , Min2/integer, Min1/integer, $:/integer
+         , S2/integer, S1/integer
+         , $Z/integer >>
+          when ?is_number(Y4), ?is_number(Y3), ?is_number(Y2), ?is_number(Y1)
+             , ?is_number(M2), ?is_number(M1)
+             , ?is_number(D2), ?is_number(D1)
+             , ?is_number(H2), ?is_number(H1)
+             , ?is_number(Min2), ?is_number(Min1)
+             , ?is_number(S2), ?is_number(S1) ->
+            Date = { chars_to_integer(Y4, Y3, Y2, Y1)
+                   , chars_to_integer(M2, M1)
+                   , chars_to_integer(D2, D1) },
+            Time = { chars_to_integer(H2, H1)
+                   , chars_to_integer(Min2, Min1)
+                   , chars_to_integer(S2, S1) },
+            DateTime = {Date, Time},
+            {halt, DateTime};
+        _ ->
+            plugins(T, Bin, Opts)
     end;
-plugins([], _Term, _Opts) ->
-    next.
+plugins([inet | T], Bin, Opts) ->
+    case inet:parse_address(binary_to_list(Bin)) of
+        {ok, Ip} ->
+            {halt, Ip};
+        {error, einval} ->
+            plugins(T, Bin, Opts)
+    end;
+plugins([pid | T], Bin, Opts) ->
+    try
+        Pid = list_to_pid(binary_to_list(Bin)),
+        {halt, Pid}
+    catch
+        error:badarg ->
+            plugins(T, Bin, Opts)
+    end;
+plugins([port | T], Bin, Opts) ->
+    try
+        Port = list_to_port(binary_to_list(Bin)),
+        {halt, Port}
+    catch
+        error:badarg ->
+            plugins(T, Bin, Opts)
+    end;
+plugins([reference | T], Bin, Opts) ->
+    try
+        Ref = list_to_ref(binary_to_list(Bin)),
+        {halt, Ref}
+    catch
+        error:badarg ->
+            plugins(T, Bin, Opts)
+    end;
+plugins([timestamp | T], Bin, Opts) ->
+    case Bin of
+        << Y4/integer, Y3/integer, Y2/integer, Y1/integer, $-/integer
+         , M2/integer, M1/integer, $-/integer
+         , D2/integer, D1/integer
+         , $T/integer
+         , H2/integer, H1/integer, $:/integer
+         , Min2/integer, Min1/integer, $:/integer
+         , S2/integer, S1/integer
+         , $./integer
+         , MSec3/integer, MSec2/integer, MSec1/integer
+         , $Z/integer >>
+          when ?is_number(Y4), ?is_number(Y3), ?is_number(Y2), ?is_number(Y1)
+             , ?is_number(M2), ?is_number(M1)
+             , ?is_number(D2), ?is_number(D1)
+             , ?is_number(H2), ?is_number(H1)
+             , ?is_number(Min2), ?is_number(Min1)
+             , ?is_number(S2), ?is_number(S1)
+             , ?is_number(MSec3), ?is_number(MSec2), ?is_number(MSec1) ->
+            Date = { chars_to_integer(Y4, Y3, Y2, Y1)
+                   , chars_to_integer(M2, M1)
+                   , chars_to_integer(D2, D1) },
+            Time = { chars_to_integer(H2, H1)
+                   , chars_to_integer(Min2, Min1)
+                   , chars_to_integer(S2, S1) },
+            DateTime = {Date, Time},
+            MilliSeconds = chars_to_integer(MSec3, MSec2, MSec1),
+            GregSeconds = calendar:datetime_to_gregorian_seconds(DateTime),
+            Seconds = GregSeconds - 62167219200,
+            Timestamp = { Seconds div 1000000
+                        , Seconds rem 1000000
+                        , MilliSeconds * 1000 },
+            {halt, Timestamp};
+        _ ->
+            plugins(T, Bin, Opts)
+    end;
+plugins([Plugin | T], Bin, Opts) ->
+    case Plugin:decode(Bin, Opts) of
+        next ->
+            plugins(T, Bin, Opts);
+        {halt, Term} ->
+            {halt, Term}
+    end.
 
 continue(Rest, Opts, Input, Pos, [Continue | Buffer], Value) ->
     case Continue of
@@ -1691,6 +1799,15 @@ throw_token(Token, Rest, Opts, Input, Pos, Buffer) ->
 throw_eof(Opts, Input, Pos, Buffer) ->
     throw({eof, Opts, Input, Pos, Buffer}).
 
+chars_to_integer(N2, N1) ->
+    ((N2 - $0) * 10) + (N1 - $0).
+
+chars_to_integer(N3, N2, N1) ->
+    ((N3 - $0) * 100) + ((N2 - $0) * 10) + (N1 - $0).
+
+chars_to_integer(N4, N3, N2, N1) ->
+    ((N4 - $0) * 1000) + ((N3 - $0) * 100) + ((N2 - $0) * 10) + (N1 - $0).
+
 %%%=====================================================================
 %%% Support functions
 %%%=====================================================================
@@ -1725,16 +1842,20 @@ decode_test() ->
         {{ok, 1.234}, <<"1.234">>, #{}},
         {{ok, 6.02e23}, <<"6.02e+23">>, #{}},
         { {ok, [<<"foo">>, 123, 6.02e+23, true]}
-        , <<"[\"foo\",123,6.02e+23,true]">>, #{}},
+        , <<"[\"foo\",123,6.02e+23,true]">>, #{}
+        },
         { {ok, #{<<"foo">> => <<"bar">>, <<"bar">> => <<"baz">>}}
-        , <<"{\"foo\": \"bar\", \"bar\": \"baz\"}">>, #{}},
+        , <<"{\"foo\": \"bar\", \"bar\": \"baz\"}">>
+        , #{}
+        },
         {{ok, true}, <<"true">>, #{}},
         {{ok, false}, <<"false">>, #{}},
         {{ok, undefined}, <<"null">>, #{}},
         {{ok, <<"ABC">>}, <<"\"\\u0041\\u0042\\u0043\"">>, #{}},
         { {ok, #{foo => 1}}
         , <<"{\"foo\": \"1\"}">>
-        , #{ keys => to_atom, values => to_integer } },
+        , #{ keys => to_atom, values => to_integer }
+        },
         {{error, not_an_iodata}, error, #{}}
     ]].
 
@@ -1743,12 +1864,104 @@ resume_test() ->
       || {Expect, Input, Opts} <- [
         { {ok, [undefined, undefined, #{<<"foo">> => undefined}]}
         , <<"[1e999,1e999,{\"foo\": 1e999}]">>
-        , #{ error_handler => fun do_handle_error/3 } }
+        , #{ error_handler => fun do_handle_error/3 }
+        }
     ]].
 
 do_handle_error(throw, {{token, Token}, Rest, Opts, Input, Pos, Buffer}, _Stacktrace) ->
     resume(Token, Rest, Opts, Input, Pos, Buffer);
 do_handle_error(Class, Reason, Stacktrace) ->
     handle_error(Class, Reason, Stacktrace).
+
+datetime_plugin_test() ->
+    [ ?assertEqual(Expect, decode(Input, Opts))
+        || {Expect, Input, Opts} <- [
+        { {ok, <<"1970-01-01T00:00:00Z">>}
+        , <<"\"1970-01-01T00:00:00Z\"">>
+        , #{}
+        },
+        { {ok, {{1970,1,1},{0,0,0}}}
+        , <<"\"1970-01-01T00:00:00Z\"">>
+        , #{plugins => [datetime]}
+        }
+    ]].
+
+inet_plugin_test() ->
+    [ ?assertEqual(Expect, decode(Input, Opts))
+      || {Expect, Input, Opts} <- [
+        % ipv4
+        {{ok, <<"0.0.0.0">>}, <<"\"0.0.0.0\"">>, #{} },
+        { {ok, {0,0,0,0}}, <<"\"0.0.0.0\"">>, #{plugins => [inet]} },
+        { {ok, {255,255,255,255}}
+        , <<"\"255.255.255.255\"">>
+        , #{plugins => [inet]}
+        },
+        % ipv6
+        {{ok, <<"::">>}, <<"\"::\"">>, #{}},
+        {{ok, {0,0,0,0,0,0,0,0}}, <<"\"::\"">>, #{plugins => [inet]}},
+        {{ok, {0,0,0,0,0,0,0,1}}, <<"\"::1\"">>, #{plugins => [inet]}},
+        { {ok, {0,0,0,0,0,0,(192 bsl 8) bor 168,(42 bsl 8) bor 2}}
+        , <<"\"::192.168.42.2\"">>
+        , #{plugins => [inet]}
+        },
+        { {ok, {0,0,0,0,0,16#FFFF,(192 bsl 8) bor 168,(42 bsl 8) bor 2}}
+        , <<"\"::ffff:192.168.42.2\"">>
+        , #{plugins => [inet]}
+        },
+        { {ok, {16#3ffe,16#b80,16#1f8d,16#2,16#204,16#acff,16#fe17,16#bf38}}
+        , <<"\"3ffe:b80:1f8d:2:204:acff:fe17:bf38\"">>
+        , #{plugins => [inet]}
+        },
+        { {ok, {16#fe80,0,0,0,16#204,16#acff,16#fe17,16#bf38}}
+        , <<"\"fe80::204:acff:fe17:bf38\"">>
+        , #{plugins => [inet]}
+        }
+    ]].
+
+pid_plugin_test() ->
+    [ ?assertEqual(Expect, decode(Input, Opts))
+        || {Expect, Input, Opts} <- [
+        {{ok, <<"<0.92.0>">>}, <<"\"<0.92.0>\"">>, #{}},
+        { {ok, list_to_pid("<0.92.0>")}
+        , <<"\"<0.92.0>\"">>
+        , #{plugins => [pid]}
+        }
+    ]].
+
+port_plugin_test() ->
+    [ ?assertEqual(Expect, decode(Input, Opts))
+        || {Expect, Input, Opts} <- [
+        {{ok, <<"#Port<0.1>">>}, <<"\"#Port<0.1>\"">>, #{}},
+        { {ok, list_to_port("#Port<0.1>")}
+        , <<"\"#Port<0.1>\"">>
+        , #{plugins => [port]}
+        }
+    ]].
+
+reference_plugin_test() ->
+    [ ?assertEqual(Expect, decode(Input, Opts))
+        || {Expect, Input, Opts} <- [
+        { {ok, <<"#Ref<0.314572725.1088159747.110918>">>}
+        , <<"\"#Ref<0.314572725.1088159747.110918>\"">>
+        , #{}
+        },
+        { {ok, list_to_ref("#Ref<0.314572725.1088159747.110918>")}
+        , <<"\"#Ref<0.314572725.1088159747.110918>\"">>
+        , #{plugins => [reference]}
+        }
+    ]].
+
+timestamp_plugin_test() ->
+    [ ?assertEqual(Expect, decode(Input, Opts))
+        || {Expect, Input, Opts} <- [
+        { {ok, <<"1970-01-01T00:00:00.000Z">>}
+        , <<"\"1970-01-01T00:00:00.000Z\"">>
+        , #{}
+        },
+        { {ok, {0,0,0}}
+        , <<"\"1970-01-01T00:00:00.000Z\"">>
+        , #{plugins => [timestamp]}
+        }
+    ]].
 
 -endif.

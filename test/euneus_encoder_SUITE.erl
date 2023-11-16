@@ -263,25 +263,7 @@ plugins(Config) when is_list(Config) ->
     {error, {unsupported_type, {test, foo}}} =
         euneus_encoder:encode({test, foo}, #{}),
     {ok, [$", <<"test::foo">>, $"]} =
-        euneus_encoder:encode({test, foo}, #{plugins => [euneus_test_plugin]}),
-    [ euneus_plugin_datetime_iso8601
-    , euneus_plugin_inet
-    , euneus_plugin_pid
-    , euneus_plugin_port
-    , euneus_plugin_proplist
-    , euneus_plugin_reference
-    , euneus_plugin_timestamp_iso8601
-    , euneus_test_plugin
-    ] = maps:get(plugins, euneus_encoder:parse_opts(#{plugins =>
-    [ datetime
-    , inet
-    , pid
-    , port
-    , proplist
-    , reference
-    , timestamp
-    , euneus_test_plugin
-    ]})).
+        euneus_encoder:encode({test, foo}, #{plugins => [euneus_test_plugin]}).
 
 %%%=====================================================================
 %%% Support functions
