@@ -103,7 +103,7 @@ end
 
 > [!NOTE]
 >
-> More types can be handled by using plugins. Please see the [Plugins](#plugins) section for more info.
+> More types can be handled by using custom plugins. Please see the [Plugins](#plugins) section for more info.
 
 <!-- Generated via https://www.tablesgenerator.com/markdown_tables -->
 <!-- To edit, open "./assets/md-tables/data-mapping.tgn" in the link above. -->
@@ -290,7 +290,7 @@ Available encode options:
     map_encoder => function((map(), euneus_encoder:options()) -> iolist()),
     %% unhandled_encoder allow encode any custom term (default: raise unsupported_type error).
     unhandled_encoder => function((term(), euneus_encoder:options()) -> iolist()),
-    %% escaper allow override the binary escaping (default: json)
+    %% escaper allow override the binary escaping (default: json).
     escaper => json
              | html
              | javascript
@@ -299,7 +299,7 @@ Available encode options:
     error_handler => function(( error | exit | throw
                               , term()
                               , erlang:stacktrace() ) -> euneus_encoder:result()),
-    %% extends the encode types
+    %% plugins extends the encode types.
     plugins => datetime
              | inet
              | pid
@@ -307,7 +307,7 @@ Available encode options:
              | proplist
              | reference
              | timestamp
-             | module()
+             | module() % that implements the `euneus_plugin` behavior.
 }
 ```
 
@@ -374,14 +374,14 @@ Available decode options:
             | to_existing_atom
             | to_integer
             | function((binary(), euneus_decoder:options()) -> term()),
-    %% extends the decode types
+    %% plugins extends the decode types.
     plugins => datetime
              | inet
              | pid
              | port
              | reference
              | timestamp
-             | module()
+             | module() % that implements the `euneus_plugin` behavior.
 }
 ```
 
