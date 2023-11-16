@@ -1984,4 +1984,21 @@ timestamp_plugin_test() ->
         }
     ]].
 
+plugins_type_check_test() ->
+    Plugins = [ datetime
+              , inet
+              , pid
+              , port
+              , reference
+              , timestamp
+              ],
+    [ ?assertEqual(Expect, decode(Input, Opts#{plugins => Plugins}))
+        || {Expect, Input, Opts} <- [
+        {{ok, <<"foo">>}, <<"\"foo\"">>, #{}},
+        {{ok, 0}, <<"0">>, #{}},
+        {{ok, 0.0}, <<"0.0">>, #{}},
+        {{ok, #{}}, <<"{}">>, #{}},
+        {{ok, []}, <<"[]">>, #{}}
+    ]].
+
 -endif.
