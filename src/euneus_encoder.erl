@@ -21,7 +21,6 @@
 %%%---------------------------------------------------------------------
 -module(euneus_encoder).
 
--compile({ inline, plugins/3 }).
 -compile({ inline, encode_binary/2 }).
 -compile({ inline, encode_atom/2 }).
 -compile({ inline, encode_integer/2 }).
