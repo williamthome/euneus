@@ -40,11 +40,10 @@
         , float_encoder/1
         , list_encoder/1
         , map_encoder/1
-        , datetime_encoder/1
-        , timestamp_encoder/1
         , unhandled_encoder/1
         , escaper/1
         , error_handler/1
+        , plugins/1
         ]).
 
 %%%=====================================================================
@@ -146,11 +145,10 @@ all() ->
     , float_encoder
     , list_encoder
     , map_encoder
-    , datetime_encoder
-    , timestamp_encoder
     , unhandled_encoder
     , escaper
     , error_handler
+    , plugins
     ].
 
 %%%=====================================================================
@@ -216,22 +214,6 @@ map_encoder(Config) when is_list(Config) ->
         end
     }).
 
-datetime_encoder(Config) when is_list(Config) ->
-    {ok, [$", <<"1970-01-01T00:00:00Z">>, $"]} = encode({{1970,1,1},{0,0,0}}, #{}),
-    {ok, [$", <<"2023-01-01T00:00:00Z">>, $"]} = encode({{1970,1,1},{0,0,0}}, #{
-        datetime_encoder => fun (_DateTime, Opts) ->
-            euneus_encoder:encode_datetime({{2023,1,1},{0,0,0}}, Opts)
-        end
-    }).
-
-timestamp_encoder(Config) when is_list(Config) ->
-    {ok, [$", <<"1970-01-01T00:00:00.000Z">>, $"]} = encode({0,0,0}, #{}),
-    {ok, [$", <<"2023-01-01T00:00:00.000Z">>, $"]} = encode({0,0,0}, #{
-        timestamp_encoder => fun (_DateTime, Opts) ->
-            euneus_encoder:encode_timestamp({1672,531200,0}, Opts)
-        end
-    }).
-
 unhandled_encoder(Config) when is_list(Config) ->
     {error, {unsupported_type, {foo}}} = encode({foo}, #{}),
     {ok, [$[, [$", <<"myrecord">>, $"], [$,,
@@ -272,6 +254,16 @@ error_handler(Config) when is_list(Config) ->
             {error, bar}
         end
     }).
+
+plugins(Config) when is_list(Config) ->
+    {halt, [$", <<"test::foo">>, $"]} =
+        euneus_test_plugin:encode({test, foo}, euneus_encoder:parse_opts(#{})),
+    next =
+        euneus_test_plugin:encode({test, bar}, euneus_encoder:parse_opts(#{})),
+    {error, {unsupported_type, {test, foo}}} =
+        euneus_encoder:encode({test, foo}, #{}),
+    {ok, [$", <<"test::foo">>, $"]} =
+        euneus_encoder:encode({test, foo}, #{plugins => [euneus_test_plugin]}).
 
 %%%=====================================================================
 %%% Support functions

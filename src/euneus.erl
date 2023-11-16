@@ -163,9 +163,9 @@ encode_parsed_to_binary(Input, ParsedOpts) ->
 %%
 %% Uses JSON encoder.
 %%
-%% @equiv euneus_smart_json_encoder:encode/1
+%% @equiv euneus_encoder_smart_json:encode/1
 %%
-%% @see euneus_smart_json_encoder:encode/1
+%% @see euneus_encoder_smart_json:encode/1
 %%
 %% @end
 %%----------------------------------------------------------------------
@@ -174,7 +174,7 @@ encode_parsed_to_binary(Input, ParsedOpts) ->
     Return :: encode_result().
 
 encode(Input) ->
-    euneus_smart_json_encoder:encode(Input).
+    euneus_encoder_smart_json:encode(Input).
 
 %%----------------------------------------------------------------------
 %% @doc Generates a JSON as {@link erlang:binary()} from Erlang term.
@@ -183,7 +183,7 @@ encode(Input) ->
 %%
 %% @returns {@link erlang:binary()}.
 %%
-%% @see euneus_smart_json_encoder:encode/1
+%% @see euneus_encoder_smart_json:encode/1
 %%
 %% @end
 %%----------------------------------------------------------------------
@@ -203,9 +203,9 @@ encode_to_binary(Input) ->
 %%
 %% Uses Javascript encoder.
 %%
-%% @equiv euneus_smart_js_encoder:encode/1
+%% @equiv euneus_encoder_smart_javascript:encode/1
 %%
-%% @see euneus_smart_js_encoder:encode/1
+%% @see euneus_encoder_smart_javascript:encode/1
 %%
 %% @end
 %%----------------------------------------------------------------------
@@ -214,7 +214,7 @@ encode_to_binary(Input) ->
     Return :: encode_result().
 
 encode_js(Input) ->
-    euneus_smart_js_encoder:encode(Input).
+    euneus_encoder_smart_javascript:encode(Input).
 
 %%----------------------------------------------------------------------
 %% @doc Generates a JSON as {@link erlang:binary()} from Erlang term.
@@ -223,7 +223,7 @@ encode_js(Input) ->
 %%
 %% @returns {@link erlang:binary()}.
 %%
-%% @see euneus_smart_js_encoder:encode/1
+%% @see euneus_encoder_smart_javascript:encode/1
 %%
 %% @end
 %%----------------------------------------------------------------------
@@ -243,9 +243,9 @@ encode_js_to_binary(Input) ->
 %%
 %% Uses HTML encoder.
 %%
-%% @equiv euneus_smart_html_encoder:encode/1
+%% @equiv euneus_encoder_smart_html:encode/1
 %%
-%% @see euneus_smart_html_encoder:encode/1
+%% @see euneus_encoder_smart_html:encode/1
 %%
 %% @end
 %%----------------------------------------------------------------------
@@ -254,7 +254,7 @@ encode_js_to_binary(Input) ->
     Return :: encode_result().
 
 encode_html(Input) ->
-    euneus_smart_html_encoder:encode(Input).
+    euneus_encoder_smart_html:encode(Input).
 
 %%----------------------------------------------------------------------
 %% @doc Generates a JSON as {@link erlang:binary()} from Erlang term.
@@ -263,7 +263,7 @@ encode_html(Input) ->
 %%
 %% @returns {@link erlang:binary()}.
 %%
-%% @see euneus_smart_html_encoder:encode/1
+%% @see euneus_encoder_smart_html:encode/1
 %%
 %% @end
 %%----------------------------------------------------------------------
@@ -283,9 +283,9 @@ encode_html_to_binary(Input) ->
 %%
 %% Uses Unicode encoder.
 %%
-%% @equiv euneus_smart_unicode_encoder:encode/1
+%% @equiv euneus_encoder_smart_unicode:encode/1
 %%
-%% @see euneus_smart_unicode_encoder:encode/1
+%% @see euneus_encoder_smart_unicode:encode/1
 %%
 %% @end
 %%----------------------------------------------------------------------
@@ -294,7 +294,7 @@ encode_html_to_binary(Input) ->
     Return :: encode_result().
 
 encode_unicode(Input) ->
-    euneus_smart_unicode_encoder:encode(Input).
+    euneus_encoder_smart_unicode:encode(Input).
 
 %%----------------------------------------------------------------------
 %% @doc Generates a JSON as {@link erlang:binary()} from Erlang term.
@@ -303,7 +303,7 @@ encode_unicode(Input) ->
 %%
 %% @returns {@link erlang:binary()}.
 %%
-%% @see euneus_smart_unicode_encoder:encode/1
+%% @see euneus_encoder_smart_unicode:encode/1
 %%
 %% @end
 %%----------------------------------------------------------------------
@@ -321,9 +321,9 @@ encode_unicode_to_binary(Input) ->
 %%----------------------------------------------------------------------
 %% @doc Parses JSON to Erlang term.
 %%
-%% @equiv euneus_smart_decoder:decode/1
+%% @equiv euneus_decoder_smart:decode/1
 %%
-%% @see euneus_smart_decoder:decode/1
+%% @see euneus_decoder_smart:decode/1
 %%
 %% @end
 %%----------------------------------------------------------------------
@@ -332,7 +332,7 @@ encode_unicode_to_binary(Input) ->
     Result :: decode_result().
 
 decode(Input) ->
-    euneus_smart_decoder:decode(Input).
+    euneus_decoder_smart:decode(Input).
 
 %%----------------------------------------------------------------------
 %% @doc Parses JSON to Erlang term.

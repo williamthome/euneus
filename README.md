@@ -17,14 +17,26 @@ Like Thoas, both the parser and generator fully conform to
 - [Data Mapping](#data-mapping)
     - [Why not more built-in types?](#why-not-more-built-in-types)
     - [Note about proplists](#note-about-proplists)
+- [Plugins](#plugins)
+    - [Usage](#usage)
+        - [Encode](#encode)
+        - [Decode](#decode)
+    - [Built-in Plugins](#built-in-plugins)
+        - [datetime](#datetime)
+        - [inet](#inet)
+        - [pid](#pid)
+        - [port](#port)
+        - [proplist](#proplist)
+        - [reference](#reference)
+        - [timestamp](#timestamp)
 - [Differences to Thoas](#differences-to-thoas)
-    - [Encode](#encode)
-    - [Decode](#decode)
+    - [Encode](#encode-1)
+    - [Decode](#decode-1)
         - [Resuming](#resuming)
     - [Why Euneus over Thoas?](#why-euneus-over-thoas)
 - [Benchmarks](#benchmarks)
-    - [Encode](#encode-1)
-    - [Decode](#decode-1)
+    - [Encode](#encode-2)
+    - [Decode](#decode-2)
 - [Tests](#tests)
 - [Smart modules](#smart-modules)
 - [Credits](#credits)
@@ -57,13 +69,12 @@ end
 ## Basic Usage
 
 ```erlang
-1> {ok, JSON} = euneus:encode_to_binary(#{name => #{english => <<"Charmander">>, japanese => <<"ヒトカゲ"/utf8>>}, caught_at => erlang:timestamp(), type => [fire], profile => #{height => 0.6, weight => 8}, ability => #{0 => <<"Blaze">>, 1 => undefined}}).
-{ok, <<"{\"name\":{\"english\":\"Charmander\",\"japanese\":\"ヒトカゲ\"},\"profile\":{\"height\":0.6,\"weight\":8},\"type\":[\"fire\"],\"caught_at\":\"2023-10-24T05:47:04.939Z\",\"ability\":{\"0\":\"Blaze\",\"1\":null}}">>}
+1> {ok, JSON} = euneus:encode_to_binary(#{name => #{english => <<"Charmander">>, japanese => <<"ヒトカゲ"/utf8>>}, type => [fire], profile => #{height => 0.6, weight => 8}, ability => #{0 => <<"Blaze">>, 1 => undefined}}).
+{ok, <<"{\"name\":{\"english\":\"Charmander\",\"japanese\":\"ヒトカゲ\"},\"profile\":{\"height\":0.6,\"weight\":8},\"type\":[\"fire\"],\"ability\":{\"0\":\"Blaze\",\"1\":null}}">>}
 
 2> euneus:decode(JSON).
 {ok,#{<<"ability">> =>
           #{<<"0">> => <<"Blaze">>,<<"1">> => undefined},
-      <<"caught_at">> => {1698,126333,753000},
       <<"name">> =>
           #{<<"english">> => <<"Charmander">>,
             <<"japanese">> =>
@@ -85,40 +96,54 @@ end
                 <<227,131,146,227,131,136,227,130,171,227,130,178>>},
       profile => #{height => 0.6,weight => 8},
       type => [<<"fire">>],
-      caught_at => {1698,126333,753000},
       ability => #{0 => <<"Blaze">>,1 => undefined}}}
 ```
 
 ## Data Mapping
 
+> [!TIP]
+>
+> More types can be handled by using custom plugins. Please see the [Plugins](#plugins) section for more info.
+
 <!-- Generated via https://www.tablesgenerator.com/markdown_tables -->
 <!-- To edit, open "./assets/md-tables/data-mapping.tgn" in the link above. -->
-| **Erlang ->**                	| **Encode Options ->**                                                                                                                                     	| **JSON ->**                 	| **Decode Options ->**                                                                                           	| **Erlang**                   	|
-|------------------------------	|-----------------------------------------------------------------------------------------------------------------------------------------------------------	|-----------------------------	|-----------------------------------------------------------------------------------------------------------------	|------------------------------	|
-| undefined                    	| #{}                                                                                                                                                       	| null                        	| #{}                                                                                                             	| undefined                    	|
-| undefined                    	| #{}                                                                                                                                                       	| null                        	| #{null_term => nil}                                                                                             	| nil                          	|
-| true                         	| #{}                                                                                                                                                       	| true                        	| #{}                                                                                                             	| true                         	|
-| false                        	| #{}                                                                                                                                                       	| false                       	| #{}                                                                                                             	| false                        	|
-| abc                          	| #{}                                                                                                                                                       	| "abc"                       	| #{}                                                                                                             	| <<"abc">>                    	|
-| "abc"                        	| #{}                                                                                                                                                       	| [97,98,99]                  	| #{}                                                                                                             	| "abc"                        	|
-| <<"abc">>                    	| #{}                                                                                                                                                       	| "abc"                       	| #{}                                                                                                             	| <<"abc">>                    	|
-| {{1970,1,1},{0,0,0}}         	| #{}                                                                                                                                                       	| "1970-01-01T00:00:00Z"      	| #{}                                                                                                             	| {{1970,1,1},{0,0,0}}         	|
-| {0,0,0}                      	| #{}                                                                                                                                                       	| "1970-01-01T00:00:00.000Z"  	| #{}                                                                                                             	| {0,0,0}                      	|
-| 123                          	| #{}                                                                                                                                                       	| 123                         	| #{}                                                                                                             	| 123                          	|
-| 123.45600                    	| #{}                                                                                                                                                       	| 123.456                     	| #{}                                                                                                             	| 123.456                      	|
-| [<<"foo">>,true,0,undefined] 	| #{}                                                                                                                                                       	| ["foo",true,0,null]         	| #{}                                                                                                             	| [<<"foo">>,true,0,undefined] 	|
-| #{foo => bar}                	| #{}                                                                                                                                                       	| {"foo":"bar"}               	| #{}                                                                                                             	| #{<<"foo">> => <<"bar">>}    	|
-| #{foo => bar}                	| #{}                                                                                                                                                       	| {"foo":"bar"}               	| #{keys => to_existing_atom}                                                                                     	| #{foo => <<"bar">>}          	|
-| #{0 => 0}                    	| #{}                                                                                                                                                       	| {"0":0}                     	| #{keys => to_integer}                                                                                           	| #{0 => 0}                    	|
-| {myrecord, val}              	| #{unhandled_encoder => fun({myrecord, Val}, Opts) -><br>    Encode = maps:get(list_encoder, Opts),<br>    Encode([myrecord, #{key => Val}], Opts)<br>end}) 	| ["myrecord", {"key":"val"}] 	| #{arrays => fun([<<"myrecord">>, #{<<"key">> := Val}], _Opts) -><br>    {myrecord, binary_to_atom(Val)}<br>end} 	| {myrecord, val}              	|
+| **Erlang ->**                                                	| **Encode Options ->**                                                                                                                                      	| **JSON ->**                          	| **Decode Options ->**                                                                                           	| **Erlang**                                                   	|
+|--------------------------------------------------------------	|------------------------------------------------------------------------------------------------------------------------------------------------------------	|--------------------------------------	|-----------------------------------------------------------------------------------------------------------------	|--------------------------------------------------------------	|
+| undefined                                                    	| #{}                                                                                                                                                        	| null                                 	| #{}                                                                                                             	| undefined                                                    	|
+| undefined                                                    	| #{}                                                                                                                                                        	| null                                 	| #{null_term => nil}                                                                                             	| nil                                                          	|
+| true                                                         	| #{}                                                                                                                                                        	| true                                 	| #{}                                                                                                             	| true                                                         	|
+| false                                                        	| #{}                                                                                                                                                        	| false                                	| #{}                                                                                                             	| false                                                        	|
+| abc                                                          	| #{}                                                                                                                                                        	| "abc"                                	| #{}                                                                                                             	| <<"abc">>                                                    	|
+| "abc"                                                        	| #{}                                                                                                                                                        	| [97,98,99]                           	| #{}                                                                                                             	| "abc"                                                        	|
+| <<"abc">>                                                    	| #{}                                                                                                                                                        	| "abc"                                	| #{}                                                                                                             	| <<"abc">>                                                    	|
+| 123                                                          	| #{}                                                                                                                                                        	| 123                                  	| #{}                                                                                                             	| 123                                                          	|
+| 123.45600                                                    	| #{}                                                                                                                                                        	| 123.456                              	| #{}                                                                                                             	| 123.456                                                      	|
+| [<<"foo">>,true,0,undefined]                                 	| #{}                                                                                                                                                        	| ["foo",true,0,null]                  	| #{}                                                                                                             	| [<<"foo">>,true,0,undefined]                                 	|
+| #{foo => bar}                                                	| #{}                                                                                                                                                        	| {"foo":"bar"}                        	| #{}                                                                                                             	| #{<<"foo">> => <<"bar">>}                                    	|
+| #{foo => bar}                                                	| #{}                                                                                                                                                        	| {"foo":"bar"}                        	| #{keys => to_existing_atom}                                                                                     	| #{foo => <<"bar">>}                                          	|
+| #{0 => 0}                                                    	| #{}                                                                                                                                                        	| {"0":0}                              	| #{keys => to_integer}                                                                                           	| #{0 => 0}                                                    	|
+| {{1970,1,1},{0,0,0}}                                         	| #{plugins => [datetime]}                                                                                                                                   	| "1970-01-01T00:00:00Z"               	| #{plugins => [datetime]}                                                                                        	| {{1970,1,1},{0,0,0}}                                         	|
+| {127,0,0,1}                                                  	| #{plugins => [inet]}                                                                                                                                       	| "127.0.0.1"                          	| #{plugins => [inet]}                                                                                            	| {127,0,0,1}                                                  	|
+| {16#3ffe,16#b80,16#1f8d,16#2,16#204,16#acff,16#fe17,16#bf38} 	| #{plugins => [inet]}                                                                                                                                       	| "3ffe:b80:1f8d:2:204:acff:fe17:bf38" 	| #{plugins => [inet]}                                                                                            	| {16#3ffe,16#b80,16#1f8d,16#2,16#204,16#acff,16#fe17,16#bf38} 	|
+| <0.92.0>                                                     	| #{plugins => [pid]}                                                                                                                                        	| "<0.92.0>"                           	| #{plugins => [pid]}                                                                                             	| <0.92.0>                                                     	|
+| #Port<0.1>                                                   	| #{plugins => [port]}                                                                                                                                       	| "#Port<0.1>"                         	| #{plugins => [port]}                                                                                            	| #Port<0.1>                                                   	|
+| [{foo, bar}]                                                 	| #{plugins => [proplist]}                                                                                                                                   	| {\"foo\":\"bar\"}                    	| #{plugins => [proplist]}                                                                                        	| #{<<"foo">> => <<"bar">>}                                    	|
+| #Ref<0.957048870.857473026.108035>                           	| #{plugins => [reference]}                                                                                                                                  	| "#Ref<0.957048870.857473026.108035>" 	| #{plugins => [reference]}                                                                                       	| #Ref<0.957048870.857473026.108035>                           	|
+| {0,0,0}                                                      	| #{plugins => [timestamp]}                                                                                                                                  	| 1970-01-01T00:00:00.000Z             	| #{plugins => [timestamp]}                                                                                       	| {0,0,0}                                                      	|
+| {myrecord, val}                                              	| #{unhandled_encoder => fun({myrecord, Val}, Opts) -><br>    Encode = maps:get(list_encoder, Opts),<br>    Encode([myrecord, #{key => Val}], Opts)<br>end}) 	| ["myrecord", {"key":"val"}]          	| #{arrays => fun([<<"myrecord">>, #{<<"key">> := Val}], _Opts) -><br>    {myrecord, binary_to_atom(Val)}<br>end} 	| {myrecord, val}                                              	|
 
 ### Why not more built-in types?
 
-The goal of `Euneus` is to have built-in types that can be encoded and then decoded to the original value. If you have any type that can be encoded and rolled back, feel free to open a [new issue](https://github.com/williamthome/euneus/issues/new) to discuss it.
+The goal of `Euneus` is to have built-in types that can be commonly encoded and decoded, but the range of types can be easily extended by using plugins.  Please see the [Plugins](#plugins) section for more info.
 
 ### Note about proplists
 
-Proplists are not handled by Euneus, you must convert proplists to maps before the encoding or override the `list_encoder` option in the encoder to handle them, for example:
+Proplists are not handled by Euneus by default.
+
+There are three options:
+1. Use the built-in, or create your own, [proplist plugin](#proplist);
+2. Convert proplists to maps before the encoding;
+3. Override the `list_encoder` option in the encoder to handle them, for example:
 
 ```erlang
 1> Options = #{
@@ -140,11 +165,119 @@ Proplists are not handled by Euneus, you must convert proplists to maps before t
 
 The reason for that is because it's impossible to know when a list is a proplist and also because a proplist cannot be decoded. Please see the [Why not more built-in types?](#why-not-more-built-in-types) section for more info about this decision.
 
+## Plugins
+
+Euneus has a mechanism to easily plug in encoders and decoders. You can use the [built-in plugins](#built-in-plugins) to handle common types or create your own in a module by implementing the [euneus_plugin](/src/euneus_plugin.erl) behavior.
+
+If you have a built-in plugin suggestion, feel free to open a [new issue](https://github.com/williamthome/euneus/issues/new) to discuss it.
+
+> [!IMPORTANT]
+> The plugins mechanism deprecated the `datetime_encoder` and the `timestamp_encoder` option in favor of the `datetime` and `timestamp` plugins.
+
+### Usage
+
+#### Encode
+
+```erlang
+euneus:encode(Term, #{plugins => [
+    % list of built-in or custom plugins
+]})
+```
+
+#### Decode
+
+```erlang
+euneus:decode(Term, #{plugins => [
+    % list of built-in or custom plugins
+]})
+```
+
+### Built-in Plugins
+
+#### datetime
+
+Encodes `calendar:datetime()` to ISO8601 as JSON string and decodes it back, for example:
+
+```erlang
+1> {ok, JSON} = euneus:encode_to_binary({{1970,1,1},{0,0,0}}, #{plugins => [datetime]}).
+{ok,<<"\"1970-01-01T00:00:00Z\"">>}
+
+2> euneus:decode(JSON, #{plugins => [datetime]}).
+{ok,{{1970,1,1},{0,0,0}}}
+```
+
+#### inet
+
+Encodes `inet:ip_address()` to IPV4 or IPV6 as JSON string and decodes it back, for example:
+
+```erlang
+1> {ok, JSON} = euneus:encode_to_binary({127,0,0,1}, #{plugins => [inet]}).
+{ok,<<"\"127.0.0.1\"">>}
+
+2> euneus:decode(JSON, #{plugins => [inet]}).
+{ok,{127,0,0,1}}
+```
+
+#### pid
+
+Encodes `erlang:pid()` to JSON string and decodes it back, for example:
+
+```erlang
+1> {ok, JSON} = euneus:encode_to_binary(list_to_pid("<0.92.0>"), #{plugins => [pid]}).
+{ok,<<"\"<0.92.0>\"">>}
+
+2> euneus:decode(JSON, #{plugins => [pid]}).
+{ok,<0.92.0>}
+```
+
+#### port
+
+Encodes `erlang:port()` to JSON string and decodes it back, for example:
+
+```erlang
+1> {ok, JSON} = euneus:encode_to_binary(list_to_port("#Port<0.1>"), #{plugins => [port]}).
+{ok,<<"\"#Port<0.1>\"">>}
+
+2> euneus:decode(JSON, #{plugins => [port]}).
+{ok,#Port<0.1>}
+```
+
+#### proplist
+
+Encodes `[{binary() | atom() | integer(), term()}]` to JSON object, for example:
+
+```erlang
+1> {ok, JSON} = euneus:encode_to_binary([{foo, bar}], #{plugins => [proplist]}).
+{ok,<<"{\"foo\":\"bar\"}">>}
+```
+
+#### reference
+
+Encodes `erlang:reference()` to JSON string and decodes it back, for example:
+
+```erlang
+1> {ok, JSON} = euneus:encode_to_binary(make_ref(), #{plugins => [reference]}).
+{ok,<<"\"#Ref<0.957048870.857473026.108035>\"">>}
+
+2> euneus:decode(JSON, #{plugins => [reference]}).
+{ok,#Ref<0.957048870.857473026.108035>}
+```
+
+#### timestamp
+
+Encodes `erlang:timestamp()` to ISO8601 as JSON string and decodes it back, for example:
+
+```erlang
+1> {ok, JSON} = euneus:encode_to_binary({0,0,0}, #{plugins => [timestamp]}).
+{ok,<<"\"1970-01-01T00:00:00.000Z\"">>}
+
+2> euneus:decode(JSON, #{plugins => [timestamp]}).
+{ok,{0,0,0}}
+```
+
 ## Differences to Thoas
 
-Euneus is based on [Thoas][thoas], so let's discuss the differences.
-
-The main difference between `Euneus` to `Thoas` is that Euneus gives more control to encoding or decoding data. All encode functions can be overridden and extended and all decoded data can be overridden and transformed.
+The main difference between `Euneus` to `Thoas` is that Euneus gives more control to encoding or decoding data. All encode functions can be overridden and extended and all decoded data can be overridden and transformed. Also, there is no plugin mechanism in Thoas.
 
 ### Encode
 
@@ -166,13 +299,9 @@ Available encode options:
     list_encoder => function((list(), euneus_encoder:options()) -> iolist()),
     %% map_encoder allow override the map() encoding.
     map_encoder => function((map(), euneus_encoder:options()) -> iolist()),
-    %% datetime_encoder allow override the calendar:datetime() encoding.
-    datetime_encoder => function((calendar:datetime(), euneus_encoder:options()) -> iolist()),
-    %% timestamp_encoder allow override the erlang:timestamp() encoding.
-    timestamp_encoder => function((erlang:timestamp(), euneus_encoder:options()) -> iolist()),
     %% unhandled_encoder allow encode any custom term (default: raise unsupported_type error).
     unhandled_encoder => function((term(), euneus_encoder:options()) -> iolist()),
-    %% escaper allow override the binary escaping (default: json)
+    %% escaper allow override the binary escaping (default: json).
     escaper => json
              | html
              | javascript
@@ -180,7 +309,16 @@ Available encode options:
              | function((binary(), euneus_encoder:options()) -> iolist()),
     error_handler => function(( error | exit | throw
                               , term()
-                              , erlang:stacktrace() ) -> euneus_encoder:result())
+                              , erlang:stacktrace() ) -> euneus_encoder:result()),
+    %% plugins extends the encode types.
+    plugins => datetime
+             | inet
+             | pid
+             | port
+             | proplist
+             | reference
+             | timestamp
+             | module() % that implements the `euneus_plugin` behavior.
 }
 ```
 
@@ -246,7 +384,15 @@ Available decode options:
             | to_atom
             | to_existing_atom
             | to_integer
-            | function((binary(), euneus_decoder:options()) -> term())
+            | function((binary(), euneus_decoder:options()) -> term()),
+    %% plugins extends the decode types.
+    plugins => datetime
+             | inet
+             | pid
+             | port
+             | reference
+             | timestamp
+             | module() % that implements the `euneus_plugin` behavior.
 }
 ```
 
@@ -296,7 +442,7 @@ Euneus permits resuming the decoding when an invalid token is found. Any value c
 {ok,[foo,foo,#{<<"foo">> => foo}]}
 ```
 
-> **Note**
+> [!NOTE]
 >
 > By using `euneus_decoder:resume/6` the replacement will be the `null_term` option.
 
@@ -314,7 +460,7 @@ Use `$ make bench.encode` or `$ make bench.decode` to run the benchmarks. Edit t
 
 The benchmarks use the smart versions. Please the [Smart modules](#smart-modules) section for more information.
 
-> **Note**
+> [!NOTE]
 >
 > - Results:
 >
@@ -338,10 +484,6 @@ The benchmarks use the smart versions. Please the [Smart modules](#smart-modules
 
 ### Encode
 
-> **Note**
->
-> `Thoas` does not permit any customization.
-
 <!-- Generated via https://www.tablesgenerator.com/markdown_tables -->
 <!-- To edit, open "./assets/md-tables/bench-encode.tgn" in the link above. -->
 | **File**                   	|  **Euneus** 	| **Thoas** 	| **Comparison** 	|
@@ -357,9 +499,7 @@ The benchmarks use the smart versions. Please the [Smart modules](#smart-modules
 | utf-8-escaped.json         	| **11.99 K** 	|   10.63 K 	|          1.13x 	|
 | utf-8-unescaped.json       	| **11.99 K** 	|   10.89 K 	|          1.10x 	|
 
-> **Note**
->
-> `Thoas` does not permit any customization and does not decode `ISO 8601` dates to erlang term, but Euneus decodes out of the box, for example, `"1970-01-01T00:00:00Z"` to `{{1970,01,01},{0,0,0}}` :: [calendar:datetime()](https://www.erlang.org/doc/man/calendar.html#data-types) and `"1970-01-01T00:00:00.000Z"` to `{0,0,0}` :: [erlang:timestamp()](https://www.erlang.org/doc/man/os#timestamp-0).
+### Decode
 
 <!-- Generated via https://www.tablesgenerator.com/markdown_tables -->
 <!-- To edit, open "./assets/md-tables/bench-decode.tgn" in the link above. -->
@@ -386,7 +526,7 @@ Also, the parser is tested using [JSONTestSuite](https://github.com/nst/JSONTest
 
 See the [Euneus parser](https://github.com/nst/JSONTestSuite/tree/master/parsers/test_erlang_euneus) in JSONTestSuite.
 
-> **Note**
+> [!NOTE]
 >
 > All of the JSONTestSuite tests are embedded in Euneus tests.
 
@@ -396,12 +536,12 @@ Euneus has modules that permit customizations and others that use the default op
 
 If you are good to go with the default options, please use the smart versions:
 - Encode:
-    - `euneus:encode/1` or `euneus_smart_json_encoder:encode/1`;
-    - `euneus:encode_js/1` or `euneus_smart_js_encoder:encode/1`;
-    - `euneus:encode_html/1` or `euneus_smart_html_encoder:encode/1`;
-    - `euneus:encode_unicode/1` or `euneus_smart_unicode_encoder:encode/1`;
+    - `euneus:encode/1` or `euneus_encoder_smart_json:encode/1`;
+    - `euneus:encode_js/1` or `euneus_encoder_smart_javascript:encode/1`;
+    - `euneus:encode_html/1` or `euneus_encoder_smart_html:encode/1`;
+    - `euneus:encode_unicode/1` or `euneus_encoder_smart_unicode:encode/1`;
 - Decode:
-    - `euneus:decode/1` or `euneus_smart_decoder:decode/1`.
+    - `euneus:decode/1` or `euneus_decoder_smart:decode/1`.
 
 ## Credits
 
@@ -461,7 +601,7 @@ $ make test
 $ make check
 ```
 
-> **Note**:
+> [!NOTE]:
 >
 > Open the [Makefile](Makefile) to see all commands.
 

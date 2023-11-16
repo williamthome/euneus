@@ -19,7 +19,7 @@
 %%%
 %%% @end
 %%%---------------------------------------------------------------------
--module(euneus_smart_decoder).
+-module(euneus_decoder_smart).
 
 % NOTE: Inlining escapeu_last/5 reduces the memory consumption,
 %       but huge increases the deviation and reduces the IPS.
@@ -35,9 +35,6 @@
 -compile({ inline, number_zero/5 }).
 -compile({ inline, escapeu_1/7 }).
 -compile({ inline, escapeu_2/7 }).
--compile({ inline, chars_to_integer/2 }).
--compile({ inline, chars_to_integer/3 }).
--compile({ inline, chars_to_integer/4 }).
 -compile({ inline, try_parse_integer/6 }).
 -compile({ inline, try_parse_float/6 }).
 -compile({ inline, object/5 }).
@@ -66,8 +63,6 @@
 -define(array, 1).
 -define(key, 2).
 -define(object, 3).
-
--define(is_number(X), X >= $0, X =< $9).
 
 -define(NON_PRINTABLE_LAST, 31).
 -define(ONE_BYTE_LAST, 127).
@@ -155,59 +150,7 @@ value(Data, Input, Pos, Buffer) ->
         <<$\n/integer, Rest/bitstring>> ->
             value(Rest, Input, Pos + 1, Buffer);
         <<$"/integer, Rest/bitstring>> ->
-            case Rest of
-                << Y4/integer, Y3/integer, Y2/integer, Y1/integer, $-/integer
-                 , M2/integer, M1/integer, $-/integer
-                 , D2/integer, D1/integer
-                 , $T/integer
-                 , H2/integer, H1/integer, $:/integer
-                 , Min2/integer, Min1/integer, $:/integer
-                 , S2/integer, S1/integer
-                 , Rest1/bitstring >>
-                 when ?is_number(Y4), ?is_number(Y3), ?is_number(Y2), ?is_number(Y1)
-                    , ?is_number(M2), ?is_number(M1)
-                    , ?is_number(D2), ?is_number(D1)
-                    , ?is_number(H2), ?is_number(H1)
-                    , ?is_number(Min2), ?is_number(Min1)
-                    , ?is_number(S2), ?is_number(S1) ->
-                    case Rest1 of
-                        << $Z/integer
-                         , $"
-                         , Rest2/bitstring >> ->
-                            Date = { chars_to_integer(Y4, Y3, Y2, Y1)
-                                   , chars_to_integer(M2, M1)
-                                   , chars_to_integer(D2, D1) },
-                            Time = { chars_to_integer(H2, H1)
-                                   , chars_to_integer(Min2, Min1)
-                                   , chars_to_integer(S2, S1) },
-                            Value = {Date, Time},
-                            continue(Rest2, Input, Pos + 22, Buffer, Value);
-                        << $./integer
-                         , MSec3/integer, MSec2/integer, MSec1/integer
-                         , $Z/integer
-                         , $"
-                         , Rest2/bitstring >>
-                         when ?is_number(MSec3)
-                            , ?is_number(MSec2)
-                            , ?is_number(MSec1) ->
-                            Date = { chars_to_integer(Y4, Y3, Y2, Y1)
-                                   , chars_to_integer(M2, M1)
-                                   , chars_to_integer(D2, D1) },
-                            Time = { chars_to_integer(H2, H1)
-                                   , chars_to_integer(Min2, Min1)
-                                   , chars_to_integer(S2, S1) },
-                            DateTime = {Date, Time},
-                            MilliSeconds = chars_to_integer(MSec3, MSec2, MSec1),
-                            GregSeconds = calendar:datetime_to_gregorian_seconds(DateTime),
-                            Seconds = GregSeconds - 62167219200,
-                            Value = { Seconds div 1000000
-                                    , Seconds rem 1000000
-                                    , MilliSeconds * 1000 },
-                            continue(Rest2, Input, Pos + 26, Buffer, Value)
-                    end;
-                <<_/bitstring>> ->
-                    string(Rest, Input, Pos + 1, Buffer, 0)
-            end;
+            string(Rest, Input, Pos + 1, Buffer, 0);
         <<$0/integer, Rest/bitstring>> ->
             number_zero(Rest, Input, Pos, Buffer, 1);
         <<$1/integer, Rest/bitstring>> ->
@@ -247,15 +190,6 @@ value(Data, Input, Pos, Buffer) ->
         <<_/bitstring>> ->
             throw_eof(Input, Pos, Buffer)
     end.
-
-chars_to_integer(N2, N1) ->
-    ((N2 - $0) * 10) + (N1 - $0).
-
-chars_to_integer(N3, N2, N1) ->
-    ((N3 - $0) * 100) + ((N2 - $0) * 10) + (N1 - $0).
-
-chars_to_integer(N4, N3, N2, N1) ->
-    ((N4 - $0) * 1000) + ((N3 - $0) * 100) + ((N2 - $0) * 10) + (N1 - $0).
 
 string(Data, Input, Pos, Buffer, Len) ->
     case Data of
@@ -1493,11 +1427,7 @@ decode_test() ->
         {{ok, true}, <<"true">>},
         {{ok, false}, <<"false">>},
         {{ok, undefined}, <<"null">>},
-        {{ok, <<"ABC">>}, <<"\"\\u0041\\u0042\\u0043\"">>},
-        { {ok, #{<<"datetime">> => {{1970,1,1},{0,0,0}}}}
-        , <<"{\"datetime\": \"1970-01-01T00:00:00Z\"}">> },
-        { {ok, #{<<"timestamp">> => {0,0,0}}}
-        , <<"{\"timestamp\": \"1970-01-01T00:00:00.000Z\"}">> }
+        {{ok, <<"ABC">>}, <<"\"\\u0041\\u0042\\u0043\"">>}
     ]].
 
 -endif.
