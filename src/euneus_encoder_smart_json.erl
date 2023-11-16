@@ -37,9 +37,6 @@
 
 %% Macros
 
--define(min(X, Min), is_integer(X) andalso X >= Min).
--define(range(X, Min, Max), is_integer(X) andalso X >= Min andalso X =< Max).
-
 -define(NON_PRINTABLE_LAST, 31).
 -define(ONE_BYTE_LAST, 127).
 -define(TWO_BYTE_LAST, 2_047).
@@ -110,23 +107,6 @@ value(Map) when is_map(Map) ->
         [{K, V} | T] ->
             [${, key(K), $:, value(V) | do_encode_map_loop(T)]
     end;
-value({{YYYY,MM,DD},{H,M,S}})
-  when ?min(YYYY, 0), ?range(MM, 1, 12), ?range(DD, 1, 31)
-     , ?range(H, 0, 23), ?range(M, 0, 59), ?range(S, 0, 59) ->
-    DateTime = iolist_to_binary(io_lib:format(
-        "~4.10.0B-~2.10.0B-~2.10.0BT~2.10.0B:~2.10.0B:~2.10.0BZ",
-        [YYYY,MM,DD,H,M,S])
-    ),
-    [$", escape_json(DateTime, [], DateTime, 0), $"];
-value({MegaSecs,Secs,MicroSecs} = Timestamp)
-  when ?min(MegaSecs, 0), ?min(Secs, 0), ?min(MicroSecs, 0) ->
-    MilliSecs = MicroSecs div 1000,
-    {{YYYY,MM,DD},{H,M,S}} = calendar:now_to_datetime(Timestamp),
-    DateTime = iolist_to_binary(io_lib:format(
-        "~4.10.0B-~2.10.0B-~2.10.0BT~2.10.0B:~2.10.0B:~2.10.0B.~3.10.0BZ",
-        [YYYY,MM,DD,H,M,S,MilliSecs])
-    ),
-    [$", escape_json(DateTime, [], DateTime, 0), $"];
 value(Term) ->
     throw_unsupported_type_error(Term).
 
@@ -268,9 +248,7 @@ encode_test() ->
         {{ok, <<"123.456789">>}, 123.45678900},
         {{ok, <<"[true,0,null]">>}, [true, 0, undefined]},
         {{ok, <<"{\"foo\":\"bar\"}">>}, #{foo => bar}},
-        {{ok, <<"{\"0\":0}">>}, #{0 => 0}},
-        {{ok, <<"\"1970-01-01T00:00:00Z\"">>}, {{1970,1,1},{0,0,0}}},
-        {{ok, <<"\"1970-01-01T00:00:00.000Z\"">>}, {0,0,0}}
+        {{ok, <<"{\"0\":0}">>}, #{0 => 0}}
     ]].
 
 -endif.

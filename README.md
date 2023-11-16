@@ -57,13 +57,12 @@ end
 ## Basic Usage
 
 ```erlang
-1> {ok, JSON} = euneus:encode_to_binary(#{name => #{english => <<"Charmander">>, japanese => <<"ヒトカゲ"/utf8>>}, caught_at => erlang:timestamp(), type => [fire], profile => #{height => 0.6, weight => 8}, ability => #{0 => <<"Blaze">>, 1 => undefined}}).
-{ok, <<"{\"name\":{\"english\":\"Charmander\",\"japanese\":\"ヒトカゲ\"},\"profile\":{\"height\":0.6,\"weight\":8},\"type\":[\"fire\"],\"caught_at\":\"2023-10-24T05:47:04.939Z\",\"ability\":{\"0\":\"Blaze\",\"1\":null}}">>}
+1> {ok, JSON} = euneus:encode_to_binary(#{name => #{english => <<"Charmander">>, japanese => <<"ヒトカゲ"/utf8>>}, type => [fire], profile => #{height => 0.6, weight => 8}, ability => #{0 => <<"Blaze">>, 1 => undefined}}).
+{ok, <<"{\"name\":{\"english\":\"Charmander\",\"japanese\":\"ヒトカゲ\"},\"profile\":{\"height\":0.6,\"weight\":8},\"type\":[\"fire\"],\"ability\":{\"0\":\"Blaze\",\"1\":null}}">>}
 
 2> euneus:decode(JSON).
 {ok,#{<<"ability">> =>
           #{<<"0">> => <<"Blaze">>,<<"1">> => undefined},
-      <<"caught_at">> => {1698,126333,753000},
       <<"name">> =>
           #{<<"english">> => <<"Charmander">>,
             <<"japanese">> =>
@@ -85,7 +84,6 @@ end
                 <<227,131,146,227,131,136,227,130,171,227,130,178>>},
       profile => #{height => 0.6,weight => 8},
       type => [<<"fire">>],
-      caught_at => {1698,126333,753000},
       ability => #{0 => <<"Blaze">>,1 => undefined}}}
 ```
 
@@ -93,23 +91,21 @@ end
 
 <!-- Generated via https://www.tablesgenerator.com/markdown_tables -->
 <!-- To edit, open "./assets/md-tables/data-mapping.tgn" in the link above. -->
-| **Erlang ->**                	| **Encode Options ->**                                                                                                                                     	| **JSON ->**                 	| **Decode Options ->**                                                                                           	| **Erlang**                   	|
-|------------------------------	|-----------------------------------------------------------------------------------------------------------------------------------------------------------	|-----------------------------	|-----------------------------------------------------------------------------------------------------------------	|------------------------------	|
-| undefined                    	| #{}                                                                                                                                                       	| null                        	| #{}                                                                                                             	| undefined                    	|
-| undefined                    	| #{}                                                                                                                                                       	| null                        	| #{null_term => nil}                                                                                             	| nil                          	|
-| true                         	| #{}                                                                                                                                                       	| true                        	| #{}                                                                                                             	| true                         	|
-| false                        	| #{}                                                                                                                                                       	| false                       	| #{}                                                                                                             	| false                        	|
-| abc                          	| #{}                                                                                                                                                       	| "abc"                       	| #{}                                                                                                             	| <<"abc">>                    	|
-| "abc"                        	| #{}                                                                                                                                                       	| [97,98,99]                  	| #{}                                                                                                             	| "abc"                        	|
-| <<"abc">>                    	| #{}                                                                                                                                                       	| "abc"                       	| #{}                                                                                                             	| <<"abc">>                    	|
-| {{1970,1,1},{0,0,0}}         	| #{}                                                                                                                                                       	| "1970-01-01T00:00:00Z"      	| #{}                                                                                                             	| {{1970,1,1},{0,0,0}}         	|
-| {0,0,0}                      	| #{}                                                                                                                                                       	| "1970-01-01T00:00:00.000Z"  	| #{}                                                                                                             	| {0,0,0}                      	|
-| 123                          	| #{}                                                                                                                                                       	| 123                         	| #{}                                                                                                             	| 123                          	|
-| 123.45600                    	| #{}                                                                                                                                                       	| 123.456                     	| #{}                                                                                                             	| 123.456                      	|
-| [<<"foo">>,true,0,undefined] 	| #{}                                                                                                                                                       	| ["foo",true,0,null]         	| #{}                                                                                                             	| [<<"foo">>,true,0,undefined] 	|
-| #{foo => bar}                	| #{}                                                                                                                                                       	| {"foo":"bar"}               	| #{}                                                                                                             	| #{<<"foo">> => <<"bar">>}    	|
-| #{foo => bar}                	| #{}                                                                                                                                                       	| {"foo":"bar"}               	| #{keys => to_existing_atom}                                                                                     	| #{foo => <<"bar">>}          	|
-| #{0 => 0}                    	| #{}                                                                                                                                                       	| {"0":0}                     	| #{keys => to_integer}                                                                                           	| #{0 => 0}                    	|
+| **Erlang ->**                	| **Encode Options ->**                                                                                                                                      	| **JSON ->**                 	| **Decode Options ->**                                                                                           	| **Erlang**                   	|
+|------------------------------	|------------------------------------------------------------------------------------------------------------------------------------------------------------	|-----------------------------	|-----------------------------------------------------------------------------------------------------------------	|------------------------------	|
+| undefined                    	| #{}                                                                                                                                                        	| null                        	| #{}                                                                                                             	| undefined                    	|
+| undefined                    	| #{}                                                                                                                                                        	| null                        	| #{null_term => nil}                                                                                             	| nil                          	|
+| true                         	| #{}                                                                                                                                                        	| true                        	| #{}                                                                                                             	| true                         	|
+| false                        	| #{}                                                                                                                                                        	| false                       	| #{}                                                                                                             	| false                        	|
+| abc                          	| #{}                                                                                                                                                        	| "abc"                       	| #{}                                                                                                             	| <<"abc">>                    	|
+| "abc"                        	| #{}                                                                                                                                                        	| [97,98,99]                  	| #{}                                                                                                             	| "abc"                        	|
+| <<"abc">>                    	| #{}                                                                                                                                                        	| "abc"                       	| #{}                                                                                                             	| <<"abc">>                    	|
+| 123                          	| #{}                                                                                                                                                        	| 123                         	| #{}                                                                                                             	| 123                          	|
+| 123.45600                    	| #{}                                                                                                                                                        	| 123.456                     	| #{}                                                                                                             	| 123.456                      	|
+| [<<"foo">>,true,0,undefined] 	| #{}                                                                                                                                                        	| ["foo",true,0,null]         	| #{}                                                                                                             	| [<<"foo">>,true,0,undefined] 	|
+| #{foo => bar}                	| #{}                                                                                                                                                        	| {"foo":"bar"}               	| #{}                                                                                                             	| #{<<"foo">> => <<"bar">>}    	|
+| #{foo => bar}                	| #{}                                                                                                                                                        	| {"foo":"bar"}               	| #{keys => to_existing_atom}                                                                                     	| #{foo => <<"bar">>}          	|
+| #{0 => 0}                    	| #{}                                                                                                                                                        	| {"0":0}                     	| #{keys => to_integer}                                                                                           	| #{0 => 0}                    	|
 | {myrecord, val}              	| #{unhandled_encoder => fun({myrecord, Val}, Opts) -><br>    Encode = maps:get(list_encoder, Opts),<br>    Encode([myrecord, #{key => Val}], Opts)<br>end}) 	| ["myrecord", {"key":"val"}] 	| #{arrays => fun([<<"myrecord">>, #{<<"key">> := Val}], _Opts) -><br>    {myrecord, binary_to_atom(Val)}<br>end} 	| {myrecord, val}              	|
 
 ### Why not more built-in types?
@@ -166,10 +162,6 @@ Available encode options:
     list_encoder => function((list(), euneus_encoder:options()) -> iolist()),
     %% map_encoder allow override the map() encoding.
     map_encoder => function((map(), euneus_encoder:options()) -> iolist()),
-    %% datetime_encoder allow override the calendar:datetime() encoding.
-    datetime_encoder => function((calendar:datetime(), euneus_encoder:options()) -> iolist()),
-    %% timestamp_encoder allow override the erlang:timestamp() encoding.
-    timestamp_encoder => function((erlang:timestamp(), euneus_encoder:options()) -> iolist()),
     %% unhandled_encoder allow encode any custom term (default: raise unsupported_type error).
     unhandled_encoder => function((term(), euneus_encoder:options()) -> iolist()),
     %% escaper allow override the binary escaping (default: json)
@@ -338,10 +330,6 @@ The benchmarks use the smart versions. Please the [Smart modules](#smart-modules
 
 ### Encode
 
-> **Note**
->
-> `Thoas` does not permit any customization.
-
 <!-- Generated via https://www.tablesgenerator.com/markdown_tables -->
 <!-- To edit, open "./assets/md-tables/bench-encode.tgn" in the link above. -->
 | **File**                   	|  **Euneus** 	| **Thoas** 	| **Comparison** 	|
@@ -357,9 +345,7 @@ The benchmarks use the smart versions. Please the [Smart modules](#smart-modules
 | utf-8-escaped.json         	| **11.99 K** 	|   10.63 K 	|          1.13x 	|
 | utf-8-unescaped.json       	| **11.99 K** 	|   10.89 K 	|          1.10x 	|
 
-> **Note**
->
-> `Thoas` does not permit any customization and does not decode `ISO 8601` dates to erlang term, but Euneus decodes out of the box, for example, `"1970-01-01T00:00:00Z"` to `{{1970,01,01},{0,0,0}}` :: [calendar:datetime()](https://www.erlang.org/doc/man/calendar.html#data-types) and `"1970-01-01T00:00:00.000Z"` to `{0,0,0}` :: [erlang:timestamp()](https://www.erlang.org/doc/man/os#timestamp-0).
+### Decode
 
 <!-- Generated via https://www.tablesgenerator.com/markdown_tables -->
 <!-- To edit, open "./assets/md-tables/bench-decode.tgn" in the link above. -->

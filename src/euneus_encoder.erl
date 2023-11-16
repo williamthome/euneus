@@ -27,8 +27,6 @@
 -compile({ inline, encode_float/2 }).
 -compile({ inline, encode_list/2 }).
 -compile({ inline, encode_map/2 }).
--compile({ inline, encode_datetime/2 }).
--compile({ inline, encode_timestamp/2 }).
 -compile({ inline, encode_unhandled/2 }).
 -compile({ inline, escape_json/4 }).
 -compile({ inline, escape_json_chunk/5 }).
@@ -60,8 +58,6 @@
 -export([ encode_float/2 ]).
 -export([ encode_list/2 ]).
 -export([ encode_map/2 ]).
--export([ encode_datetime/2 ]).
--export([ encode_timestamp/2 ]).
 -export([ encode_unhandled/2 ]).
 -export([ escape/2 ]).
 -export([ escape_byte/1 ]).
@@ -90,8 +86,6 @@
                     , float_encoder => encoder(float())
                     , list_encoder => encoder(list())
                     , map_encoder => encoder(map())
-                    , datetime_encoder => encoder(calendar:datetime())
-                    , timestamp_encoder => encoder(erlang:timestamp())
                     , unhandled_encoder => encoder(term())
                     , escaper => json
                                | html
@@ -114,9 +108,6 @@
                              , error_stacktrace() ) -> error_stacktrace()).
 
 %% Macros
-
--define(min(X, Min), is_integer(X) andalso X >= Min).
--define(range(X, Min, Max), is_integer(X) andalso X >= Min andalso X =< Max).
 
 -define(NON_PRINTABLE_LAST, 31).
 -define(ONE_BYTE_LAST, 127).
@@ -180,12 +171,6 @@ parse_opts(Opts) ->
         end),
         map_encoder => maps_get(map_encoder, Opts, fun (X, O) ->
             encode_map(X, O)
-        end),
-        datetime_encoder => maps_get(datetime_encoder, Opts, fun (X, O) ->
-            encode_datetime(X, O)
-        end),
-        timestamp_encoder => maps_get(timestamp_encoder, Opts, fun (X, O) ->
-            encode_timestamp(X, O)
         end),
         unhandled_encoder => maps_get(unhandled_encoder, Opts, fun (X, O) ->
             encode_unhandled(X, O)
@@ -275,22 +260,6 @@ do_encode_map_loop([], _Opts) ->
     [$}];
 do_encode_map_loop([{K, V} | T], Opts) ->
     [$,, key(K, Opts), $:, value(V, Opts) | do_encode_map_loop(T, Opts)].
-
-encode_datetime({{YYYY,MM,DD},{H,M,S}}, Opts) ->
-    DateTime = iolist_to_binary(io_lib:format(
-        "~4.10.0B-~2.10.0B-~2.10.0BT~2.10.0B:~2.10.0B:~2.10.0BZ",
-        [YYYY,MM,DD,H,M,S])
-    ),
-    escape(DateTime, Opts).
-
-encode_timestamp({_,_,MicroSecs} = Timestamp, Opts) ->
-    MilliSecs = MicroSecs div 1000,
-    {{YYYY,MM,DD},{H,M,S}} = calendar:now_to_datetime(Timestamp),
-    DateTime = iolist_to_binary(io_lib:format(
-        "~4.10.0B-~2.10.0B-~2.10.0BT~2.10.0B:~2.10.0B:~2.10.0B.~3.10.0BZ",
-        [YYYY,MM,DD,H,M,S,MilliSecs])
-    ),
-    escape(DateTime, Opts).
 
 encode_unhandled(Term, _Opts) ->
     throw_unsupported_type_error(Term).
@@ -712,13 +681,6 @@ encode_term(List, #{list_encoder := Encode} = Opts) when is_list(List) ->
     Encode(List, Opts);
 encode_term(Map, #{map_encoder := Encode} = Opts) when is_map(Map) ->
     Encode(Map, Opts);
-encode_term({{YYYY,MM,DD},{H,M,S}} = DateTime, #{datetime_encoder := Encode} = Opts)
-  when ?min(YYYY, 0), ?range(MM, 1, 12), ?range(DD, 1, 31)
-     , ?range(H, 0, 23), ?range(M, 0, 59), ?range(S, 0, 59) ->
-    Encode(DateTime, Opts);
-encode_term({MegaSecs,Secs,MicroSecs} = Timestamp, #{timestamp_encoder := Encode} = Opts)
-  when ?min(MegaSecs, 0), ?min(Secs, 0), ?min(MicroSecs, 0) ->
-    Encode(Timestamp, Opts);
 encode_term(Term, #{unhandled_encoder := Encode} = Opts) ->
     Encode(Term, Opts).
 
@@ -758,9 +720,7 @@ encode_test() ->
         {{ok, <<"123.456789">>}, 123.45678900, #{}},
         {{ok, <<"[true,0,null]">>}, [true,0,undefined], #{}},
         {{ok, <<"{\"foo\":\"bar\"}">>}, #{foo => bar}, #{}},
-        {{ok, <<"{\"0\":0}">>}, #{0 => 0}, #{}},
-        {{ok, <<"\"1970-01-01T00:00:00Z\"">>}, {{1970,1,1},{0,0,0}}, #{}},
-        {{ok, <<"\"1970-01-01T00:00:00.000Z\"">>}, {0,0,0}, #{}}
+        {{ok, <<"{\"0\":0}">>}, #{0 => 0}, #{}}
     ]].
 
 -endif.
