@@ -101,6 +101,10 @@ end
 
 ## Data Mapping
 
+> **Note**
+>
+> More types can be handled by using plugins. Please see the [Plugins](#plugins) section for more info.
+
 <!-- Generated via https://www.tablesgenerator.com/markdown_tables -->
 <!-- To edit, open "./assets/md-tables/data-mapping.tgn" in the link above. -->
 | **Erlang ->**                	| **Encode Options ->**                                                                                                                                      	| **JSON ->**                 	| **Decode Options ->**                                                                                           	| **Erlang**                   	|
@@ -122,14 +126,14 @@ end
 
 ### Why not more built-in types?
 
-The goal of `Euneus` is to have built-in types that can be encoded and then decoded to the original value. If you have any type that can be encoded and rolled back, feel free to open a [new issue](https://github.com/williamthome/euneus/issues/new) to discuss it.
+The goal of `Euneus` is to have built-in types that can be commonly encoded and decoded, but the range of types can be easily extended by using plugins.  Please see the [Plugins](#plugins) section for more info.
 
 ### Note about proplists
 
 Proplists are not handled by Euneus by default.
 
 There are three options:
-1. Use the built-in, or create your own, [proplist plugin](#plugins);
+1. Use the built-in, or create your own, [proplist plugin](#proplist);
 2. Convert proplists to maps before the encoding;
 3. Override the `list_encoder` option in the encoder to handle them, for example:
 
@@ -156,6 +160,8 @@ The reason for that is because it's impossible to know when a list is a proplist
 ## Plugins
 
 Euneus has a mechanism to easily plug in encoders and decoders. You can use the [built-in plugins](#built-in-plugins) to handle common types or create your own in a module by implementing the [euneus_plugin](/src/euneus_plugin.erl) behavior.
+
+If you have a built-in plugin suggestion, feel free to open a [new issue](https://github.com/williamthome/euneus/issues/new) to discuss it.
 
 ### Usage
 
