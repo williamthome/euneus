@@ -17,14 +17,26 @@ Like Thoas, both the parser and generator fully conform to
 - [Data Mapping](#data-mapping)
     - [Why not more built-in types?](#why-not-more-built-in-types)
     - [Note about proplists](#note-about-proplists)
+- [Plugins](#plugins)
+    - [Usage](#usage)
+        - [Encode](#encode)
+        - [Decode](#decode)
+    - [Built-in Plugins](#built-in-plugins)
+        - [datetime](#datetime)
+        - [inet](#inet)
+        - [pid](#pid)
+        - [port](#port)
+        - [proplist](#proplist)
+        - [reference](#reference)
+        - [timestamp](#timestamp)
 - [Differences to Thoas](#differences-to-thoas)
-    - [Encode](#encode)
-    - [Decode](#decode)
+    - [Encode](#encode-1)
+    - [Decode](#decode-1)
         - [Resuming](#resuming)
     - [Why Euneus over Thoas?](#why-euneus-over-thoas)
 - [Benchmarks](#benchmarks)
-    - [Encode](#encode-1)
-    - [Decode](#decode-1)
+    - [Encode](#encode-2)
+    - [Decode](#decode-2)
 - [Tests](#tests)
 - [Smart modules](#smart-modules)
 - [Credits](#credits)
@@ -114,7 +126,12 @@ The goal of `Euneus` is to have built-in types that can be encoded and then deco
 
 ### Note about proplists
 
-Proplists are not handled by Euneus, you must convert proplists to maps before the encoding or override the `list_encoder` option in the encoder to handle them, for example:
+Proplists are not handled by Euneus by default.
+
+There are three options:
+1. Use the built-in, or create your own, [proplist plugin](#plugins);
+2. Convert proplists to maps before the encoding;
+3. Override the `list_encoder` option in the encoder to handle them, for example:
 
 ```erlang
 1> Options = #{
@@ -136,11 +153,114 @@ Proplists are not handled by Euneus, you must convert proplists to maps before t
 
 The reason for that is because it's impossible to know when a list is a proplist and also because a proplist cannot be decoded. Please see the [Why not more built-in types?](#why-not-more-built-in-types) section for more info about this decision.
 
+## Plugins
+
+Euneus has a mechanism to easily plug in encoders and decoders. You can use the [built-in plugins](#built-in-plugins) to handle common types or create your own in a module by implementing the [euneus_plugin](/src/euneus_plugin.erl) behavior.
+
+### Usage
+
+#### Encode
+
+```erlang
+euneus:encode(Term, #{plugins => [
+    % list of built-in or custom plugins
+]})
+```
+
+#### Decode
+
+```erlang
+euneus:decode(Term, #{plugins => [
+    % list of built-in or custom plugins
+]})
+```
+
+### Built-in Plugins
+
+#### datetime
+
+Encodes `calendar:datetime()` to ISO8601 as JSON string and decodes it back, for example:
+
+```erlang
+1> {ok, JSON} = euneus:encode_to_binary({{1970,1,1},{0,0,0}}, #{plugins => [datetime]}).
+{ok,<<"\"1970-01-01T00:00:00Z\"">>}
+
+2> euneus:decode(JSON, #{plugins => [datetime]}).
+{ok,{{1970,1,1},{0,0,0}}}
+```
+
+#### inet
+
+Encodes `inet:ip_address()` to IPV4 or IPV6 as JSON string and decodes it back, for example:
+
+```erlang
+1> {ok, JSON} = euneus:encode_to_binary({127,0,0,1}, #{plugins => [inet]}).
+{ok,<<"\"127.0.0.1\"">>}
+
+2> euneus:decode(JSON, #{plugins => [inet]}).
+{ok,{127,0,0,1}}
+```
+
+#### pid
+
+Encodes `erlang:pid()` to JSON string and decodes it back, for example:
+
+```erlang
+1> {ok, JSON} = euneus:encode_to_binary(list_to_pid("<0.92.0>"), #{plugins => [pid]}).
+{ok,<<"\"<0.92.0>\"">>}
+
+2> euneus:decode(JSON, #{plugins => [pid]}).
+{ok,<0.92.0>}
+```
+
+#### port
+
+Encodes `erlang:port()` to JSON string and decodes it back, for example:
+
+```erlang
+1> {ok, JSON} = euneus:encode_to_binary(list_to_port("#Port<0.1>"), #{plugins => [port]}).
+{ok,<<"\"#Port<0.1>\"">>}
+
+2> euneus:decode(JSON, #{plugins => [port]}).
+{ok,#Port<0.1>}
+```
+
+#### proplist
+
+Encodes `[{binary() | atom() | integer(), term()}]` to JSON object, for example:
+
+```erlang
+1> {ok, JSON} = euneus:encode_to_binary([{foo, bar}], #{plugins => [proplist]}).
+{ok,<<"{\"foo\":\"bar\"}">>}
+```
+
+#### reference
+
+Encodes `erlang:reference()` to JSON string and decodes it back, for example:
+
+```erlang
+1> {ok, JSON} = euneus:encode_to_binary(make_ref(), #{plugins => [reference]}).
+{ok,<<"\"#Ref<0.957048870.857473026.108035>\"">>}
+
+2> euneus:decode(JSON, #{plugins => [reference]}).
+{ok,#Ref<0.957048870.857473026.108035>}
+```
+
+#### timestamp
+
+Encodes `erlang:timestamp()` to ISO8601 as JSON string and decodes it back, for example:
+
+```erlang
+1> {ok, JSON} = euneus:encode_to_binary({0,0,0}, #{plugins => [timestamp]}).
+{ok,<<"\"1970-01-01T00:00:00.000Z\"">>}
+
+2> euneus:decode(JSON, #{plugins => [timestamp]}).
+{ok,{0,0,0}}
+```
+
 ## Differences to Thoas
 
-Euneus is based on [Thoas][thoas], so let's discuss the differences.
-
-The main difference between `Euneus` to `Thoas` is that Euneus gives more control to encoding or decoding data. All encode functions can be overridden and extended and all decoded data can be overridden and transformed.
+The main difference between `Euneus` to `Thoas` is that Euneus gives more control to encoding or decoding data. All encode functions can be overridden and extended and all decoded data can be overridden and transformed. Also, there is no plugin mechanism in Thoas.
 
 ### Encode
 
@@ -172,7 +292,16 @@ Available encode options:
              | function((binary(), euneus_encoder:options()) -> iolist()),
     error_handler => function(( error | exit | throw
                               , term()
-                              , erlang:stacktrace() ) -> euneus_encoder:result())
+                              , erlang:stacktrace() ) -> euneus_encoder:result()),
+    %% extends the encode types
+    plugins => datetime
+             | inet
+             | pid
+             | port
+             | proplist
+             | reference
+             | timestamp
+             | module()
 }
 ```
 
@@ -238,7 +367,15 @@ Available decode options:
             | to_atom
             | to_existing_atom
             | to_integer
-            | function((binary(), euneus_decoder:options()) -> term())
+            | function((binary(), euneus_decoder:options()) -> term()),
+    %% extends the decode types
+    plugins => datetime
+             | inet
+             | pid
+             | port
+             | reference
+             | timestamp
+             | module()
 }
 ```
 
