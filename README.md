@@ -101,7 +101,7 @@ end
 
 ## Data Mapping
 
-> **Note**
+> [!NOTE]
 >
 > More types can be handled by using plugins. Please see the [Plugins](#plugins) section for more info.
 
@@ -431,7 +431,7 @@ Euneus permits resuming the decoding when an invalid token is found. Any value c
 {ok,[foo,foo,#{<<"foo">> => foo}]}
 ```
 
-> **Note**
+> [!NOTE]
 >
 > By using `euneus_decoder:resume/6` the replacement will be the `null_term` option.
 
@@ -449,7 +449,7 @@ Use `$ make bench.encode` or `$ make bench.decode` to run the benchmarks. Edit t
 
 The benchmarks use the smart versions. Please the [Smart modules](#smart-modules) section for more information.
 
-> **Note**
+> [!NOTE]
 >
 > - Results:
 >
@@ -515,7 +515,7 @@ Also, the parser is tested using [JSONTestSuite](https://github.com/nst/JSONTest
 
 See the [Euneus parser](https://github.com/nst/JSONTestSuite/tree/master/parsers/test_erlang_euneus) in JSONTestSuite.
 
-> **Note**
+> [!NOTE]
 >
 > All of the JSONTestSuite tests are embedded in Euneus tests.
 
@@ -590,7 +590,7 @@ $ make test
 $ make check
 ```
 
-> **Note**:
+> [!NOTE]:
 >
 > Open the [Makefile](Makefile) to see all commands.
 
