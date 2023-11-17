@@ -220,8 +220,7 @@ unhandled_encoder(Config) when is_list(Config) ->
         [${, [$", <<"key">>, $"], $:, [$", <<"val">>, $"], $}],
     $]]]} = encode({myrecord, val}, #{
         unhandled_encoder => fun({myrecord, Val}, Opts) ->
-            Encode = maps:get(list_encoder, Opts),
-            Encode([myrecord, #{key => Val}], Opts)
+            euneus_encoder:encode_list([myrecord, #{key => Val}], Opts)
         end
     }).
 
