@@ -1008,8 +1008,8 @@ plugins([inet | T], Term, Opts) ->
             plugins(T, Term, Opts)
     end;
 plugins([pid | T], Term, Opts) ->
-    case is_binary(Term) of
-        true ->
+    case Term of
+        <<$<, _/bitstring>> ->
             try
                 Pid = list_to_pid(binary_to_list(Term)),
                 {halt, Pid}
@@ -1017,12 +1017,12 @@ plugins([pid | T], Term, Opts) ->
                 error:badarg ->
                     plugins(T, Term, Opts)
             end;
-        false ->
+        _ ->
             plugins(T, Term, Opts)
     end;
 plugins([port | T], Term, Opts) ->
-    case is_binary(Term) of
-        true ->
+    case Term of
+        <<"#Port<", _/bitstring>> ->
             try
                 Port = list_to_port(binary_to_list(Term)),
                 {halt, Port}
@@ -1030,12 +1030,12 @@ plugins([port | T], Term, Opts) ->
                 error:badarg ->
                     plugins(T, Term, Opts)
             end;
-        false ->
+        _ ->
             plugins(T, Term, Opts)
     end;
 plugins([reference | T], Term, Opts) ->
-    case is_binary(Term) of
-        true ->
+    case Term of
+        <<"#Ref<", _/bitstring>> ->
             try
                 Ref = list_to_ref(binary_to_list(Term)),
                 {halt, Ref}
@@ -1043,7 +1043,7 @@ plugins([reference | T], Term, Opts) ->
                 error:badarg ->
                     plugins(T, Term, Opts)
             end;
-        false ->
+        _ ->
             plugins(T, Term, Opts)
     end;
 plugins([timestamp | T], Term, Opts) ->
