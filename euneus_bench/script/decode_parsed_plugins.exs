@@ -4,11 +4,11 @@ opts =
   :euneus.parse_decode_opts(%{
     plugins: [
       :datetime,
-      :inet,
+      :timestamp,
       :pid,
       :port,
       :reference,
-      :timestamp
+      :inet
     ]
   })
 

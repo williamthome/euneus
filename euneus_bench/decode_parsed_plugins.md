@@ -1,6 +1,6 @@
 Benchmark
 
-Benchmark run from 2023-11-17 20:39:15.426491Z UTC
+Benchmark run from 2023-11-17 21:17:25.443284Z UTC
 
 ## System
 
@@ -65,56 +65,56 @@ Run Time
 
   <tr>
     <td style="white-space: nowrap">jiffy</td>
-    <td style="white-space: nowrap; text-align: right">5.89 K</td>
-    <td style="white-space: nowrap; text-align: right">169.69 &micro;s</td>
-    <td style="white-space: nowrap; text-align: right">&plusmn;47.11%</td>
-    <td style="white-space: nowrap; text-align: right">149.16 &micro;s</td>
-    <td style="white-space: nowrap; text-align: right">567.30 &micro;s</td>
+    <td style="white-space: nowrap; text-align: right">5.98 K</td>
+    <td style="white-space: nowrap; text-align: right">167.24 &micro;s</td>
+    <td style="white-space: nowrap; text-align: right">&plusmn;44.49%</td>
+    <td style="white-space: nowrap; text-align: right">148.73 &micro;s</td>
+    <td style="white-space: nowrap; text-align: right">525.20 &micro;s</td>
   </tr>
 
   <tr>
     <td style="white-space: nowrap">Jason</td>
-    <td style="white-space: nowrap; text-align: right">5.56 K</td>
-    <td style="white-space: nowrap; text-align: right">179.91 &micro;s</td>
-    <td style="white-space: nowrap; text-align: right">&plusmn;45.71%</td>
-    <td style="white-space: nowrap; text-align: right">154.36 &micro;s</td>
-    <td style="white-space: nowrap; text-align: right">521.18 &micro;s</td>
+    <td style="white-space: nowrap; text-align: right">5.59 K</td>
+    <td style="white-space: nowrap; text-align: right">179.03 &micro;s</td>
+    <td style="white-space: nowrap; text-align: right">&plusmn;45.33%</td>
+    <td style="white-space: nowrap; text-align: right">154.38 &micro;s</td>
+    <td style="white-space: nowrap; text-align: right">512.95 &micro;s</td>
   </tr>
 
   <tr>
     <td style="white-space: nowrap">thoas</td>
-    <td style="white-space: nowrap; text-align: right">4.89 K</td>
-    <td style="white-space: nowrap; text-align: right">204.70 &micro;s</td>
-    <td style="white-space: nowrap; text-align: right">&plusmn;30.61%</td>
-    <td style="white-space: nowrap; text-align: right">186.24 &micro;s</td>
-    <td style="white-space: nowrap; text-align: right">488.61 &micro;s</td>
+    <td style="white-space: nowrap; text-align: right">4.86 K</td>
+    <td style="white-space: nowrap; text-align: right">205.79 &micro;s</td>
+    <td style="white-space: nowrap; text-align: right">&plusmn;29.84%</td>
+    <td style="white-space: nowrap; text-align: right">186.79 &micro;s</td>
+    <td style="white-space: nowrap; text-align: right">479.75 &micro;s</td>
   </tr>
 
   <tr>
     <td style="white-space: nowrap">jsone</td>
-    <td style="white-space: nowrap; text-align: right">4.26 K</td>
-    <td style="white-space: nowrap; text-align: right">234.86 &micro;s</td>
-    <td style="white-space: nowrap; text-align: right">&plusmn;31.72%</td>
-    <td style="white-space: nowrap; text-align: right">222.43 &micro;s</td>
-    <td style="white-space: nowrap; text-align: right">487.24 &micro;s</td>
+    <td style="white-space: nowrap; text-align: right">4.25 K</td>
+    <td style="white-space: nowrap; text-align: right">235.14 &micro;s</td>
+    <td style="white-space: nowrap; text-align: right">&plusmn;32.07%</td>
+    <td style="white-space: nowrap; text-align: right">222.02 &micro;s</td>
+    <td style="white-space: nowrap; text-align: right">485.72 &micro;s</td>
   </tr>
 
   <tr>
     <td style="white-space: nowrap">jsx</td>
-    <td style="white-space: nowrap; text-align: right">1.84 K</td>
-    <td style="white-space: nowrap; text-align: right">544.06 &micro;s</td>
-    <td style="white-space: nowrap; text-align: right">&plusmn;12.58%</td>
-    <td style="white-space: nowrap; text-align: right">546.43 &micro;s</td>
-    <td style="white-space: nowrap; text-align: right">719.43 &micro;s</td>
+    <td style="white-space: nowrap; text-align: right">1.83 K</td>
+    <td style="white-space: nowrap; text-align: right">546.65 &micro;s</td>
+    <td style="white-space: nowrap; text-align: right">&plusmn;11.94%</td>
+    <td style="white-space: nowrap; text-align: right">551.52 &micro;s</td>
+    <td style="white-space: nowrap; text-align: right">709.47 &micro;s</td>
   </tr>
 
   <tr>
     <td style="white-space: nowrap">euneus</td>
-    <td style="white-space: nowrap; text-align: right">0.90 K</td>
-    <td style="white-space: nowrap; text-align: right">1113.12 &micro;s</td>
-    <td style="white-space: nowrap; text-align: right">&plusmn;11.14%</td>
-    <td style="white-space: nowrap; text-align: right">1104.19 &micro;s</td>
-    <td style="white-space: nowrap; text-align: right">1480.44 &micro;s</td>
+    <td style="white-space: nowrap; text-align: right">1.64 K</td>
+    <td style="white-space: nowrap; text-align: right">610.01 &micro;s</td>
+    <td style="white-space: nowrap; text-align: right">&plusmn;11.08%</td>
+    <td style="white-space: nowrap; text-align: right">596.30 &micro;s</td>
+    <td style="white-space: nowrap; text-align: right">766.52 &micro;s</td>
   </tr>
 
 </table>
@@ -129,38 +129,38 @@ Run Time Comparison
     <th style="text-align: right">Slower</th>
   <tr>
     <td style="white-space: nowrap">jiffy</td>
-    <td style="white-space: nowrap;text-align: right">5.89 K</td>
+    <td style="white-space: nowrap;text-align: right">5.98 K</td>
     <td>&nbsp;</td>
   </tr>
 
   <tr>
     <td style="white-space: nowrap">Jason</td>
-    <td style="white-space: nowrap; text-align: right">5.56 K</td>
-    <td style="white-space: nowrap; text-align: right">1.06x</td>
+    <td style="white-space: nowrap; text-align: right">5.59 K</td>
+    <td style="white-space: nowrap; text-align: right">1.07x</td>
   </tr>
 
   <tr>
     <td style="white-space: nowrap">thoas</td>
-    <td style="white-space: nowrap; text-align: right">4.89 K</td>
-    <td style="white-space: nowrap; text-align: right">1.21x</td>
+    <td style="white-space: nowrap; text-align: right">4.86 K</td>
+    <td style="white-space: nowrap; text-align: right">1.23x</td>
   </tr>
 
   <tr>
     <td style="white-space: nowrap">jsone</td>
-    <td style="white-space: nowrap; text-align: right">4.26 K</td>
-    <td style="white-space: nowrap; text-align: right">1.38x</td>
+    <td style="white-space: nowrap; text-align: right">4.25 K</td>
+    <td style="white-space: nowrap; text-align: right">1.41x</td>
   </tr>
 
   <tr>
     <td style="white-space: nowrap">jsx</td>
-    <td style="white-space: nowrap; text-align: right">1.84 K</td>
-    <td style="white-space: nowrap; text-align: right">3.21x</td>
+    <td style="white-space: nowrap; text-align: right">1.83 K</td>
+    <td style="white-space: nowrap; text-align: right">3.27x</td>
   </tr>
 
   <tr>
     <td style="white-space: nowrap">euneus</td>
-    <td style="white-space: nowrap; text-align: right">0.90 K</td>
-    <td style="white-space: nowrap; text-align: right">6.56x</td>
+    <td style="white-space: nowrap; text-align: right">1.64 K</td>
+    <td style="white-space: nowrap; text-align: right">3.65x</td>
   </tr>
 
 </table>
@@ -202,8 +202,8 @@ Memory Usage
   </tr>
     <tr>
     <td style="white-space: nowrap">euneus</td>
-    <td style="white-space: nowrap">1165.27 KB</td>
-    <td>753.31x</td>
+    <td style="white-space: nowrap">558.15 KB</td>
+    <td>360.82x</td>
   </tr>
 </table>
 
@@ -225,56 +225,56 @@ Run Time
 
   <tr>
     <td style="white-space: nowrap">jiffy</td>
-    <td style="white-space: nowrap; text-align: right">965.28</td>
-    <td style="white-space: nowrap; text-align: right">1.04 ms</td>
-    <td style="white-space: nowrap; text-align: right">&plusmn;22.74%</td>
-    <td style="white-space: nowrap; text-align: right">1.09 ms</td>
-    <td style="white-space: nowrap; text-align: right">1.45 ms</td>
+    <td style="white-space: nowrap; text-align: right">975.66</td>
+    <td style="white-space: nowrap; text-align: right">1.02 ms</td>
+    <td style="white-space: nowrap; text-align: right">&plusmn;24.71%</td>
+    <td style="white-space: nowrap; text-align: right">1.02 ms</td>
+    <td style="white-space: nowrap; text-align: right">1.61 ms</td>
   </tr>
 
   <tr>
     <td style="white-space: nowrap">thoas</td>
-    <td style="white-space: nowrap; text-align: right">495.59</td>
-    <td style="white-space: nowrap; text-align: right">2.02 ms</td>
-    <td style="white-space: nowrap; text-align: right">&plusmn;5.60%</td>
-    <td style="white-space: nowrap; text-align: right">1.97 ms</td>
-    <td style="white-space: nowrap; text-align: right">2.38 ms</td>
+    <td style="white-space: nowrap; text-align: right">492.76</td>
+    <td style="white-space: nowrap; text-align: right">2.03 ms</td>
+    <td style="white-space: nowrap; text-align: right">&plusmn;5.00%</td>
+    <td style="white-space: nowrap; text-align: right">1.98 ms</td>
+    <td style="white-space: nowrap; text-align: right">2.34 ms</td>
   </tr>
 
   <tr>
     <td style="white-space: nowrap">Jason</td>
-    <td style="white-space: nowrap; text-align: right">469.39</td>
-    <td style="white-space: nowrap; text-align: right">2.13 ms</td>
-    <td style="white-space: nowrap; text-align: right">&plusmn;6.82%</td>
+    <td style="white-space: nowrap; text-align: right">467.73</td>
     <td style="white-space: nowrap; text-align: right">2.14 ms</td>
-    <td style="white-space: nowrap; text-align: right">2.44 ms</td>
+    <td style="white-space: nowrap; text-align: right">&plusmn;7.07%</td>
+    <td style="white-space: nowrap; text-align: right">2.15 ms</td>
+    <td style="white-space: nowrap; text-align: right">2.45 ms</td>
   </tr>
 
   <tr>
     <td style="white-space: nowrap">jsone</td>
-    <td style="white-space: nowrap; text-align: right">278.04</td>
-    <td style="white-space: nowrap; text-align: right">3.60 ms</td>
-    <td style="white-space: nowrap; text-align: right">&plusmn;3.97%</td>
-    <td style="white-space: nowrap; text-align: right">3.53 ms</td>
-    <td style="white-space: nowrap; text-align: right">3.96 ms</td>
+    <td style="white-space: nowrap; text-align: right">278.18</td>
+    <td style="white-space: nowrap; text-align: right">3.59 ms</td>
+    <td style="white-space: nowrap; text-align: right">&plusmn;3.91%</td>
+    <td style="white-space: nowrap; text-align: right">3.52 ms</td>
+    <td style="white-space: nowrap; text-align: right">3.99 ms</td>
   </tr>
 
   <tr>
     <td style="white-space: nowrap">jsx</td>
-    <td style="white-space: nowrap; text-align: right">164.49</td>
-    <td style="white-space: nowrap; text-align: right">6.08 ms</td>
-    <td style="white-space: nowrap; text-align: right">&plusmn;4.78%</td>
-    <td style="white-space: nowrap; text-align: right">6.03 ms</td>
-    <td style="white-space: nowrap; text-align: right">7.51 ms</td>
+    <td style="white-space: nowrap; text-align: right">165.33</td>
+    <td style="white-space: nowrap; text-align: right">6.05 ms</td>
+    <td style="white-space: nowrap; text-align: right">&plusmn;2.66%</td>
+    <td style="white-space: nowrap; text-align: right">6.02 ms</td>
+    <td style="white-space: nowrap; text-align: right">6.50 ms</td>
   </tr>
 
   <tr>
     <td style="white-space: nowrap">euneus</td>
-    <td style="white-space: nowrap; text-align: right">94.08</td>
-    <td style="white-space: nowrap; text-align: right">10.63 ms</td>
-    <td style="white-space: nowrap; text-align: right">&plusmn;1.64%</td>
-    <td style="white-space: nowrap; text-align: right">10.60 ms</td>
-    <td style="white-space: nowrap; text-align: right">11.37 ms</td>
+    <td style="white-space: nowrap; text-align: right">148.98</td>
+    <td style="white-space: nowrap; text-align: right">6.71 ms</td>
+    <td style="white-space: nowrap; text-align: right">&plusmn;2.11%</td>
+    <td style="white-space: nowrap; text-align: right">6.72 ms</td>
+    <td style="white-space: nowrap; text-align: right">7.32 ms</td>
   </tr>
 
 </table>
@@ -289,38 +289,38 @@ Run Time Comparison
     <th style="text-align: right">Slower</th>
   <tr>
     <td style="white-space: nowrap">jiffy</td>
-    <td style="white-space: nowrap;text-align: right">965.28</td>
+    <td style="white-space: nowrap;text-align: right">975.66</td>
     <td>&nbsp;</td>
   </tr>
 
   <tr>
     <td style="white-space: nowrap">thoas</td>
-    <td style="white-space: nowrap; text-align: right">495.59</td>
-    <td style="white-space: nowrap; text-align: right">1.95x</td>
+    <td style="white-space: nowrap; text-align: right">492.76</td>
+    <td style="white-space: nowrap; text-align: right">1.98x</td>
   </tr>
 
   <tr>
     <td style="white-space: nowrap">Jason</td>
-    <td style="white-space: nowrap; text-align: right">469.39</td>
-    <td style="white-space: nowrap; text-align: right">2.06x</td>
+    <td style="white-space: nowrap; text-align: right">467.73</td>
+    <td style="white-space: nowrap; text-align: right">2.09x</td>
   </tr>
 
   <tr>
     <td style="white-space: nowrap">jsone</td>
-    <td style="white-space: nowrap; text-align: right">278.04</td>
-    <td style="white-space: nowrap; text-align: right">3.47x</td>
+    <td style="white-space: nowrap; text-align: right">278.18</td>
+    <td style="white-space: nowrap; text-align: right">3.51x</td>
   </tr>
 
   <tr>
     <td style="white-space: nowrap">jsx</td>
-    <td style="white-space: nowrap; text-align: right">164.49</td>
-    <td style="white-space: nowrap; text-align: right">5.87x</td>
+    <td style="white-space: nowrap; text-align: right">165.33</td>
+    <td style="white-space: nowrap; text-align: right">5.9x</td>
   </tr>
 
   <tr>
     <td style="white-space: nowrap">euneus</td>
-    <td style="white-space: nowrap; text-align: right">94.08</td>
-    <td style="white-space: nowrap; text-align: right">10.26x</td>
+    <td style="white-space: nowrap; text-align: right">148.98</td>
+    <td style="white-space: nowrap; text-align: right">6.55x</td>
   </tr>
 
 </table>
@@ -362,8 +362,8 @@ Memory Usage
   </tr>
     <tr>
     <td style="white-space: nowrap">euneus</td>
-    <td style="white-space: nowrap">8.54 MB</td>
-    <td>33.25x</td>
+    <td style="white-space: nowrap">5.03 MB</td>
+    <td>19.57x</td>
   </tr>
 </table>
 
@@ -386,55 +386,55 @@ Run Time
   <tr>
     <td style="white-space: nowrap">jiffy</td>
     <td style="white-space: nowrap; text-align: right">2.70 K</td>
-    <td style="white-space: nowrap; text-align: right">371.01 &micro;s</td>
-    <td style="white-space: nowrap; text-align: right">&plusmn;22.73%</td>
-    <td style="white-space: nowrap; text-align: right">346.81 &micro;s</td>
-    <td style="white-space: nowrap; text-align: right">679.38 &micro;s</td>
+    <td style="white-space: nowrap; text-align: right">371.03 &micro;s</td>
+    <td style="white-space: nowrap; text-align: right">&plusmn;22.76%</td>
+    <td style="white-space: nowrap; text-align: right">348.45 &micro;s</td>
+    <td style="white-space: nowrap; text-align: right">655.11 &micro;s</td>
   </tr>
 
   <tr>
     <td style="white-space: nowrap">Jason</td>
     <td style="white-space: nowrap; text-align: right">2.02 K</td>
-    <td style="white-space: nowrap; text-align: right">495.99 &micro;s</td>
-    <td style="white-space: nowrap; text-align: right">&plusmn;13.86%</td>
-    <td style="white-space: nowrap; text-align: right">487.75 &micro;s</td>
-    <td style="white-space: nowrap; text-align: right">655.30 &micro;s</td>
+    <td style="white-space: nowrap; text-align: right">494.61 &micro;s</td>
+    <td style="white-space: nowrap; text-align: right">&plusmn;12.81%</td>
+    <td style="white-space: nowrap; text-align: right">487.71 &micro;s</td>
+    <td style="white-space: nowrap; text-align: right">643.43 &micro;s</td>
   </tr>
 
   <tr>
     <td style="white-space: nowrap">thoas</td>
     <td style="white-space: nowrap; text-align: right">1.81 K</td>
-    <td style="white-space: nowrap; text-align: right">553.15 &micro;s</td>
-    <td style="white-space: nowrap; text-align: right">&plusmn;9.24%</td>
-    <td style="white-space: nowrap; text-align: right">560.78 &micro;s</td>
-    <td style="white-space: nowrap; text-align: right">696.57 &micro;s</td>
+    <td style="white-space: nowrap; text-align: right">552.82 &micro;s</td>
+    <td style="white-space: nowrap; text-align: right">&plusmn;8.91%</td>
+    <td style="white-space: nowrap; text-align: right">560.86 &micro;s</td>
+    <td style="white-space: nowrap; text-align: right">685.18 &micro;s</td>
   </tr>
 
   <tr>
     <td style="white-space: nowrap">jsone</td>
-    <td style="white-space: nowrap; text-align: right">1.41 K</td>
-    <td style="white-space: nowrap; text-align: right">707.27 &micro;s</td>
-    <td style="white-space: nowrap; text-align: right">&plusmn;8.22%</td>
-    <td style="white-space: nowrap; text-align: right">711.57 &micro;s</td>
-    <td style="white-space: nowrap; text-align: right">884.83 &micro;s</td>
-  </tr>
-
-  <tr>
-    <td style="white-space: nowrap">jsx</td>
-    <td style="white-space: nowrap; text-align: right">0.51 K</td>
-    <td style="white-space: nowrap; text-align: right">1955.37 &micro;s</td>
-    <td style="white-space: nowrap; text-align: right">&plusmn;5.75%</td>
-    <td style="white-space: nowrap; text-align: right">1951.61 &micro;s</td>
-    <td style="white-space: nowrap; text-align: right">2279.04 &micro;s</td>
+    <td style="white-space: nowrap; text-align: right">1.42 K</td>
+    <td style="white-space: nowrap; text-align: right">701.91 &micro;s</td>
+    <td style="white-space: nowrap; text-align: right">&plusmn;7.50%</td>
+    <td style="white-space: nowrap; text-align: right">709.14 &micro;s</td>
+    <td style="white-space: nowrap; text-align: right">845.09 &micro;s</td>
   </tr>
 
   <tr>
     <td style="white-space: nowrap">euneus</td>
-    <td style="white-space: nowrap; text-align: right">0.25 K</td>
-    <td style="white-space: nowrap; text-align: right">3961.16 &micro;s</td>
-    <td style="white-space: nowrap; text-align: right">&plusmn;2.84%</td>
-    <td style="white-space: nowrap; text-align: right">3966.72 &micro;s</td>
-    <td style="white-space: nowrap; text-align: right">4292.52 &micro;s</td>
+    <td style="white-space: nowrap; text-align: right">0.52 K</td>
+    <td style="white-space: nowrap; text-align: right">1921.26 &micro;s</td>
+    <td style="white-space: nowrap; text-align: right">&plusmn;3.72%</td>
+    <td style="white-space: nowrap; text-align: right">1927.53 &micro;s</td>
+    <td style="white-space: nowrap; text-align: right">2112.83 &micro;s</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">jsx</td>
+    <td style="white-space: nowrap; text-align: right">0.52 K</td>
+    <td style="white-space: nowrap; text-align: right">1936.19 &micro;s</td>
+    <td style="white-space: nowrap; text-align: right">&plusmn;4.29%</td>
+    <td style="white-space: nowrap; text-align: right">1947.14 &micro;s</td>
+    <td style="white-space: nowrap; text-align: right">2131.16 &micro;s</td>
   </tr>
 
 </table>
@@ -456,7 +456,7 @@ Run Time Comparison
   <tr>
     <td style="white-space: nowrap">Jason</td>
     <td style="white-space: nowrap; text-align: right">2.02 K</td>
-    <td style="white-space: nowrap; text-align: right">1.34x</td>
+    <td style="white-space: nowrap; text-align: right">1.33x</td>
   </tr>
 
   <tr>
@@ -467,20 +467,20 @@ Run Time Comparison
 
   <tr>
     <td style="white-space: nowrap">jsone</td>
-    <td style="white-space: nowrap; text-align: right">1.41 K</td>
-    <td style="white-space: nowrap; text-align: right">1.91x</td>
-  </tr>
-
-  <tr>
-    <td style="white-space: nowrap">jsx</td>
-    <td style="white-space: nowrap; text-align: right">0.51 K</td>
-    <td style="white-space: nowrap; text-align: right">5.27x</td>
+    <td style="white-space: nowrap; text-align: right">1.42 K</td>
+    <td style="white-space: nowrap; text-align: right">1.89x</td>
   </tr>
 
   <tr>
     <td style="white-space: nowrap">euneus</td>
-    <td style="white-space: nowrap; text-align: right">0.25 K</td>
-    <td style="white-space: nowrap; text-align: right">10.68x</td>
+    <td style="white-space: nowrap; text-align: right">0.52 K</td>
+    <td style="white-space: nowrap; text-align: right">5.18x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">jsx</td>
+    <td style="white-space: nowrap; text-align: right">0.52 K</td>
+    <td style="white-space: nowrap; text-align: right">5.22x</td>
   </tr>
 
 </table>
@@ -516,14 +516,14 @@ Memory Usage
     <td>10.15x</td>
   </tr>
     <tr>
+    <td style="white-space: nowrap">euneus</td>
+    <td style="white-space: nowrap">1896.52 KB</td>
+    <td>45.26x</td>
+  </tr>
+    <tr>
     <td style="white-space: nowrap">jsx</td>
     <td style="white-space: nowrap">1190.20 KB</td>
     <td>28.4x</td>
-  </tr>
-    <tr>
-    <td style="white-space: nowrap">euneus</td>
-    <td style="white-space: nowrap">4605.71 KB</td>
-    <td>109.91x</td>
   </tr>
 </table>
 
@@ -545,56 +545,56 @@ Run Time
 
   <tr>
     <td style="white-space: nowrap">jiffy</td>
-    <td style="white-space: nowrap; text-align: right">27.24</td>
-    <td style="white-space: nowrap; text-align: right">36.71 ms</td>
-    <td style="white-space: nowrap; text-align: right">&plusmn;1.39%</td>
-    <td style="white-space: nowrap; text-align: right">36.64 ms</td>
-    <td style="white-space: nowrap; text-align: right">39.56 ms</td>
+    <td style="white-space: nowrap; text-align: right">26.88</td>
+    <td style="white-space: nowrap; text-align: right">37.20 ms</td>
+    <td style="white-space: nowrap; text-align: right">&plusmn;1.09%</td>
+    <td style="white-space: nowrap; text-align: right">37.13 ms</td>
+    <td style="white-space: nowrap; text-align: right">39.52 ms</td>
   </tr>
 
   <tr>
     <td style="white-space: nowrap">Jason</td>
-    <td style="white-space: nowrap; text-align: right">17.03</td>
-    <td style="white-space: nowrap; text-align: right">58.72 ms</td>
-    <td style="white-space: nowrap; text-align: right">&plusmn;3.15%</td>
-    <td style="white-space: nowrap; text-align: right">58.72 ms</td>
-    <td style="white-space: nowrap; text-align: right">65.57 ms</td>
+    <td style="white-space: nowrap; text-align: right">17.15</td>
+    <td style="white-space: nowrap; text-align: right">58.29 ms</td>
+    <td style="white-space: nowrap; text-align: right">&plusmn;2.93%</td>
+    <td style="white-space: nowrap; text-align: right">58.33 ms</td>
+    <td style="white-space: nowrap; text-align: right">64.32 ms</td>
   </tr>
 
   <tr>
     <td style="white-space: nowrap">thoas</td>
-    <td style="white-space: nowrap; text-align: right">15.61</td>
-    <td style="white-space: nowrap; text-align: right">64.06 ms</td>
-    <td style="white-space: nowrap; text-align: right">&plusmn;1.04%</td>
-    <td style="white-space: nowrap; text-align: right">63.92 ms</td>
-    <td style="white-space: nowrap; text-align: right">67.05 ms</td>
+    <td style="white-space: nowrap; text-align: right">15.79</td>
+    <td style="white-space: nowrap; text-align: right">63.32 ms</td>
+    <td style="white-space: nowrap; text-align: right">&plusmn;1.20%</td>
+    <td style="white-space: nowrap; text-align: right">63.06 ms</td>
+    <td style="white-space: nowrap; text-align: right">67.23 ms</td>
   </tr>
 
   <tr>
     <td style="white-space: nowrap">jsone</td>
-    <td style="white-space: nowrap; text-align: right">9.41</td>
-    <td style="white-space: nowrap; text-align: right">106.30 ms</td>
-    <td style="white-space: nowrap; text-align: right">&plusmn;2.58%</td>
-    <td style="white-space: nowrap; text-align: right">107.13 ms</td>
-    <td style="white-space: nowrap; text-align: right">113.81 ms</td>
+    <td style="white-space: nowrap; text-align: right">9.36</td>
+    <td style="white-space: nowrap; text-align: right">106.80 ms</td>
+    <td style="white-space: nowrap; text-align: right">&plusmn;2.71%</td>
+    <td style="white-space: nowrap; text-align: right">106.73 ms</td>
+    <td style="white-space: nowrap; text-align: right">113.62 ms</td>
   </tr>
 
   <tr>
     <td style="white-space: nowrap">jsx</td>
-    <td style="white-space: nowrap; text-align: right">4.39</td>
-    <td style="white-space: nowrap; text-align: right">227.99 ms</td>
-    <td style="white-space: nowrap; text-align: right">&plusmn;1.82%</td>
-    <td style="white-space: nowrap; text-align: right">227.16 ms</td>
-    <td style="white-space: nowrap; text-align: right">237.51 ms</td>
+    <td style="white-space: nowrap; text-align: right">4.42</td>
+    <td style="white-space: nowrap; text-align: right">226.16 ms</td>
+    <td style="white-space: nowrap; text-align: right">&plusmn;1.32%</td>
+    <td style="white-space: nowrap; text-align: right">226.39 ms</td>
+    <td style="white-space: nowrap; text-align: right">232.20 ms</td>
   </tr>
 
   <tr>
     <td style="white-space: nowrap">euneus</td>
-    <td style="white-space: nowrap; text-align: right">1.91</td>
-    <td style="white-space: nowrap; text-align: right">524.71 ms</td>
-    <td style="white-space: nowrap; text-align: right">&plusmn;0.79%</td>
-    <td style="white-space: nowrap; text-align: right">523.33 ms</td>
-    <td style="white-space: nowrap; text-align: right">539.47 ms</td>
+    <td style="white-space: nowrap; text-align: right">3.65</td>
+    <td style="white-space: nowrap; text-align: right">273.90 ms</td>
+    <td style="white-space: nowrap; text-align: right">&plusmn;1.27%</td>
+    <td style="white-space: nowrap; text-align: right">272.56 ms</td>
+    <td style="white-space: nowrap; text-align: right">281.44 ms</td>
   </tr>
 
 </table>
@@ -609,38 +609,38 @@ Run Time Comparison
     <th style="text-align: right">Slower</th>
   <tr>
     <td style="white-space: nowrap">jiffy</td>
-    <td style="white-space: nowrap;text-align: right">27.24</td>
+    <td style="white-space: nowrap;text-align: right">26.88</td>
     <td>&nbsp;</td>
   </tr>
 
   <tr>
     <td style="white-space: nowrap">Jason</td>
-    <td style="white-space: nowrap; text-align: right">17.03</td>
-    <td style="white-space: nowrap; text-align: right">1.6x</td>
+    <td style="white-space: nowrap; text-align: right">17.15</td>
+    <td style="white-space: nowrap; text-align: right">1.57x</td>
   </tr>
 
   <tr>
     <td style="white-space: nowrap">thoas</td>
-    <td style="white-space: nowrap; text-align: right">15.61</td>
-    <td style="white-space: nowrap; text-align: right">1.74x</td>
+    <td style="white-space: nowrap; text-align: right">15.79</td>
+    <td style="white-space: nowrap; text-align: right">1.7x</td>
   </tr>
 
   <tr>
     <td style="white-space: nowrap">jsone</td>
-    <td style="white-space: nowrap; text-align: right">9.41</td>
-    <td style="white-space: nowrap; text-align: right">2.9x</td>
+    <td style="white-space: nowrap; text-align: right">9.36</td>
+    <td style="white-space: nowrap; text-align: right">2.87x</td>
   </tr>
 
   <tr>
     <td style="white-space: nowrap">jsx</td>
-    <td style="white-space: nowrap; text-align: right">4.39</td>
-    <td style="white-space: nowrap; text-align: right">6.21x</td>
+    <td style="white-space: nowrap; text-align: right">4.42</td>
+    <td style="white-space: nowrap; text-align: right">6.08x</td>
   </tr>
 
   <tr>
     <td style="white-space: nowrap">euneus</td>
-    <td style="white-space: nowrap; text-align: right">1.91</td>
-    <td style="white-space: nowrap; text-align: right">14.29x</td>
+    <td style="white-space: nowrap; text-align: right">3.65</td>
+    <td style="white-space: nowrap; text-align: right">7.36x</td>
   </tr>
 
 </table>
@@ -682,8 +682,8 @@ Memory Usage
   </tr>
     <tr>
     <td style="white-space: nowrap">euneus</td>
-    <td style="white-space: nowrap">333.09 MB</td>
-    <td>29.5x</td>
+    <td style="white-space: nowrap">147.57 MB</td>
+    <td>13.07x</td>
   </tr>
 </table>
 
@@ -705,56 +705,56 @@ Run Time
 
   <tr>
     <td style="white-space: nowrap">jiffy</td>
-    <td style="white-space: nowrap; text-align: right">49.89</td>
-    <td style="white-space: nowrap; text-align: right">20.04 ms</td>
-    <td style="white-space: nowrap; text-align: right">&plusmn;1.76%</td>
+    <td style="white-space: nowrap; text-align: right">49.80</td>
+    <td style="white-space: nowrap; text-align: right">20.08 ms</td>
+    <td style="white-space: nowrap; text-align: right">&plusmn;2.11%</td>
     <td style="white-space: nowrap; text-align: right">19.95 ms</td>
-    <td style="white-space: nowrap; text-align: right">22.01 ms</td>
-  </tr>
-
-  <tr>
-    <td style="white-space: nowrap">Jason</td>
-    <td style="white-space: nowrap; text-align: right">25.24</td>
-    <td style="white-space: nowrap; text-align: right">39.63 ms</td>
-    <td style="white-space: nowrap; text-align: right">&plusmn;1.55%</td>
-    <td style="white-space: nowrap; text-align: right">39.50 ms</td>
-    <td style="white-space: nowrap; text-align: right">43.33 ms</td>
+    <td style="white-space: nowrap; text-align: right">22.42 ms</td>
   </tr>
 
   <tr>
     <td style="white-space: nowrap">euneus</td>
-    <td style="white-space: nowrap; text-align: right">24.31</td>
-    <td style="white-space: nowrap; text-align: right">41.13 ms</td>
-    <td style="white-space: nowrap; text-align: right">&plusmn;1.76%</td>
-    <td style="white-space: nowrap; text-align: right">40.93 ms</td>
-    <td style="white-space: nowrap; text-align: right">43.26 ms</td>
+    <td style="white-space: nowrap; text-align: right">25.88</td>
+    <td style="white-space: nowrap; text-align: right">38.64 ms</td>
+    <td style="white-space: nowrap; text-align: right">&plusmn;1.90%</td>
+    <td style="white-space: nowrap; text-align: right">38.41 ms</td>
+    <td style="white-space: nowrap; text-align: right">40.50 ms</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">Jason</td>
+    <td style="white-space: nowrap; text-align: right">25.26</td>
+    <td style="white-space: nowrap; text-align: right">39.59 ms</td>
+    <td style="white-space: nowrap; text-align: right">&plusmn;1.32%</td>
+    <td style="white-space: nowrap; text-align: right">39.45 ms</td>
+    <td style="white-space: nowrap; text-align: right">41.36 ms</td>
   </tr>
 
   <tr>
     <td style="white-space: nowrap">jsone</td>
-    <td style="white-space: nowrap; text-align: right">23.19</td>
-    <td style="white-space: nowrap; text-align: right">43.13 ms</td>
-    <td style="white-space: nowrap; text-align: right">&plusmn;0.91%</td>
-    <td style="white-space: nowrap; text-align: right">43.06 ms</td>
-    <td style="white-space: nowrap; text-align: right">44.55 ms</td>
+    <td style="white-space: nowrap; text-align: right">23.27</td>
+    <td style="white-space: nowrap; text-align: right">42.97 ms</td>
+    <td style="white-space: nowrap; text-align: right">&plusmn;0.89%</td>
+    <td style="white-space: nowrap; text-align: right">42.88 ms</td>
+    <td style="white-space: nowrap; text-align: right">44.49 ms</td>
   </tr>
 
   <tr>
     <td style="white-space: nowrap">thoas</td>
-    <td style="white-space: nowrap; text-align: right">17.83</td>
-    <td style="white-space: nowrap; text-align: right">56.09 ms</td>
-    <td style="white-space: nowrap; text-align: right">&plusmn;0.92%</td>
-    <td style="white-space: nowrap; text-align: right">55.98 ms</td>
-    <td style="white-space: nowrap; text-align: right">58.30 ms</td>
+    <td style="white-space: nowrap; text-align: right">17.99</td>
+    <td style="white-space: nowrap; text-align: right">55.60 ms</td>
+    <td style="white-space: nowrap; text-align: right">&plusmn;0.72%</td>
+    <td style="white-space: nowrap; text-align: right">55.48 ms</td>
+    <td style="white-space: nowrap; text-align: right">57.25 ms</td>
   </tr>
 
   <tr>
     <td style="white-space: nowrap">jsx</td>
-    <td style="white-space: nowrap; text-align: right">10.13</td>
-    <td style="white-space: nowrap; text-align: right">98.69 ms</td>
-    <td style="white-space: nowrap; text-align: right">&plusmn;0.93%</td>
-    <td style="white-space: nowrap; text-align: right">98.77 ms</td>
-    <td style="white-space: nowrap; text-align: right">103.83 ms</td>
+    <td style="white-space: nowrap; text-align: right">9.87</td>
+    <td style="white-space: nowrap; text-align: right">101.36 ms</td>
+    <td style="white-space: nowrap; text-align: right">&plusmn;0.55%</td>
+    <td style="white-space: nowrap; text-align: right">101.26 ms</td>
+    <td style="white-space: nowrap; text-align: right">102.66 ms</td>
   </tr>
 
 </table>
@@ -769,38 +769,38 @@ Run Time Comparison
     <th style="text-align: right">Slower</th>
   <tr>
     <td style="white-space: nowrap">jiffy</td>
-    <td style="white-space: nowrap;text-align: right">49.89</td>
+    <td style="white-space: nowrap;text-align: right">49.80</td>
     <td>&nbsp;</td>
   </tr>
 
   <tr>
-    <td style="white-space: nowrap">Jason</td>
-    <td style="white-space: nowrap; text-align: right">25.24</td>
-    <td style="white-space: nowrap; text-align: right">1.98x</td>
+    <td style="white-space: nowrap">euneus</td>
+    <td style="white-space: nowrap; text-align: right">25.88</td>
+    <td style="white-space: nowrap; text-align: right">1.92x</td>
   </tr>
 
   <tr>
-    <td style="white-space: nowrap">euneus</td>
-    <td style="white-space: nowrap; text-align: right">24.31</td>
-    <td style="white-space: nowrap; text-align: right">2.05x</td>
+    <td style="white-space: nowrap">Jason</td>
+    <td style="white-space: nowrap; text-align: right">25.26</td>
+    <td style="white-space: nowrap; text-align: right">1.97x</td>
   </tr>
 
   <tr>
     <td style="white-space: nowrap">jsone</td>
-    <td style="white-space: nowrap; text-align: right">23.19</td>
-    <td style="white-space: nowrap; text-align: right">2.15x</td>
+    <td style="white-space: nowrap; text-align: right">23.27</td>
+    <td style="white-space: nowrap; text-align: right">2.14x</td>
   </tr>
 
   <tr>
     <td style="white-space: nowrap">thoas</td>
-    <td style="white-space: nowrap; text-align: right">17.83</td>
-    <td style="white-space: nowrap; text-align: right">2.8x</td>
+    <td style="white-space: nowrap; text-align: right">17.99</td>
+    <td style="white-space: nowrap; text-align: right">2.77x</td>
   </tr>
 
   <tr>
     <td style="white-space: nowrap">jsx</td>
-    <td style="white-space: nowrap; text-align: right">10.13</td>
-    <td style="white-space: nowrap; text-align: right">4.92x</td>
+    <td style="white-space: nowrap; text-align: right">9.87</td>
+    <td style="white-space: nowrap; text-align: right">5.05x</td>
   </tr>
 
 </table>
@@ -821,14 +821,14 @@ Memory Usage
     <td>&nbsp;</td>
   </tr>
     <tr>
+    <td style="white-space: nowrap">euneus</td>
+    <td style="white-space: nowrap">1.23 MB</td>
+    <td>107.87x</td>
+  </tr>
+    <tr>
     <td style="white-space: nowrap">Jason</td>
     <td style="white-space: nowrap">0.94 MB</td>
     <td>82.47x</td>
-  </tr>
-    <tr>
-    <td style="white-space: nowrap">euneus</td>
-    <td style="white-space: nowrap">1.41 MB</td>
-    <td>123.56x</td>
   </tr>
     <tr>
     <td style="white-space: nowrap">jsone</td>
@@ -865,56 +865,56 @@ Run Time
 
   <tr>
     <td style="white-space: nowrap">jiffy</td>
-    <td style="white-space: nowrap; text-align: right">1141.96</td>
-    <td style="white-space: nowrap; text-align: right">0.88 ms</td>
-    <td style="white-space: nowrap; text-align: right">&plusmn;23.74%</td>
-    <td style="white-space: nowrap; text-align: right">0.79 ms</td>
-    <td style="white-space: nowrap; text-align: right">1.38 ms</td>
+    <td style="white-space: nowrap; text-align: right">1156.93</td>
+    <td style="white-space: nowrap; text-align: right">0.86 ms</td>
+    <td style="white-space: nowrap; text-align: right">&plusmn;24.00%</td>
+    <td style="white-space: nowrap; text-align: right">0.78 ms</td>
+    <td style="white-space: nowrap; text-align: right">1.39 ms</td>
   </tr>
 
   <tr>
     <td style="white-space: nowrap">Jason</td>
-    <td style="white-space: nowrap; text-align: right">698.57</td>
-    <td style="white-space: nowrap; text-align: right">1.43 ms</td>
-    <td style="white-space: nowrap; text-align: right">&plusmn;6.94%</td>
+    <td style="white-space: nowrap; text-align: right">691.15</td>
     <td style="white-space: nowrap; text-align: right">1.45 ms</td>
-    <td style="white-space: nowrap; text-align: right">1.64 ms</td>
+    <td style="white-space: nowrap; text-align: right">&plusmn;11.05%</td>
+    <td style="white-space: nowrap; text-align: right">1.46 ms</td>
+    <td style="white-space: nowrap; text-align: right">1.83 ms</td>
   </tr>
 
   <tr>
     <td style="white-space: nowrap">thoas</td>
-    <td style="white-space: nowrap; text-align: right">628.75</td>
-    <td style="white-space: nowrap; text-align: right">1.59 ms</td>
-    <td style="white-space: nowrap; text-align: right">&plusmn;6.19%</td>
+    <td style="white-space: nowrap; text-align: right">622.00</td>
     <td style="white-space: nowrap; text-align: right">1.61 ms</td>
-    <td style="white-space: nowrap; text-align: right">1.82 ms</td>
+    <td style="white-space: nowrap; text-align: right">&plusmn;8.10%</td>
+    <td style="white-space: nowrap; text-align: right">1.62 ms</td>
+    <td style="white-space: nowrap; text-align: right">1.99 ms</td>
   </tr>
 
   <tr>
     <td style="white-space: nowrap">jsone</td>
-    <td style="white-space: nowrap; text-align: right">437.22</td>
+    <td style="white-space: nowrap; text-align: right">437.37</td>
     <td style="white-space: nowrap; text-align: right">2.29 ms</td>
-    <td style="white-space: nowrap; text-align: right">&plusmn;4.88%</td>
-    <td style="white-space: nowrap; text-align: right">2.28 ms</td>
-    <td style="white-space: nowrap; text-align: right">2.56 ms</td>
+    <td style="white-space: nowrap; text-align: right">&plusmn;5.06%</td>
+    <td style="white-space: nowrap; text-align: right">2.29 ms</td>
+    <td style="white-space: nowrap; text-align: right">2.57 ms</td>
   </tr>
 
   <tr>
     <td style="white-space: nowrap">jsx</td>
-    <td style="white-space: nowrap; text-align: right">183.42</td>
-    <td style="white-space: nowrap; text-align: right">5.45 ms</td>
-    <td style="white-space: nowrap; text-align: right">&plusmn;7.12%</td>
-    <td style="white-space: nowrap; text-align: right">5.42 ms</td>
-    <td style="white-space: nowrap; text-align: right">6.71 ms</td>
+    <td style="white-space: nowrap; text-align: right">188.78</td>
+    <td style="white-space: nowrap; text-align: right">5.30 ms</td>
+    <td style="white-space: nowrap; text-align: right">&plusmn;2.86%</td>
+    <td style="white-space: nowrap; text-align: right">5.29 ms</td>
+    <td style="white-space: nowrap; text-align: right">5.87 ms</td>
   </tr>
 
   <tr>
     <td style="white-space: nowrap">euneus</td>
-    <td style="white-space: nowrap; text-align: right">79.96</td>
-    <td style="white-space: nowrap; text-align: right">12.51 ms</td>
-    <td style="white-space: nowrap; text-align: right">&plusmn;2.05%</td>
-    <td style="white-space: nowrap; text-align: right">12.49 ms</td>
-    <td style="white-space: nowrap; text-align: right">13.22 ms</td>
+    <td style="white-space: nowrap; text-align: right">150.94</td>
+    <td style="white-space: nowrap; text-align: right">6.62 ms</td>
+    <td style="white-space: nowrap; text-align: right">&plusmn;2.00%</td>
+    <td style="white-space: nowrap; text-align: right">6.61 ms</td>
+    <td style="white-space: nowrap; text-align: right">7.11 ms</td>
   </tr>
 
 </table>
@@ -929,38 +929,38 @@ Run Time Comparison
     <th style="text-align: right">Slower</th>
   <tr>
     <td style="white-space: nowrap">jiffy</td>
-    <td style="white-space: nowrap;text-align: right">1141.96</td>
+    <td style="white-space: nowrap;text-align: right">1156.93</td>
     <td>&nbsp;</td>
   </tr>
 
   <tr>
     <td style="white-space: nowrap">Jason</td>
-    <td style="white-space: nowrap; text-align: right">698.57</td>
-    <td style="white-space: nowrap; text-align: right">1.63x</td>
+    <td style="white-space: nowrap; text-align: right">691.15</td>
+    <td style="white-space: nowrap; text-align: right">1.67x</td>
   </tr>
 
   <tr>
     <td style="white-space: nowrap">thoas</td>
-    <td style="white-space: nowrap; text-align: right">628.75</td>
-    <td style="white-space: nowrap; text-align: right">1.82x</td>
+    <td style="white-space: nowrap; text-align: right">622.00</td>
+    <td style="white-space: nowrap; text-align: right">1.86x</td>
   </tr>
 
   <tr>
     <td style="white-space: nowrap">jsone</td>
-    <td style="white-space: nowrap; text-align: right">437.22</td>
-    <td style="white-space: nowrap; text-align: right">2.61x</td>
+    <td style="white-space: nowrap; text-align: right">437.37</td>
+    <td style="white-space: nowrap; text-align: right">2.65x</td>
   </tr>
 
   <tr>
     <td style="white-space: nowrap">jsx</td>
-    <td style="white-space: nowrap; text-align: right">183.42</td>
-    <td style="white-space: nowrap; text-align: right">6.23x</td>
+    <td style="white-space: nowrap; text-align: right">188.78</td>
+    <td style="white-space: nowrap; text-align: right">6.13x</td>
   </tr>
 
   <tr>
     <td style="white-space: nowrap">euneus</td>
-    <td style="white-space: nowrap; text-align: right">79.96</td>
-    <td style="white-space: nowrap; text-align: right">14.28x</td>
+    <td style="white-space: nowrap; text-align: right">150.94</td>
+    <td style="white-space: nowrap; text-align: right">7.66x</td>
   </tr>
 
 </table>
@@ -1002,8 +1002,8 @@ Memory Usage
   </tr>
     <tr>
     <td style="white-space: nowrap">euneus</td>
-    <td style="white-space: nowrap">12.14 MB</td>
-    <td>59.82x</td>
+    <td style="white-space: nowrap">5.68 MB</td>
+    <td>28.0x</td>
   </tr>
 </table>
 
@@ -1025,56 +1025,56 @@ Run Time
 
   <tr>
     <td style="white-space: nowrap">jiffy</td>
-    <td style="white-space: nowrap; text-align: right">694.10</td>
+    <td style="white-space: nowrap; text-align: right">692.32</td>
     <td style="white-space: nowrap; text-align: right">1.44 ms</td>
     <td style="white-space: nowrap; text-align: right">&plusmn;11.56%</td>
-    <td style="white-space: nowrap; text-align: right">1.43 ms</td>
+    <td style="white-space: nowrap; text-align: right">1.44 ms</td>
     <td style="white-space: nowrap; text-align: right">1.81 ms</td>
   </tr>
 
   <tr>
     <td style="white-space: nowrap">Jason</td>
-    <td style="white-space: nowrap; text-align: right">593.37</td>
+    <td style="white-space: nowrap; text-align: right">591.86</td>
     <td style="white-space: nowrap; text-align: right">1.69 ms</td>
-    <td style="white-space: nowrap; text-align: right">&plusmn;7.38%</td>
-    <td style="white-space: nowrap; text-align: right">1.70 ms</td>
-    <td style="white-space: nowrap; text-align: right">1.89 ms</td>
+    <td style="white-space: nowrap; text-align: right">&plusmn;5.56%</td>
+    <td style="white-space: nowrap; text-align: right">1.71 ms</td>
+    <td style="white-space: nowrap; text-align: right">1.91 ms</td>
   </tr>
 
   <tr>
     <td style="white-space: nowrap">thoas</td>
-    <td style="white-space: nowrap; text-align: right">543.53</td>
-    <td style="white-space: nowrap; text-align: right">1.84 ms</td>
-    <td style="white-space: nowrap; text-align: right">&plusmn;5.08%</td>
+    <td style="white-space: nowrap; text-align: right">541.94</td>
+    <td style="white-space: nowrap; text-align: right">1.85 ms</td>
+    <td style="white-space: nowrap; text-align: right">&plusmn;4.97%</td>
     <td style="white-space: nowrap; text-align: right">1.84 ms</td>
     <td style="white-space: nowrap; text-align: right">2.06 ms</td>
   </tr>
 
   <tr>
     <td style="white-space: nowrap">jsone</td>
-    <td style="white-space: nowrap; text-align: right">400.96</td>
-    <td style="white-space: nowrap; text-align: right">2.49 ms</td>
-    <td style="white-space: nowrap; text-align: right">&plusmn;5.34%</td>
+    <td style="white-space: nowrap; text-align: right">402.62</td>
+    <td style="white-space: nowrap; text-align: right">2.48 ms</td>
+    <td style="white-space: nowrap; text-align: right">&plusmn;4.59%</td>
     <td style="white-space: nowrap; text-align: right">2.48 ms</td>
     <td style="white-space: nowrap; text-align: right">2.75 ms</td>
   </tr>
 
   <tr>
     <td style="white-space: nowrap">jsx</td>
-    <td style="white-space: nowrap; text-align: right">179.14</td>
+    <td style="white-space: nowrap; text-align: right">179.11</td>
     <td style="white-space: nowrap; text-align: right">5.58 ms</td>
-    <td style="white-space: nowrap; text-align: right">&plusmn;2.50%</td>
-    <td style="white-space: nowrap; text-align: right">5.58 ms</td>
-    <td style="white-space: nowrap; text-align: right">6.09 ms</td>
+    <td style="white-space: nowrap; text-align: right">&plusmn;2.77%</td>
+    <td style="white-space: nowrap; text-align: right">5.57 ms</td>
+    <td style="white-space: nowrap; text-align: right">6.03 ms</td>
   </tr>
 
   <tr>
     <td style="white-space: nowrap">euneus</td>
-    <td style="white-space: nowrap; text-align: right">77.73</td>
-    <td style="white-space: nowrap; text-align: right">12.86 ms</td>
-    <td style="white-space: nowrap; text-align: right">&plusmn;1.85%</td>
-    <td style="white-space: nowrap; text-align: right">12.84 ms</td>
-    <td style="white-space: nowrap; text-align: right">13.56 ms</td>
+    <td style="white-space: nowrap; text-align: right">144.80</td>
+    <td style="white-space: nowrap; text-align: right">6.91 ms</td>
+    <td style="white-space: nowrap; text-align: right">&plusmn;2.03%</td>
+    <td style="white-space: nowrap; text-align: right">6.89 ms</td>
+    <td style="white-space: nowrap; text-align: right">7.47 ms</td>
   </tr>
 
 </table>
@@ -1089,38 +1089,38 @@ Run Time Comparison
     <th style="text-align: right">Slower</th>
   <tr>
     <td style="white-space: nowrap">jiffy</td>
-    <td style="white-space: nowrap;text-align: right">694.10</td>
+    <td style="white-space: nowrap;text-align: right">692.32</td>
     <td>&nbsp;</td>
   </tr>
 
   <tr>
     <td style="white-space: nowrap">Jason</td>
-    <td style="white-space: nowrap; text-align: right">593.37</td>
+    <td style="white-space: nowrap; text-align: right">591.86</td>
     <td style="white-space: nowrap; text-align: right">1.17x</td>
   </tr>
 
   <tr>
     <td style="white-space: nowrap">thoas</td>
-    <td style="white-space: nowrap; text-align: right">543.53</td>
+    <td style="white-space: nowrap; text-align: right">541.94</td>
     <td style="white-space: nowrap; text-align: right">1.28x</td>
   </tr>
 
   <tr>
     <td style="white-space: nowrap">jsone</td>
-    <td style="white-space: nowrap; text-align: right">400.96</td>
-    <td style="white-space: nowrap; text-align: right">1.73x</td>
+    <td style="white-space: nowrap; text-align: right">402.62</td>
+    <td style="white-space: nowrap; text-align: right">1.72x</td>
   </tr>
 
   <tr>
     <td style="white-space: nowrap">jsx</td>
-    <td style="white-space: nowrap; text-align: right">179.14</td>
+    <td style="white-space: nowrap; text-align: right">179.11</td>
     <td style="white-space: nowrap; text-align: right">3.87x</td>
   </tr>
 
   <tr>
     <td style="white-space: nowrap">euneus</td>
-    <td style="white-space: nowrap; text-align: right">77.73</td>
-    <td style="white-space: nowrap; text-align: right">8.93x</td>
+    <td style="white-space: nowrap; text-align: right">144.80</td>
+    <td style="white-space: nowrap; text-align: right">4.78x</td>
   </tr>
 
 </table>
@@ -1162,8 +1162,8 @@ Memory Usage
   </tr>
     <tr>
     <td style="white-space: nowrap">euneus</td>
-    <td style="white-space: nowrap">12.16 MB</td>
-    <td>48.42x</td>
+    <td style="white-space: nowrap">5.65 MB</td>
+    <td>22.53x</td>
   </tr>
 </table>
 
@@ -1185,19 +1185,19 @@ Run Time
 
   <tr>
     <td style="white-space: nowrap">jiffy</td>
-    <td style="white-space: nowrap; text-align: right">1.33 K</td>
-    <td style="white-space: nowrap; text-align: right">0.75 ms</td>
-    <td style="white-space: nowrap; text-align: right">&plusmn;24.93%</td>
-    <td style="white-space: nowrap; text-align: right">0.77 ms</td>
-    <td style="white-space: nowrap; text-align: right">1.10 ms</td>
+    <td style="white-space: nowrap; text-align: right">1.35 K</td>
+    <td style="white-space: nowrap; text-align: right">0.74 ms</td>
+    <td style="white-space: nowrap; text-align: right">&plusmn;24.09%</td>
+    <td style="white-space: nowrap; text-align: right">0.76 ms</td>
+    <td style="white-space: nowrap; text-align: right">1.06 ms</td>
   </tr>
 
   <tr>
     <td style="white-space: nowrap">thoas</td>
-    <td style="white-space: nowrap; text-align: right">1.17 K</td>
+    <td style="white-space: nowrap; text-align: right">1.16 K</td>
     <td style="white-space: nowrap; text-align: right">0.86 ms</td>
-    <td style="white-space: nowrap; text-align: right">&plusmn;11.52%</td>
-    <td style="white-space: nowrap; text-align: right">0.80 ms</td>
+    <td style="white-space: nowrap; text-align: right">&plusmn;10.29%</td>
+    <td style="white-space: nowrap; text-align: right">0.81 ms</td>
     <td style="white-space: nowrap; text-align: right">1.07 ms</td>
   </tr>
 
@@ -1205,16 +1205,16 @@ Run Time
     <td style="white-space: nowrap">Jason</td>
     <td style="white-space: nowrap; text-align: right">1.06 K</td>
     <td style="white-space: nowrap; text-align: right">0.95 ms</td>
-    <td style="white-space: nowrap; text-align: right">&plusmn;9.60%</td>
+    <td style="white-space: nowrap; text-align: right">&plusmn;8.14%</td>
     <td style="white-space: nowrap; text-align: right">0.96 ms</td>
-    <td style="white-space: nowrap; text-align: right">1.23 ms</td>
+    <td style="white-space: nowrap; text-align: right">1.17 ms</td>
   </tr>
 
   <tr>
     <td style="white-space: nowrap">jsone</td>
-    <td style="white-space: nowrap; text-align: right">0.58 K</td>
+    <td style="white-space: nowrap; text-align: right">0.59 K</td>
     <td style="white-space: nowrap; text-align: right">1.71 ms</td>
-    <td style="white-space: nowrap; text-align: right">&plusmn;7.36%</td>
+    <td style="white-space: nowrap; text-align: right">&plusmn;7.53%</td>
     <td style="white-space: nowrap; text-align: right">1.72 ms</td>
     <td style="white-space: nowrap; text-align: right">2.00 ms</td>
   </tr>
@@ -1222,19 +1222,19 @@ Run Time
   <tr>
     <td style="white-space: nowrap">jsx</td>
     <td style="white-space: nowrap; text-align: right">0.25 K</td>
-    <td style="white-space: nowrap; text-align: right">3.94 ms</td>
-    <td style="white-space: nowrap; text-align: right">&plusmn;2.09%</td>
+    <td style="white-space: nowrap; text-align: right">3.93 ms</td>
+    <td style="white-space: nowrap; text-align: right">&plusmn;2.00%</td>
     <td style="white-space: nowrap; text-align: right">3.92 ms</td>
-    <td style="white-space: nowrap; text-align: right">4.33 ms</td>
+    <td style="white-space: nowrap; text-align: right">4.27 ms</td>
   </tr>
 
   <tr>
     <td style="white-space: nowrap">euneus</td>
-    <td style="white-space: nowrap; text-align: right">0.0984 K</td>
-    <td style="white-space: nowrap; text-align: right">10.16 ms</td>
-    <td style="white-space: nowrap; text-align: right">&plusmn;1.70%</td>
-    <td style="white-space: nowrap; text-align: right">10.14 ms</td>
-    <td style="white-space: nowrap; text-align: right">10.67 ms</td>
+    <td style="white-space: nowrap; text-align: right">0.181 K</td>
+    <td style="white-space: nowrap; text-align: right">5.51 ms</td>
+    <td style="white-space: nowrap; text-align: right">&plusmn;1.75%</td>
+    <td style="white-space: nowrap; text-align: right">5.50 ms</td>
+    <td style="white-space: nowrap; text-align: right">5.86 ms</td>
   </tr>
 
 </table>
@@ -1249,38 +1249,38 @@ Run Time Comparison
     <th style="text-align: right">Slower</th>
   <tr>
     <td style="white-space: nowrap">jiffy</td>
-    <td style="white-space: nowrap;text-align: right">1.33 K</td>
+    <td style="white-space: nowrap;text-align: right">1.35 K</td>
     <td>&nbsp;</td>
   </tr>
 
   <tr>
     <td style="white-space: nowrap">thoas</td>
-    <td style="white-space: nowrap; text-align: right">1.17 K</td>
-    <td style="white-space: nowrap; text-align: right">1.14x</td>
+    <td style="white-space: nowrap; text-align: right">1.16 K</td>
+    <td style="white-space: nowrap; text-align: right">1.16x</td>
   </tr>
 
   <tr>
     <td style="white-space: nowrap">Jason</td>
     <td style="white-space: nowrap; text-align: right">1.06 K</td>
-    <td style="white-space: nowrap; text-align: right">1.26x</td>
+    <td style="white-space: nowrap; text-align: right">1.27x</td>
   </tr>
 
   <tr>
     <td style="white-space: nowrap">jsone</td>
-    <td style="white-space: nowrap; text-align: right">0.58 K</td>
-    <td style="white-space: nowrap; text-align: right">2.28x</td>
+    <td style="white-space: nowrap; text-align: right">0.59 K</td>
+    <td style="white-space: nowrap; text-align: right">2.3x</td>
   </tr>
 
   <tr>
     <td style="white-space: nowrap">jsx</td>
     <td style="white-space: nowrap; text-align: right">0.25 K</td>
-    <td style="white-space: nowrap; text-align: right">5.24x</td>
+    <td style="white-space: nowrap; text-align: right">5.29x</td>
   </tr>
 
   <tr>
     <td style="white-space: nowrap">euneus</td>
-    <td style="white-space: nowrap; text-align: right">0.0984 K</td>
-    <td style="white-space: nowrap; text-align: right">13.54x</td>
+    <td style="white-space: nowrap; text-align: right">0.181 K</td>
+    <td style="white-space: nowrap; text-align: right">7.42x</td>
   </tr>
 
 </table>
@@ -1322,8 +1322,8 @@ Memory Usage
   </tr>
     <tr>
     <td style="white-space: nowrap">euneus</td>
-    <td style="white-space: nowrap">8.72 MB</td>
-    <td>87.58x</td>
+    <td style="white-space: nowrap">4.46 MB</td>
+    <td>44.79x</td>
   </tr>
 </table>
 
@@ -1345,56 +1345,56 @@ Run Time
 
   <tr>
     <td style="white-space: nowrap">jiffy</td>
-    <td style="white-space: nowrap; text-align: right">10.43 K</td>
-    <td style="white-space: nowrap; text-align: right">95.92 &micro;s</td>
-    <td style="white-space: nowrap; text-align: right">&plusmn;9.23%</td>
-    <td style="white-space: nowrap; text-align: right">94.62 &micro;s</td>
-    <td style="white-space: nowrap; text-align: right">128.75 &micro;s</td>
+    <td style="white-space: nowrap; text-align: right">10.39 K</td>
+    <td style="white-space: nowrap; text-align: right">96.25 &micro;s</td>
+    <td style="white-space: nowrap; text-align: right">&plusmn;12.22%</td>
+    <td style="white-space: nowrap; text-align: right">94.84 &micro;s</td>
+    <td style="white-space: nowrap; text-align: right">129.35 &micro;s</td>
   </tr>
 
   <tr>
     <td style="white-space: nowrap">thoas</td>
-    <td style="white-space: nowrap; text-align: right">1.70 K</td>
-    <td style="white-space: nowrap; text-align: right">587.18 &micro;s</td>
-    <td style="white-space: nowrap; text-align: right">&plusmn;21.57%</td>
-    <td style="white-space: nowrap; text-align: right">583.48 &micro;s</td>
-    <td style="white-space: nowrap; text-align: right">867.84 &micro;s</td>
+    <td style="white-space: nowrap; text-align: right">1.71 K</td>
+    <td style="white-space: nowrap; text-align: right">586.17 &micro;s</td>
+    <td style="white-space: nowrap; text-align: right">&plusmn;21.29%</td>
+    <td style="white-space: nowrap; text-align: right">575.46 &micro;s</td>
+    <td style="white-space: nowrap; text-align: right">869.53 &micro;s</td>
   </tr>
 
   <tr>
     <td style="white-space: nowrap">Jason</td>
     <td style="white-space: nowrap; text-align: right">1.70 K</td>
-    <td style="white-space: nowrap; text-align: right">587.70 &micro;s</td>
-    <td style="white-space: nowrap; text-align: right">&plusmn;22.23%</td>
-    <td style="white-space: nowrap; text-align: right">560.47 &micro;s</td>
-    <td style="white-space: nowrap; text-align: right">870.07 &micro;s</td>
+    <td style="white-space: nowrap; text-align: right">586.84 &micro;s</td>
+    <td style="white-space: nowrap; text-align: right">&plusmn;22.21%</td>
+    <td style="white-space: nowrap; text-align: right">561.49 &micro;s</td>
+    <td style="white-space: nowrap; text-align: right">869.64 &micro;s</td>
   </tr>
 
   <tr>
     <td style="white-space: nowrap">euneus</td>
-    <td style="white-space: nowrap; text-align: right">1.44 K</td>
-    <td style="white-space: nowrap; text-align: right">694.12 &micro;s</td>
-    <td style="white-space: nowrap; text-align: right">&plusmn;20.70%</td>
-    <td style="white-space: nowrap; text-align: right">682.17 &micro;s</td>
-    <td style="white-space: nowrap; text-align: right">991.41 &micro;s</td>
+    <td style="white-space: nowrap; text-align: right">1.46 K</td>
+    <td style="white-space: nowrap; text-align: right">686.73 &micro;s</td>
+    <td style="white-space: nowrap; text-align: right">&plusmn;20.17%</td>
+    <td style="white-space: nowrap; text-align: right">677.30 &micro;s</td>
+    <td style="white-space: nowrap; text-align: right">970.88 &micro;s</td>
   </tr>
 
   <tr>
     <td style="white-space: nowrap">jsone</td>
-    <td style="white-space: nowrap; text-align: right">1.30 K</td>
-    <td style="white-space: nowrap; text-align: right">769.59 &micro;s</td>
-    <td style="white-space: nowrap; text-align: right">&plusmn;12.31%</td>
-    <td style="white-space: nowrap; text-align: right">770.42 &micro;s</td>
-    <td style="white-space: nowrap; text-align: right">974.57 &micro;s</td>
+    <td style="white-space: nowrap; text-align: right">1.31 K</td>
+    <td style="white-space: nowrap; text-align: right">765.71 &micro;s</td>
+    <td style="white-space: nowrap; text-align: right">&plusmn;12.43%</td>
+    <td style="white-space: nowrap; text-align: right">764.70 &micro;s</td>
+    <td style="white-space: nowrap; text-align: right">981.33 &micro;s</td>
   </tr>
 
   <tr>
     <td style="white-space: nowrap">jsx</td>
-    <td style="white-space: nowrap; text-align: right">1.17 K</td>
-    <td style="white-space: nowrap; text-align: right">853.29 &micro;s</td>
-    <td style="white-space: nowrap; text-align: right">&plusmn;15.68%</td>
-    <td style="white-space: nowrap; text-align: right">916.11 &micro;s</td>
-    <td style="white-space: nowrap; text-align: right">1140.85 &micro;s</td>
+    <td style="white-space: nowrap; text-align: right">1.15 K</td>
+    <td style="white-space: nowrap; text-align: right">867.47 &micro;s</td>
+    <td style="white-space: nowrap; text-align: right">&plusmn;15.64%</td>
+    <td style="white-space: nowrap; text-align: right">930.06 &micro;s</td>
+    <td style="white-space: nowrap; text-align: right">1134.91 &micro;s</td>
   </tr>
 
 </table>
@@ -1409,38 +1409,38 @@ Run Time Comparison
     <th style="text-align: right">Slower</th>
   <tr>
     <td style="white-space: nowrap">jiffy</td>
-    <td style="white-space: nowrap;text-align: right">10.43 K</td>
+    <td style="white-space: nowrap;text-align: right">10.39 K</td>
     <td>&nbsp;</td>
   </tr>
 
   <tr>
     <td style="white-space: nowrap">thoas</td>
-    <td style="white-space: nowrap; text-align: right">1.70 K</td>
-    <td style="white-space: nowrap; text-align: right">6.12x</td>
+    <td style="white-space: nowrap; text-align: right">1.71 K</td>
+    <td style="white-space: nowrap; text-align: right">6.09x</td>
   </tr>
 
   <tr>
     <td style="white-space: nowrap">Jason</td>
     <td style="white-space: nowrap; text-align: right">1.70 K</td>
-    <td style="white-space: nowrap; text-align: right">6.13x</td>
+    <td style="white-space: nowrap; text-align: right">6.1x</td>
   </tr>
 
   <tr>
     <td style="white-space: nowrap">euneus</td>
-    <td style="white-space: nowrap; text-align: right">1.44 K</td>
-    <td style="white-space: nowrap; text-align: right">7.24x</td>
+    <td style="white-space: nowrap; text-align: right">1.46 K</td>
+    <td style="white-space: nowrap; text-align: right">7.13x</td>
   </tr>
 
   <tr>
     <td style="white-space: nowrap">jsone</td>
-    <td style="white-space: nowrap; text-align: right">1.30 K</td>
-    <td style="white-space: nowrap; text-align: right">8.02x</td>
+    <td style="white-space: nowrap; text-align: right">1.31 K</td>
+    <td style="white-space: nowrap; text-align: right">7.96x</td>
   </tr>
 
   <tr>
     <td style="white-space: nowrap">jsx</td>
-    <td style="white-space: nowrap; text-align: right">1.17 K</td>
-    <td style="white-space: nowrap; text-align: right">8.9x</td>
+    <td style="white-space: nowrap; text-align: right">1.15 K</td>
+    <td style="white-space: nowrap; text-align: right">9.01x</td>
   </tr>
 
 </table>
@@ -1505,56 +1505,56 @@ Run Time
 
   <tr>
     <td style="white-space: nowrap">jiffy</td>
-    <td style="white-space: nowrap; text-align: right">18.07 K</td>
-    <td style="white-space: nowrap; text-align: right">55.36 &micro;s</td>
-    <td style="white-space: nowrap; text-align: right">&plusmn;19.75%</td>
-    <td style="white-space: nowrap; text-align: right">54.30 &micro;s</td>
-    <td style="white-space: nowrap; text-align: right">78.51 &micro;s</td>
+    <td style="white-space: nowrap; text-align: right">18.02 K</td>
+    <td style="white-space: nowrap; text-align: right">55.48 &micro;s</td>
+    <td style="white-space: nowrap; text-align: right">&plusmn;16.16%</td>
+    <td style="white-space: nowrap; text-align: right">54.36 &micro;s</td>
+    <td style="white-space: nowrap; text-align: right">80.25 &micro;s</td>
   </tr>
 
   <tr>
     <td style="white-space: nowrap">euneus</td>
-    <td style="white-space: nowrap; text-align: right">10.21 K</td>
-    <td style="white-space: nowrap; text-align: right">97.90 &micro;s</td>
-    <td style="white-space: nowrap; text-align: right">&plusmn;53.22%</td>
-    <td style="white-space: nowrap; text-align: right">88.72 &micro;s</td>
-    <td style="white-space: nowrap; text-align: right">387.26 &micro;s</td>
+    <td style="white-space: nowrap; text-align: right">10.50 K</td>
+    <td style="white-space: nowrap; text-align: right">95.20 &micro;s</td>
+    <td style="white-space: nowrap; text-align: right">&plusmn;53.50%</td>
+    <td style="white-space: nowrap; text-align: right">86.98 &micro;s</td>
+    <td style="white-space: nowrap; text-align: right">383.25 &micro;s</td>
   </tr>
 
   <tr>
     <td style="white-space: nowrap">Jason</td>
-    <td style="white-space: nowrap; text-align: right">10.12 K</td>
-    <td style="white-space: nowrap; text-align: right">98.78 &micro;s</td>
-    <td style="white-space: nowrap; text-align: right">&plusmn;53.09%</td>
-    <td style="white-space: nowrap; text-align: right">89.32 &micro;s</td>
-    <td style="white-space: nowrap; text-align: right">408.44 &micro;s</td>
+    <td style="white-space: nowrap; text-align: right">10.23 K</td>
+    <td style="white-space: nowrap; text-align: right">97.77 &micro;s</td>
+    <td style="white-space: nowrap; text-align: right">&plusmn;51.42%</td>
+    <td style="white-space: nowrap; text-align: right">89.06 &micro;s</td>
+    <td style="white-space: nowrap; text-align: right">392.61 &micro;s</td>
   </tr>
 
   <tr>
     <td style="white-space: nowrap">thoas</td>
-    <td style="white-space: nowrap; text-align: right">9.54 K</td>
-    <td style="white-space: nowrap; text-align: right">104.82 &micro;s</td>
-    <td style="white-space: nowrap; text-align: right">&plusmn;48.21%</td>
-    <td style="white-space: nowrap; text-align: right">95.44 &micro;s</td>
-    <td style="white-space: nowrap; text-align: right">406.59 &micro;s</td>
+    <td style="white-space: nowrap; text-align: right">9.64 K</td>
+    <td style="white-space: nowrap; text-align: right">103.74 &micro;s</td>
+    <td style="white-space: nowrap; text-align: right">&plusmn;46.94%</td>
+    <td style="white-space: nowrap; text-align: right">95.16 &micro;s</td>
+    <td style="white-space: nowrap; text-align: right">391.26 &micro;s</td>
   </tr>
 
   <tr>
     <td style="white-space: nowrap">jsone</td>
-    <td style="white-space: nowrap; text-align: right">9.39 K</td>
-    <td style="white-space: nowrap; text-align: right">106.48 &micro;s</td>
-    <td style="white-space: nowrap; text-align: right">&plusmn;71.20%</td>
-    <td style="white-space: nowrap; text-align: right">90.89 &micro;s</td>
-    <td style="white-space: nowrap; text-align: right">555.44 &micro;s</td>
+    <td style="white-space: nowrap; text-align: right">9.49 K</td>
+    <td style="white-space: nowrap; text-align: right">105.42 &micro;s</td>
+    <td style="white-space: nowrap; text-align: right">&plusmn;71.47%</td>
+    <td style="white-space: nowrap; text-align: right">89.06 &micro;s</td>
+    <td style="white-space: nowrap; text-align: right">550.63 &micro;s</td>
   </tr>
 
   <tr>
     <td style="white-space: nowrap">jsx</td>
-    <td style="white-space: nowrap; text-align: right">6.58 K</td>
-    <td style="white-space: nowrap; text-align: right">151.98 &micro;s</td>
-    <td style="white-space: nowrap; text-align: right">&plusmn;46.39%</td>
-    <td style="white-space: nowrap; text-align: right">126.82 &micro;s</td>
-    <td style="white-space: nowrap; text-align: right">498.33 &micro;s</td>
+    <td style="white-space: nowrap; text-align: right">6.57 K</td>
+    <td style="white-space: nowrap; text-align: right">152.10 &micro;s</td>
+    <td style="white-space: nowrap; text-align: right">&plusmn;46.46%</td>
+    <td style="white-space: nowrap; text-align: right">126.59 &micro;s</td>
+    <td style="white-space: nowrap; text-align: right">499.30 &micro;s</td>
   </tr>
 
 </table>
@@ -1569,38 +1569,38 @@ Run Time Comparison
     <th style="text-align: right">Slower</th>
   <tr>
     <td style="white-space: nowrap">jiffy</td>
-    <td style="white-space: nowrap;text-align: right">18.07 K</td>
+    <td style="white-space: nowrap;text-align: right">18.02 K</td>
     <td>&nbsp;</td>
   </tr>
 
   <tr>
     <td style="white-space: nowrap">euneus</td>
-    <td style="white-space: nowrap; text-align: right">10.21 K</td>
-    <td style="white-space: nowrap; text-align: right">1.77x</td>
+    <td style="white-space: nowrap; text-align: right">10.50 K</td>
+    <td style="white-space: nowrap; text-align: right">1.72x</td>
   </tr>
 
   <tr>
     <td style="white-space: nowrap">Jason</td>
-    <td style="white-space: nowrap; text-align: right">10.12 K</td>
-    <td style="white-space: nowrap; text-align: right">1.78x</td>
+    <td style="white-space: nowrap; text-align: right">10.23 K</td>
+    <td style="white-space: nowrap; text-align: right">1.76x</td>
   </tr>
 
   <tr>
     <td style="white-space: nowrap">thoas</td>
-    <td style="white-space: nowrap; text-align: right">9.54 K</td>
-    <td style="white-space: nowrap; text-align: right">1.89x</td>
+    <td style="white-space: nowrap; text-align: right">9.64 K</td>
+    <td style="white-space: nowrap; text-align: right">1.87x</td>
   </tr>
 
   <tr>
     <td style="white-space: nowrap">jsone</td>
-    <td style="white-space: nowrap; text-align: right">9.39 K</td>
-    <td style="white-space: nowrap; text-align: right">1.92x</td>
+    <td style="white-space: nowrap; text-align: right">9.49 K</td>
+    <td style="white-space: nowrap; text-align: right">1.9x</td>
   </tr>
 
   <tr>
     <td style="white-space: nowrap">jsx</td>
-    <td style="white-space: nowrap; text-align: right">6.58 K</td>
-    <td style="white-space: nowrap; text-align: right">2.75x</td>
+    <td style="white-space: nowrap; text-align: right">6.57 K</td>
+    <td style="white-space: nowrap; text-align: right">2.74x</td>
   </tr>
 
 </table>
