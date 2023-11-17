@@ -1,14 +1,14 @@
 Code.eval_file("helper.exs", "./script")
 
-opts = :euneus.parse_decode_opts(%{})
+opts = :euneus.parse_encode_opts(%{})
 
 jobs = %{
-  "euneus" => &:euneus.decode_parsed(&1, opts),
-  "thoas" => &:thoas.decode/1,
-  "jsone" => &:jsone.decode/1,
-  "jsx" => &:jsx.decode/1,
-  "jiffy" => &:jiffy.decode/1
-  # "Jason" => &Jason.decode!/1,
+  "euneus" => &:euneus.encode_parsed(&1, opts),
+  "thoas" => &:thoas.encode_to_iodata/1,
+  "jsone" => &:jsone.encode/1,
+  "jsx" => &:jsx.encode/1,
+  "jiffy" => &:jiffy.encode/1,
+  "Jason" => &Jason.encode_to_iodata/1
 }
 
 data = [
@@ -17,10 +17,8 @@ data = [
   "GitHub",
   "GovTrack",
   "Issue 90",
-  "JSON Generator (Pretty)",
   "JSON Generator",
   "Pokedex",
-  "UTF-8 escaped",
   "UTF-8 unescaped"
 ]
 
@@ -28,11 +26,12 @@ inputs =
   for name <- data, into: %{} do
     name
     |> EuneusBench.Helper.read_data()
+    |> Jason.decode!()
     |> (&{name, &1}).()
   end
 
 EuneusBench.Helper.run(
-  "decode",
+  "encode_parsed",
   jobs,
   inputs,
   %{

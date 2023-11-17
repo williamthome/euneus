@@ -41,8 +41,7 @@ defmodule EuneusBench.Helper do
           end ++
           if opts[:markdown] do
             [
-              {Benchee.Formatters.Markdown,
-               file: Path.expand("../tmp/markdown/#{label}.md", __DIR__)}
+              {Benchee.Formatters.Markdown, file: Path.expand("../#{label}.md", __DIR__)}
             ]
           else
             []

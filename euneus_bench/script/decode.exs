@@ -5,8 +5,8 @@ jobs = %{
   "thoas" => &:thoas.decode/1,
   "jsone" => &:jsone.decode/1,
   "jsx" => &:jsx.decode/1,
-  "jiffy" => &:jiffy.decode/1
-  # "Jason" => &Jason.decode!/1,
+  "jiffy" => &:jiffy.decode/1,
+  "Jason" => &Jason.decode!/1
 }
 
 data = [
