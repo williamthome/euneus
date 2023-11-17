@@ -739,11 +739,23 @@ plugins([datetime | T], Term, Opts) ->
             plugins(T, Term, Opts)
     end;
 plugins([inet | T], Term, Opts) ->
-    case inet:ntoa(Term) of
-        {error, einval} ->
-            plugins(T, Term, Opts);
-        Ip ->
-            {halt, escape(list_to_binary(Ip), Opts)}
+    case Term of
+        {_A,_B,_C,_D} ->
+            case inet_parse:ntoa(Term) of
+                {error, einval} ->
+                    plugins(T, Term, Opts);
+                Ipv4 ->
+                    {halt, escape(list_to_binary(Ipv4), Opts)}
+            end;
+        {_A,_B,_C,_D,_E,_F,_G,_H} ->
+            case inet_parse:ntoa(Term) of
+                {error, einval} ->
+                    plugins(T, Term, Opts);
+                Ipv6 ->
+                    {halt, escape(list_to_binary(Ipv6), Opts)}
+            end;
+        _ ->
+            plugins(T, Term, Opts)
     end;
 plugins([pid | T], Term, Opts) ->
     case is_pid(Term) of
