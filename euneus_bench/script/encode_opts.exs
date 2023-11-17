@@ -3,7 +3,7 @@ Code.eval_file("helper.exs", "./script")
 opts = :euneus.parse_encode_opts(%{})
 
 jobs = %{
-  "euneus" => &:euneus.encode(&1, opts),
+  "euneus" => &:euneus.encode_parsed(&1, opts),
   "thoas" => &:thoas.encode_to_iodata/1,
   "jsone" => &:jsone.encode/1,
   "jsx" => &:jsx.encode/1,
