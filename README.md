@@ -1,6 +1,6 @@
 # Euneus
 
-A JSON parser and generator in pure Erlang.
+An incredibly flexible and performant JSON parser and generator.
 
 Euneus is a rewrite of [Thoas][thoas].
 

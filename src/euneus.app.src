@@ -1,5 +1,5 @@
 {application, euneus, [
-    {description, "A JSON parser and generator"},
+    {description, "An incredibly flexible and performant JSON parser and generator"},
     {vsn, "1.0.1"},
     {registered, []},
     {applications, [
