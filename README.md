@@ -36,7 +36,13 @@ Like Thoas, both the parser and generator fully conform to
     - [Why Euneus over Thoas?](#why-euneus-over-thoas)
 - [Benchmarks](#benchmarks)
     - [Encode](#encode-2)
+        - [Smart encoding](#smart-encoding)
+        - [Encoding with empty map as option](#encoding-with-empty-map-as-option)
+        - [Encoding with all built-in plugins](#encoding-with-all-built-in-plugins)
     - [Decode](#decode-2)
+        - [Smart decoding](#smart-decoding)
+        - [Decoding with empty map as option](#decoding-with-empty-map-as-option)
+        - [Decoding with all built-in plugins](#decoding-with-all-built-in-plugins)
 - [Tests](#tests)
 - [Smart modules](#smart-modules)
 - [Credits](#credits)
@@ -454,67 +460,2506 @@ The motivation for Euneus is [this PR](https://github.com/lpil/thoas/pull/28).
 
 ## Benchmarks
 
-All the benchmarks compare `Euneus` and `Thoas` via [Benchee](https://github.com/bencheeorg/benchee) to obtain the results.
-
-Use `$ make bench.encode` or `$ make bench.decode` to run the benchmarks. Edit the scripts in the `./euneus_bench/script` folder if needed.
-
-The benchmarks use the smart versions. Please the [Smart modules](#smart-modules) section for more information.
-
-> [!NOTE]
->
-> - Results:
->
->   Values in `IPS` (iterations per second), aka how often can the given function be executed within one second (the higher the better - good for graphing), only for run times.
->   - `Bold`: best IPS;
->
-> - System info:
->   - Erlang: 26.1
->   - Elixir: 1.16.0-dev
->   - Operating system: Linux
->   - Available memory: 15.54 GB
->   - CPU Information: Intel(R) Core(TM) i7-7700HQ CPU @ 2.80GHz
->   - Number of Available Cores: 8
->
-> - Benchmark setup:
->   - warmup: 5 s
->   - time: 30 s
->   - memory time: 1 s
->   - reduction time: 0 ns
->   - parallel: 1
+All the latest runs details can be found under the [runs](./euneus_bench/runs/) directory in the [benchmark project](./euneus_bench/).
 
 ### Encode
 
-<!-- Generated via https://www.tablesgenerator.com/markdown_tables -->
-<!-- To edit, open "./assets/md-tables/bench-encode.tgn" in the link above. -->
-| **File**                   	|  **Euneus** 	| **Thoas** 	| **Comparison** 	|
-|----------------------------	|------------:	|----------:	|---------------:	|
-| blockchain.json            	| **12.00 K** 	|    7.92 K 	|          1.52x 	|
-| giphy.json                 	|  **1.03 K** 	|    0.86 K 	|          1.20x 	|
-| github.json                	|  **3.67 K** 	|    2.57 K 	|          1.43x 	|
-| govtrack.json              	|   **13.33** 	|     12.37 	|          1.08x 	|
-| issue-90.json              	|   **30.10** 	|     17.56 	|          1.71x 	|
-| json-generator-pretty.json 	|  **1.45 K** 	|    1.09 K 	|          1.33x 	|
-| json-generator.json        	|  **1.45 K** 	|    1.08 K 	|          1.34x 	|
-| pokedex.json               	|  **2.08 K** 	|    1.75 K 	|          1.19x 	|
-| utf-8-escaped.json         	| **11.99 K** 	|   10.63 K 	|          1.13x 	|
-| utf-8-unescaped.json       	| **11.99 K** 	|   10.89 K 	|          1.10x 	|
+#### Smart encoding
+
+This benchmark uses the JSON smart module via the `euneus:encode/1` function. Smart modules only receive the input as the argument, so no option is available to set. Smart modules are the fastest euneus modules.
+
+<div style="overflow: auto;">
+
+<div style="display: grid; grid-auto-flow: column; column-gap: 5px;">
+
+<table style="width: 1%">
+  <caption><b>Blockchain</b></caption>
+  <tr>
+    <th>Name</th>
+    <th style="text-align: right">IPS</th>
+    <th style="text-align: right">Slower</th>
+  <tr>
+    <td style="white-space: nowrap">jiffy</td>
+    <td style="white-space: nowrap;text-align: right">11.14 K</td>
+    <td>&nbsp;</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">Jason</td>
+    <td style="white-space: nowrap; text-align: right">4.60 K</td>
+    <td style="white-space: nowrap; text-align: right">2.42x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">euneus</td>
+    <td style="white-space: nowrap; text-align: right">4.49 K</td>
+    <td style="white-space: nowrap; text-align: right">2.48x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">thoas</td>
+    <td style="white-space: nowrap; text-align: right">3.78 K</td>
+    <td style="white-space: nowrap; text-align: right">2.94x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">jsone</td>
+    <td style="white-space: nowrap; text-align: right">2.54 K</td>
+    <td style="white-space: nowrap; text-align: right">4.39x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">jsx</td>
+    <td style="white-space: nowrap; text-align: right">1.00 K</td>
+    <td style="white-space: nowrap; text-align: right">11.18x</td>
+  </tr>
+
+</table>
+
+<table style="width: 1%">
+  <caption><b>Giphy</b></caption>
+  <tr>
+    <th>Name</th>
+    <th style="text-align: right">IPS</th>
+    <th style="text-align: right">Slower</th>
+  <tr>
+    <td style="white-space: nowrap">jiffy</td>
+    <td style="white-space: nowrap;text-align: right">1162.06</td>
+    <td>&nbsp;</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">Jason</td>
+    <td style="white-space: nowrap; text-align: right">429.19</td>
+    <td style="white-space: nowrap; text-align: right">2.71x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">euneus</td>
+    <td style="white-space: nowrap; text-align: right">427.23</td>
+    <td style="white-space: nowrap; text-align: right">2.72x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">thoas</td>
+    <td style="white-space: nowrap; text-align: right">403.55</td>
+    <td style="white-space: nowrap; text-align: right">2.88x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">jsone</td>
+    <td style="white-space: nowrap; text-align: right">213.42</td>
+    <td style="white-space: nowrap; text-align: right">5.44x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">jsx</td>
+    <td style="white-space: nowrap; text-align: right">78.73</td>
+    <td style="white-space: nowrap; text-align: right">14.76x</td>
+  </tr>
+
+</table>
+
+<table style="width: 1%">
+  <caption><b>GitHub</b></caption>
+  <tr>
+    <th>Name</th>
+    <th style="text-align: right">IPS</th>
+    <th style="text-align: right">Slower</th>
+  <tr>
+    <td style="white-space: nowrap">jiffy</td>
+    <td style="white-space: nowrap;text-align: right">3.55 K</td>
+    <td>&nbsp;</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">Jason</td>
+    <td style="white-space: nowrap; text-align: right">1.51 K</td>
+    <td style="white-space: nowrap; text-align: right">2.35x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">euneus</td>
+    <td style="white-space: nowrap; text-align: right">1.45 K</td>
+    <td style="white-space: nowrap; text-align: right">2.44x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">thoas</td>
+    <td style="white-space: nowrap; text-align: right">1.30 K</td>
+    <td style="white-space: nowrap; text-align: right">2.72x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">jsone</td>
+    <td style="white-space: nowrap; text-align: right">0.67 K</td>
+    <td style="white-space: nowrap; text-align: right">5.34x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">jsx</td>
+    <td style="white-space: nowrap; text-align: right">0.197 K</td>
+    <td style="white-space: nowrap; text-align: right">18.01x</td>
+  </tr>
+
+</table>
+
+<table style="width: 1%">
+  <caption><b>GovTrack</b></caption>
+  <tr>
+    <th>Name</th>
+    <th style="text-align: right">IPS</th>
+    <th style="text-align: right">Slower</th>
+  <tr>
+    <td style="white-space: nowrap">jiffy</td>
+    <td style="white-space: nowrap;text-align: right">52.04</td>
+    <td>&nbsp;</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">Jason</td>
+    <td style="white-space: nowrap; text-align: right">17.91</td>
+    <td style="white-space: nowrap; text-align: right">2.91x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">thoas</td>
+    <td style="white-space: nowrap; text-align: right">16.56</td>
+    <td style="white-space: nowrap; text-align: right">3.14x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">euneus</td>
+    <td style="white-space: nowrap; text-align: right">14.72</td>
+    <td style="white-space: nowrap; text-align: right">3.53x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">jsone</td>
+    <td style="white-space: nowrap; text-align: right">8.58</td>
+    <td style="white-space: nowrap; text-align: right">6.06x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">jsx</td>
+    <td style="white-space: nowrap; text-align: right">3.07</td>
+    <td style="white-space: nowrap; text-align: right">16.95x</td>
+  </tr>
+
+</table>
+
+<table style="width: 1%">
+  <caption><b>Issue 90</b></caption>
+  <tr>
+    <th>Name</th>
+    <th style="text-align: right">IPS</th>
+    <th style="text-align: right">Slower</th>
+  <tr>
+    <td style="white-space: nowrap">jiffy</td>
+    <td style="white-space: nowrap;text-align: right">36.73</td>
+    <td>&nbsp;</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">Jason</td>
+    <td style="white-space: nowrap; text-align: right">27.44</td>
+    <td style="white-space: nowrap; text-align: right">1.34x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">euneus</td>
+    <td style="white-space: nowrap; text-align: right">23.24</td>
+    <td style="white-space: nowrap; text-align: right">1.58x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">thoas</td>
+    <td style="white-space: nowrap; text-align: right">17.01</td>
+    <td style="white-space: nowrap; text-align: right">2.16x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">jsone</td>
+    <td style="white-space: nowrap; text-align: right">16.65</td>
+    <td style="white-space: nowrap; text-align: right">2.21x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">jsx</td>
+    <td style="white-space: nowrap; text-align: right">8.75</td>
+    <td style="white-space: nowrap; text-align: right">4.2x</td>
+  </tr>
+
+</table>
+
+<table style="width: 1%">
+  <caption><b>JSON Generator</b></caption>
+  <tr>
+    <th>Name</th>
+    <th style="text-align: right">IPS</th>
+    <th style="text-align: right">Slower</th>
+  <tr>
+    <td style="white-space: nowrap">jiffy</td>
+    <td style="white-space: nowrap;text-align: right">1191.94</td>
+    <td>&nbsp;</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">euneus</td>
+    <td style="white-space: nowrap; text-align: right">417.78</td>
+    <td style="white-space: nowrap; text-align: right">2.85x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">Jason</td>
+    <td style="white-space: nowrap; text-align: right">411.69</td>
+    <td style="white-space: nowrap; text-align: right">2.9x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">thoas</td>
+    <td style="white-space: nowrap; text-align: right">405.74</td>
+    <td style="white-space: nowrap; text-align: right">2.94x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">jsone</td>
+    <td style="white-space: nowrap; text-align: right">273.00</td>
+    <td style="white-space: nowrap; text-align: right">4.37x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">jsx</td>
+    <td style="white-space: nowrap; text-align: right">97.47</td>
+    <td style="white-space: nowrap; text-align: right">12.23x</td>
+  </tr>
+
+</table>
+
+<table style="width: 1%">
+  <caption><b>Pokedex</b></caption>
+  <tr>
+    <th>Name</th>
+    <th style="text-align: right">IPS</th>
+    <th style="text-align: right">Slower</th>
+  <tr>
+    <td style="white-space: nowrap">jiffy</td>
+    <td style="white-space: nowrap;text-align: right">1669.42</td>
+    <td>&nbsp;</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">euneus</td>
+    <td style="white-space: nowrap; text-align: right">644.19</td>
+    <td style="white-space: nowrap; text-align: right">2.59x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">Jason</td>
+    <td style="white-space: nowrap; text-align: right">628.42</td>
+    <td style="white-space: nowrap; text-align: right">2.66x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">thoas</td>
+    <td style="white-space: nowrap; text-align: right">613.91</td>
+    <td style="white-space: nowrap; text-align: right">2.72x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">jsone</td>
+    <td style="white-space: nowrap; text-align: right">322.22</td>
+    <td style="white-space: nowrap; text-align: right">5.18x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">jsx</td>
+    <td style="white-space: nowrap; text-align: right">108.10</td>
+    <td style="white-space: nowrap; text-align: right">15.44x</td>
+  </tr>
+
+</table>
+
+<table style="width: 1%">
+  <caption><b>UTF-8 unescaped</b></caption>
+  <tr>
+    <th>Name</th>
+    <th style="text-align: right">IPS</th>
+    <th style="text-align: right">Slower</th>
+  <tr>
+    <td style="white-space: nowrap">jiffy</td>
+    <td style="white-space: nowrap;text-align: right">14.32 K</td>
+    <td>&nbsp;</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">Jason</td>
+    <td style="white-space: nowrap; text-align: right">10.11 K</td>
+    <td style="white-space: nowrap; text-align: right">1.42x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">euneus</td>
+    <td style="white-space: nowrap; text-align: right">9.40 K</td>
+    <td style="white-space: nowrap; text-align: right">1.52x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">thoas</td>
+    <td style="white-space: nowrap; text-align: right">9.07 K</td>
+    <td style="white-space: nowrap; text-align: right">1.58x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">jsx</td>
+    <td style="white-space: nowrap; text-align: right">4.76 K</td>
+    <td style="white-space: nowrap; text-align: right">3.01x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">jsone</td>
+    <td style="white-space: nowrap; text-align: right">1.83 K</td>
+    <td style="white-space: nowrap; text-align: right">7.83x</td>
+  </tr>
+
+</table>
+
+</div>
+
+</div>
+
+All benchmark details are available [here](./euneus_bench/runs/encode.md).
+
+#### Encoding with empty map as option
+
+This benchmark passes the input and options parsed as the `euneus:encode_parsed/2` function arguments. There is no option set, just an empty map, so all the default options are used. This function it's a bit slower than the smart one, but all options are analyzed in the run.
+
+<div style="overflow: auto;">
+
+<div style="display: grid; grid-auto-flow: column; column-gap: 5px;">
+
+<table style="width: 1%">
+  <caption><b>Blockchain</b></caption>
+  <tr>
+    <th>Name</th>
+    <th style="text-align: right">IPS</th>
+    <th style="text-align: right">Slower</th>
+  <tr>
+    <td style="white-space: nowrap">jiffy</td>
+    <td style="white-space: nowrap;text-align: right">11.13 K</td>
+    <td>&nbsp;</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">Jason</td>
+    <td style="white-space: nowrap; text-align: right">4.62 K</td>
+    <td style="white-space: nowrap; text-align: right">2.41x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">euneus</td>
+    <td style="white-space: nowrap; text-align: right">3.92 K</td>
+    <td style="white-space: nowrap; text-align: right">2.84x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">thoas</td>
+    <td style="white-space: nowrap; text-align: right">3.74 K</td>
+    <td style="white-space: nowrap; text-align: right">2.98x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">jsone</td>
+    <td style="white-space: nowrap; text-align: right">2.55 K</td>
+    <td style="white-space: nowrap; text-align: right">4.37x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">jsx</td>
+    <td style="white-space: nowrap; text-align: right">1.01 K</td>
+    <td style="white-space: nowrap; text-align: right">11.03x</td>
+  </tr>
+
+</table>
+
+<table style="width: 1%">
+  <caption><b>Giphy</b></caption>
+  <tr>
+    <th>Name</th>
+    <th style="text-align: right">IPS</th>
+    <th style="text-align: right">Slower</th>
+  <tr>
+    <td style="white-space: nowrap">jiffy</td>
+    <td style="white-space: nowrap;text-align: right">1163.05</td>
+    <td>&nbsp;</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">Jason</td>
+    <td style="white-space: nowrap; text-align: right">416.91</td>
+    <td style="white-space: nowrap; text-align: right">2.79x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">thoas</td>
+    <td style="white-space: nowrap; text-align: right">396.88</td>
+    <td style="white-space: nowrap; text-align: right">2.93x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">euneus</td>
+    <td style="white-space: nowrap; text-align: right">335.54</td>
+    <td style="white-space: nowrap; text-align: right">3.47x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">jsone</td>
+    <td style="white-space: nowrap; text-align: right">212.68</td>
+    <td style="white-space: nowrap; text-align: right">5.47x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">jsx</td>
+    <td style="white-space: nowrap; text-align: right">79.30</td>
+    <td style="white-space: nowrap; text-align: right">14.67x</td>
+  </tr>
+
+</table>
+
+<table style="width: 1%">
+  <caption><b>GitHub</b></caption>
+  <tr>
+    <th>Name</th>
+    <th style="text-align: right">IPS</th>
+    <th style="text-align: right">Slower</th>
+  <tr>
+    <td style="white-space: nowrap">jiffy</td>
+    <td style="white-space: nowrap;text-align: right">3.50 K</td>
+    <td>&nbsp;</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">Jason</td>
+    <td style="white-space: nowrap; text-align: right">1.50 K</td>
+    <td style="white-space: nowrap; text-align: right">2.34x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">thoas</td>
+    <td style="white-space: nowrap; text-align: right">1.28 K</td>
+    <td style="white-space: nowrap; text-align: right">2.74x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">euneus</td>
+    <td style="white-space: nowrap; text-align: right">1.25 K</td>
+    <td style="white-space: nowrap; text-align: right">2.81x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">jsone</td>
+    <td style="white-space: nowrap; text-align: right">0.66 K</td>
+    <td style="white-space: nowrap; text-align: right">5.31x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">jsx</td>
+    <td style="white-space: nowrap; text-align: right">0.199 K</td>
+    <td style="white-space: nowrap; text-align: right">17.63x</td>
+  </tr>
+
+</table>
+
+<table style="width: 1%">
+  <caption><b>GovTrack</b></caption>
+  <tr>
+    <th>Name</th>
+    <th style="text-align: right">IPS</th>
+    <th style="text-align: right">Slower</th>
+  <tr>
+    <td style="white-space: nowrap">jiffy</td>
+    <td style="white-space: nowrap;text-align: right">51.97</td>
+    <td>&nbsp;</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">Jason</td>
+    <td style="white-space: nowrap; text-align: right">17.96</td>
+    <td style="white-space: nowrap; text-align: right">2.89x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">euneus</td>
+    <td style="white-space: nowrap; text-align: right">17.40</td>
+    <td style="white-space: nowrap; text-align: right">2.99x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">thoas</td>
+    <td style="white-space: nowrap; text-align: right">16.46</td>
+    <td style="white-space: nowrap; text-align: right">3.16x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">jsone</td>
+    <td style="white-space: nowrap; text-align: right">8.54</td>
+    <td style="white-space: nowrap; text-align: right">6.09x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">jsx</td>
+    <td style="white-space: nowrap; text-align: right">3.08</td>
+    <td style="white-space: nowrap; text-align: right">16.9x</td>
+  </tr>
+
+</table>
+
+<table style="width: 1%">
+  <caption><b>Issue 90</b></caption>
+  <tr>
+    <th>Name</th>
+    <th style="text-align: right">IPS</th>
+    <th style="text-align: right">Slower</th>
+  <tr>
+    <td style="white-space: nowrap">jiffy</td>
+    <td style="white-space: nowrap;text-align: right">36.68</td>
+    <td>&nbsp;</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">Jason</td>
+    <td style="white-space: nowrap; text-align: right">27.35</td>
+    <td style="white-space: nowrap; text-align: right">1.34x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">euneus</td>
+    <td style="white-space: nowrap; text-align: right">24.04</td>
+    <td style="white-space: nowrap; text-align: right">1.53x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">thoas</td>
+    <td style="white-space: nowrap; text-align: right">16.94</td>
+    <td style="white-space: nowrap; text-align: right">2.17x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">jsone</td>
+    <td style="white-space: nowrap; text-align: right">16.68</td>
+    <td style="white-space: nowrap; text-align: right">2.2x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">jsx</td>
+    <td style="white-space: nowrap; text-align: right">8.76</td>
+    <td style="white-space: nowrap; text-align: right">4.19x</td>
+  </tr>
+
+</table>
+
+<table style="width: 1%">
+  <caption><b>JSON Generator</b></caption>
+  <tr>
+    <th>Name</th>
+    <th style="text-align: right">IPS</th>
+    <th style="text-align: right">Slower</th>
+  <tr>
+    <td style="white-space: nowrap">jiffy</td>
+    <td style="white-space: nowrap;text-align: right">1177.53</td>
+    <td>&nbsp;</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">euneus</td>
+    <td style="white-space: nowrap; text-align: right">409.80</td>
+    <td style="white-space: nowrap; text-align: right">2.87x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">Jason</td>
+    <td style="white-space: nowrap; text-align: right">406.64</td>
+    <td style="white-space: nowrap; text-align: right">2.9x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">thoas</td>
+    <td style="white-space: nowrap; text-align: right">399.93</td>
+    <td style="white-space: nowrap; text-align: right">2.94x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">jsone</td>
+    <td style="white-space: nowrap; text-align: right">270.72</td>
+    <td style="white-space: nowrap; text-align: right">4.35x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">jsx</td>
+    <td style="white-space: nowrap; text-align: right">97.89</td>
+    <td style="white-space: nowrap; text-align: right">12.03x</td>
+  </tr>
+
+</table>
+
+<table style="width: 1%">
+  <caption><b>Pokedex</b></caption>
+  <tr>
+    <th>Name</th>
+    <th style="text-align: right">IPS</th>
+    <th style="text-align: right">Slower</th>
+  <tr>
+    <td style="white-space: nowrap">jiffy</td>
+    <td style="white-space: nowrap;text-align: right">1659.13</td>
+    <td>&nbsp;</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">Jason</td>
+    <td style="white-space: nowrap; text-align: right">620.01</td>
+    <td style="white-space: nowrap; text-align: right">2.68x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">thoas</td>
+    <td style="white-space: nowrap; text-align: right">609.24</td>
+    <td style="white-space: nowrap; text-align: right">2.72x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">euneus</td>
+    <td style="white-space: nowrap; text-align: right">487.64</td>
+    <td style="white-space: nowrap; text-align: right">3.4x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">jsone</td>
+    <td style="white-space: nowrap; text-align: right">321.06</td>
+    <td style="white-space: nowrap; text-align: right">5.17x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">jsx</td>
+    <td style="white-space: nowrap; text-align: right">108.35</td>
+    <td style="white-space: nowrap; text-align: right">15.31x</td>
+  </tr>
+
+</table>
+
+<table style="width: 1%">
+  <caption><b>UTF-8 unescaped</b></caption>
+  <tr>
+    <th>Name</th>
+    <th style="text-align: right">IPS</th>
+    <th style="text-align: right">Slower</th>
+  <tr>
+    <td style="white-space: nowrap">jiffy</td>
+    <td style="white-space: nowrap;text-align: right">14.36 K</td>
+    <td>&nbsp;</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">Jason</td>
+    <td style="white-space: nowrap; text-align: right">10.07 K</td>
+    <td style="white-space: nowrap; text-align: right">1.43x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">euneus</td>
+    <td style="white-space: nowrap; text-align: right">9.27 K</td>
+    <td style="white-space: nowrap; text-align: right">1.55x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">thoas</td>
+    <td style="white-space: nowrap; text-align: right">9.07 K</td>
+    <td style="white-space: nowrap; text-align: right">1.58x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">jsx</td>
+    <td style="white-space: nowrap; text-align: right">4.78 K</td>
+    <td style="white-space: nowrap; text-align: right">3.0x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">jsone</td>
+    <td style="white-space: nowrap; text-align: right">1.83 K</td>
+    <td style="white-space: nowrap; text-align: right">7.86x</td>
+  </tr>
+
+</table>
+
+</div>
+
+</div>
+
+All benchmark details are available [here](./euneus_bench/runs/encode_parsed.md).
+
+#### Encoding with all built-in plugins
+
+This benchmark passes all the encode built-in plugins to the plugins option:
+
+```erlang
+euneus:parse_encode_opts(#{
+  plugins => [
+    datetime,
+    inet,
+    pid,
+    port,
+    proplist,
+    reference,
+    timestamp
+  ]
+}).
+```
+
+It's the slowest euneus encode run, but at the same time it is very efficient.
+
+<div style="overflow: auto;">
+
+<div style="display: grid; grid-auto-flow: column; column-gap: 5px;">
+
+<table style="width: 1%">
+  <caption><b>Blockchain</b></caption>
+  <tr>
+    <th>Name</th>
+    <th style="text-align: right">IPS</th>
+    <th style="text-align: right">Slower</th>
+  <tr>
+    <td style="white-space: nowrap">jiffy</td>
+    <td style="white-space: nowrap;text-align: right">11.28 K</td>
+    <td>&nbsp;</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">Jason</td>
+    <td style="white-space: nowrap; text-align: right">4.59 K</td>
+    <td style="white-space: nowrap; text-align: right">2.46x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">euneus</td>
+    <td style="white-space: nowrap; text-align: right">3.79 K</td>
+    <td style="white-space: nowrap; text-align: right">2.97x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">thoas</td>
+    <td style="white-space: nowrap; text-align: right">3.79 K</td>
+    <td style="white-space: nowrap; text-align: right">2.98x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">jsone</td>
+    <td style="white-space: nowrap; text-align: right">2.54 K</td>
+    <td style="white-space: nowrap; text-align: right">4.44x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">jsx</td>
+    <td style="white-space: nowrap; text-align: right">1.01 K</td>
+    <td style="white-space: nowrap; text-align: right">11.2x</td>
+  </tr>
+
+</table>
+
+<table style="width: 1%">
+  <caption><b>Giphy</b></caption>
+  <tr>
+    <th>Name</th>
+    <th style="text-align: right">IPS</th>
+    <th style="text-align: right">Slower</th>
+  <tr>
+    <td style="white-space: nowrap">jiffy</td>
+    <td style="white-space: nowrap;text-align: right">1172.88</td>
+    <td>&nbsp;</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">Jason</td>
+    <td style="white-space: nowrap; text-align: right">424.49</td>
+    <td style="white-space: nowrap; text-align: right">2.76x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">thoas</td>
+    <td style="white-space: nowrap; text-align: right">402.26</td>
+    <td style="white-space: nowrap; text-align: right">2.92x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">euneus</td>
+    <td style="white-space: nowrap; text-align: right">332.49</td>
+    <td style="white-space: nowrap; text-align: right">3.53x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">jsone</td>
+    <td style="white-space: nowrap; text-align: right">213.21</td>
+    <td style="white-space: nowrap; text-align: right">5.5x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">jsx</td>
+    <td style="white-space: nowrap; text-align: right">79.30</td>
+    <td style="white-space: nowrap; text-align: right">14.79x</td>
+  </tr>
+
+</table>
+
+<table style="width: 1%">
+  <caption><b>GitHub</b></caption>
+  <tr>
+    <th>Name</th>
+    <th style="text-align: right">IPS</th>
+    <th style="text-align: right">Slower</th>
+  <tr>
+    <td style="white-space: nowrap">jiffy</td>
+    <td style="white-space: nowrap;text-align: right">3.26 K</td>
+    <td>&nbsp;</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">Jason</td>
+    <td style="white-space: nowrap; text-align: right">1.52 K</td>
+    <td style="white-space: nowrap; text-align: right">2.14x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">thoas</td>
+    <td style="white-space: nowrap; text-align: right">1.30 K</td>
+    <td style="white-space: nowrap; text-align: right">2.51x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">euneus</td>
+    <td style="white-space: nowrap; text-align: right">1.22 K</td>
+    <td style="white-space: nowrap; text-align: right">2.67x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">jsone</td>
+    <td style="white-space: nowrap; text-align: right">0.66 K</td>
+    <td style="white-space: nowrap; text-align: right">4.93x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">jsx</td>
+    <td style="white-space: nowrap; text-align: right">0.196 K</td>
+    <td style="white-space: nowrap; text-align: right">16.62x</td>
+  </tr>
+
+</table>
+
+<table style="width: 1%">
+  <caption><b>GovTrack</b></caption>
+  <tr>
+    <th>Name</th>
+    <th style="text-align: right">IPS</th>
+    <th style="text-align: right">Slower</th>
+  <tr>
+    <td style="white-space: nowrap">jiffy</td>
+    <td style="white-space: nowrap;text-align: right">52.16</td>
+    <td>&nbsp;</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">Jason</td>
+    <td style="white-space: nowrap; text-align: right">18.21</td>
+    <td style="white-space: nowrap; text-align: right">2.86x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">thoas</td>
+    <td style="white-space: nowrap; text-align: right">16.95</td>
+    <td style="white-space: nowrap; text-align: right">3.08x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">euneus</td>
+    <td style="white-space: nowrap; text-align: right">16.66</td>
+    <td style="white-space: nowrap; text-align: right">3.13x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">jsone</td>
+    <td style="white-space: nowrap; text-align: right">8.55</td>
+    <td style="white-space: nowrap; text-align: right">6.1x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">jsx</td>
+    <td style="white-space: nowrap; text-align: right">3.10</td>
+    <td style="white-space: nowrap; text-align: right">16.83x</td>
+  </tr>
+
+</table>
+
+<table style="width: 1%">
+  <caption><b>Issue 90</b></caption>
+  <tr>
+    <th>Name</th>
+    <th style="text-align: right">IPS</th>
+    <th style="text-align: right">Slower</th>
+  <tr>
+    <td style="white-space: nowrap">jiffy</td>
+    <td style="white-space: nowrap;text-align: right">36.70</td>
+    <td>&nbsp;</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">Jason</td>
+    <td style="white-space: nowrap; text-align: right">27.43</td>
+    <td style="white-space: nowrap; text-align: right">1.34x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">euneus</td>
+    <td style="white-space: nowrap; text-align: right">24.12</td>
+    <td style="white-space: nowrap; text-align: right">1.52x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">thoas</td>
+    <td style="white-space: nowrap; text-align: right">16.98</td>
+    <td style="white-space: nowrap; text-align: right">2.16x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">jsone</td>
+    <td style="white-space: nowrap; text-align: right">16.66</td>
+    <td style="white-space: nowrap; text-align: right">2.2x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">jsx</td>
+    <td style="white-space: nowrap; text-align: right">8.78</td>
+    <td style="white-space: nowrap; text-align: right">4.18x</td>
+  </tr>
+
+</table>
+
+<table style="width: 1%">
+  <caption><b>JSON Generator</b></caption>
+  <tr>
+    <th>Name</th>
+    <th style="text-align: right">IPS</th>
+    <th style="text-align: right">Slower</th>
+  <tr>
+    <td style="white-space: nowrap">jiffy</td>
+    <td style="white-space: nowrap;text-align: right">1188.50</td>
+    <td>&nbsp;</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">Jason</td>
+    <td style="white-space: nowrap; text-align: right">412.20</td>
+    <td style="white-space: nowrap; text-align: right">2.88x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">thoas</td>
+    <td style="white-space: nowrap; text-align: right">405.50</td>
+    <td style="white-space: nowrap; text-align: right">2.93x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">euneus</td>
+    <td style="white-space: nowrap; text-align: right">397.61</td>
+    <td style="white-space: nowrap; text-align: right">2.99x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">jsone</td>
+    <td style="white-space: nowrap; text-align: right">272.44</td>
+    <td style="white-space: nowrap; text-align: right">4.36x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">jsx</td>
+    <td style="white-space: nowrap; text-align: right">94.44</td>
+    <td style="white-space: nowrap; text-align: right">12.59x</td>
+  </tr>
+
+</table>
+
+<table style="width: 1%">
+  <caption><b>Pokedex</b></caption>
+  <tr>
+    <th>Name</th>
+    <th style="text-align: right">IPS</th>
+    <th style="text-align: right">Slower</th>
+  <tr>
+    <td style="white-space: nowrap">jiffy</td>
+    <td style="white-space: nowrap;text-align: right">1648.51</td>
+    <td>&nbsp;</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">Jason</td>
+    <td style="white-space: nowrap; text-align: right">628.07</td>
+    <td style="white-space: nowrap; text-align: right">2.62x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">thoas</td>
+    <td style="white-space: nowrap; text-align: right">613.82</td>
+    <td style="white-space: nowrap; text-align: right">2.69x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">euneus</td>
+    <td style="white-space: nowrap; text-align: right">470.18</td>
+    <td style="white-space: nowrap; text-align: right">3.51x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">jsone</td>
+    <td style="white-space: nowrap; text-align: right">321.84</td>
+    <td style="white-space: nowrap; text-align: right">5.12x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">jsx</td>
+    <td style="white-space: nowrap; text-align: right">108.45</td>
+    <td style="white-space: nowrap; text-align: right">15.2x</td>
+  </tr>
+
+</table>
+
+<table style="width: 1%">
+  <caption><b>UTF-8 unescaped</b></caption>
+  <tr>
+    <th>Name</th>
+    <th style="text-align: right">IPS</th>
+    <th style="text-align: right">Slower</th>
+  <tr>
+    <td style="white-space: nowrap">jiffy</td>
+    <td style="white-space: nowrap;text-align: right">14.38 K</td>
+    <td>&nbsp;</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">Jason</td>
+    <td style="white-space: nowrap; text-align: right">10.09 K</td>
+    <td style="white-space: nowrap; text-align: right">1.42x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">euneus</td>
+    <td style="white-space: nowrap; text-align: right">9.41 K</td>
+    <td style="white-space: nowrap; text-align: right">1.53x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">thoas</td>
+    <td style="white-space: nowrap; text-align: right">9.13 K</td>
+    <td style="white-space: nowrap; text-align: right">1.57x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">jsx</td>
+    <td style="white-space: nowrap; text-align: right">4.76 K</td>
+    <td style="white-space: nowrap; text-align: right">3.02x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">jsone</td>
+    <td style="white-space: nowrap; text-align: right">1.79 K</td>
+    <td style="white-space: nowrap; text-align: right">8.02x</td>
+  </tr>
+
+</table>
+
+</div>
+
+</div>
+
+All benchmark details are available [here](./euneus_bench/runs/encode_parsed_plugins.md).
 
 ### Decode
 
-<!-- Generated via https://www.tablesgenerator.com/markdown_tables -->
-<!-- To edit, open "./assets/md-tables/bench-decode.tgn" in the link above. -->
-| **File**                   	|  **Euneus** 	| **Thoas** 	| **Comparison** 	|
-|----------------------------	|------------:	|----------:	|---------------:	|
-| blockchain.json            	|  **7.18 K** 	|    5.78 K 	|          1.24x 	|
-| giphy.json                 	|  **589.84** 	|    536.41 	|          1.08x 	|
-| github.json                	|  **2.33 K** 	|    2.02 K 	|          1.16x 	|
-| govtrack.json              	|   **16.90** 	|     15.89 	|          1.06x 	|
-| issue-90.json              	|   **25.35** 	|     17.70 	|          1.43x 	|
-| json-generator-pretty.json 	|  **617.33** 	|    542.99 	|          1.14x 	|
-| json-generator.json        	|  **800.43** 	|    700.34 	|          1.15x 	|
-| pokedex.json               	|  **1.36 K** 	|    1.31 K 	|          1.04x 	|
-| utf-8-escaped.json         	|  **2.05 K** 	|    1.67 K 	|          1.23x 	|
-| utf-8-unescaped.json       	| **11.27 K** 	|   10.48 K 	|          1.08x 	|
+#### Smart decoding
+
+This benchmark uses the decode smart module via the `euneus:decode/1` function. Smart modules only receive the input as the argument, so no option is available to set. Smart modules are the fastest euneus modules.
+
+<div style="overflow: auto;">
+
+<div style="display: grid; grid-auto-flow: column; column-gap: 5px;">
+
+<table style="width: 1%">
+  <caption><b>Blockchain</b></caption>
+  <tr>
+    <th>Name</th>
+    <th style="text-align: right">IPS</th>
+    <th style="text-align: right">Slower</th>
+  <tr>
+    <td style="white-space: nowrap">jiffy</td>
+    <td style="white-space: nowrap;text-align: right">5.94 K</td>
+    <td>&nbsp;</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">euneus</td>
+    <td style="white-space: nowrap; text-align: right">5.77 K</td>
+    <td style="white-space: nowrap; text-align: right">1.03x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">Jason</td>
+    <td style="white-space: nowrap; text-align: right">5.53 K</td>
+    <td style="white-space: nowrap; text-align: right">1.08x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">thoas</td>
+    <td style="white-space: nowrap; text-align: right">4.87 K</td>
+    <td style="white-space: nowrap; text-align: right">1.22x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">jsone</td>
+    <td style="white-space: nowrap; text-align: right">4.26 K</td>
+    <td style="white-space: nowrap; text-align: right">1.39x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">jsx</td>
+    <td style="white-space: nowrap; text-align: right">1.83 K</td>
+    <td style="white-space: nowrap; text-align: right">3.25x</td>
+  </tr>
+
+</table>
+
+<table style="width: 1%">
+  <caption><b>Giphy</b></caption>
+  <tr>
+    <th>Name</th>
+    <th style="text-align: right">IPS</th>
+    <th style="text-align: right">Slower</th>
+  <tr>
+    <td style="white-space: nowrap">jiffy</td>
+    <td style="white-space: nowrap;text-align: right">925.19</td>
+    <td>&nbsp;</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">thoas</td>
+    <td style="white-space: nowrap; text-align: right">498.15</td>
+    <td style="white-space: nowrap; text-align: right">1.86x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">euneus</td>
+    <td style="white-space: nowrap; text-align: right">494.10</td>
+    <td style="white-space: nowrap; text-align: right">1.87x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">Jason</td>
+    <td style="white-space: nowrap; text-align: right">451.81</td>
+    <td style="white-space: nowrap; text-align: right">2.05x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">jsone</td>
+    <td style="white-space: nowrap; text-align: right">278.02</td>
+    <td style="white-space: nowrap; text-align: right">3.33x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">jsx</td>
+    <td style="white-space: nowrap; text-align: right">162.97</td>
+    <td style="white-space: nowrap; text-align: right">5.68x</td>
+  </tr>
+
+</table>
+
+<table style="width: 1%">
+  <caption><b>GitHub</b></caption>
+  <tr>
+    <th>Name</th>
+    <th style="text-align: right">IPS</th>
+    <th style="text-align: right">Slower</th>
+  <tr>
+    <td style="white-space: nowrap">jiffy</td>
+    <td style="white-space: nowrap;text-align: right">2.69 K</td>
+    <td>&nbsp;</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">euneus</td>
+    <td style="white-space: nowrap; text-align: right">2.09 K</td>
+    <td style="white-space: nowrap; text-align: right">1.29x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">Jason</td>
+    <td style="white-space: nowrap; text-align: right">2.01 K</td>
+    <td style="white-space: nowrap; text-align: right">1.34x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">thoas</td>
+    <td style="white-space: nowrap; text-align: right">1.81 K</td>
+    <td style="white-space: nowrap; text-align: right">1.49x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">jsone</td>
+    <td style="white-space: nowrap; text-align: right">1.42 K</td>
+    <td style="white-space: nowrap; text-align: right">1.9x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">jsx</td>
+    <td style="white-space: nowrap; text-align: right">0.51 K</td>
+    <td style="white-space: nowrap; text-align: right">5.24x</td>
+  </tr>
+
+</table>
+
+<table style="width: 1%">
+  <caption><b>GovTrack</b></caption>
+  <tr>
+    <th>Name</th>
+    <th style="text-align: right">IPS</th>
+    <th style="text-align: right">Slower</th>
+  <tr>
+    <td style="white-space: nowrap">jiffy</td>
+    <td style="white-space: nowrap;text-align: right">27.04</td>
+    <td>&nbsp;</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">Jason</td>
+    <td style="white-space: nowrap; text-align: right">17.02</td>
+    <td style="white-space: nowrap; text-align: right">1.59x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">euneus</td>
+    <td style="white-space: nowrap; text-align: right">16.79</td>
+    <td style="white-space: nowrap; text-align: right">1.61x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">thoas</td>
+    <td style="white-space: nowrap; text-align: right">15.69</td>
+    <td style="white-space: nowrap; text-align: right">1.72x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">jsone</td>
+    <td style="white-space: nowrap; text-align: right">9.35</td>
+    <td style="white-space: nowrap; text-align: right">2.89x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">jsx</td>
+    <td style="white-space: nowrap; text-align: right">4.40</td>
+    <td style="white-space: nowrap; text-align: right">6.14x</td>
+  </tr>
+
+</table>
+
+<table style="width: 1%">
+  <caption><b>Issue 90</b></caption>
+  <tr>
+    <th>Name</th>
+    <th style="text-align: right">IPS</th>
+    <th style="text-align: right">Slower</th>
+  <tr>
+    <td style="white-space: nowrap">jiffy</td>
+    <td style="white-space: nowrap;text-align: right">49.92</td>
+    <td>&nbsp;</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">euneus</td>
+    <td style="white-space: nowrap; text-align: right">26.62</td>
+    <td style="white-space: nowrap; text-align: right">1.88x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">Jason</td>
+    <td style="white-space: nowrap; text-align: right">25.25</td>
+    <td style="white-space: nowrap; text-align: right">1.98x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">jsone</td>
+    <td style="white-space: nowrap; text-align: right">23.25</td>
+    <td style="white-space: nowrap; text-align: right">2.15x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">thoas</td>
+    <td style="white-space: nowrap; text-align: right">17.79</td>
+    <td style="white-space: nowrap; text-align: right">2.81x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">jsx</td>
+    <td style="white-space: nowrap; text-align: right">9.92</td>
+    <td style="white-space: nowrap; text-align: right">5.03x</td>
+  </tr>
+
+</table>
+
+<table style="width: 1%">
+  <caption><b>JSON Generator (Pretty)</b></caption>
+  <tr>
+    <th>Name</th>
+    <th style="text-align: right">IPS</th>
+    <th style="text-align: right">Slower</th>
+  <tr>
+    <td style="white-space: nowrap">jiffy</td>
+    <td style="white-space: nowrap;text-align: right">1143.30</td>
+    <td>&nbsp;</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">euneus</td>
+    <td style="white-space: nowrap; text-align: right">707.45</td>
+    <td style="white-space: nowrap; text-align: right">1.62x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">Jason</td>
+    <td style="white-space: nowrap; text-align: right">696.88</td>
+    <td style="white-space: nowrap; text-align: right">1.64x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">thoas</td>
+    <td style="white-space: nowrap; text-align: right">624.07</td>
+    <td style="white-space: nowrap; text-align: right">1.83x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">jsone</td>
+    <td style="white-space: nowrap; text-align: right">435.82</td>
+    <td style="white-space: nowrap; text-align: right">2.62x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">jsx</td>
+    <td style="white-space: nowrap; text-align: right">185.81</td>
+    <td style="white-space: nowrap; text-align: right">6.15x</td>
+  </tr>
+
+</table>
+
+<table style="width: 1%">
+  <caption><b>JSON Generator</b></caption>
+  <tr>
+    <th>Name</th>
+    <th style="text-align: right">IPS</th>
+    <th style="text-align: right">Slower</th>
+  <tr>
+    <td style="white-space: nowrap">jiffy</td>
+    <td style="white-space: nowrap;text-align: right">698.94</td>
+    <td>&nbsp;</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">euneus</td>
+    <td style="white-space: nowrap; text-align: right">616.18</td>
+    <td style="white-space: nowrap; text-align: right">1.13x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">Jason</td>
+    <td style="white-space: nowrap; text-align: right">591.72</td>
+    <td style="white-space: nowrap; text-align: right">1.18x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">thoas</td>
+    <td style="white-space: nowrap; text-align: right">539.94</td>
+    <td style="white-space: nowrap; text-align: right">1.29x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">jsone</td>
+    <td style="white-space: nowrap; text-align: right">400.04</td>
+    <td style="white-space: nowrap; text-align: right">1.75x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">jsx</td>
+    <td style="white-space: nowrap; text-align: right">176.01</td>
+    <td style="white-space: nowrap; text-align: right">3.97x</td>
+  </tr>
+
+</table>
+
+<table style="width: 1%">
+  <caption><b>Pokedex</b></caption>
+  <tr>
+    <th>Name</th>
+    <th style="text-align: right">IPS</th>
+    <th style="text-align: right">Slower</th>
+  <tr>
+    <td style="white-space: nowrap">jiffy</td>
+    <td style="white-space: nowrap;text-align: right">1.36 K</td>
+    <td>&nbsp;</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">euneus</td>
+    <td style="white-space: nowrap; text-align: right">1.17 K</td>
+    <td style="white-space: nowrap; text-align: right">1.16x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">thoas</td>
+    <td style="white-space: nowrap; text-align: right">1.15 K</td>
+    <td style="white-space: nowrap; text-align: right">1.18x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">Jason</td>
+    <td style="white-space: nowrap; text-align: right">1.04 K</td>
+    <td style="white-space: nowrap; text-align: right">1.3x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">jsone</td>
+    <td style="white-space: nowrap; text-align: right">0.59 K</td>
+    <td style="white-space: nowrap; text-align: right">2.31x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">jsx</td>
+    <td style="white-space: nowrap; text-align: right">0.26 K</td>
+    <td style="white-space: nowrap; text-align: right">5.31x</td>
+  </tr>
+
+</table>
+
+<table style="width: 1%">
+  <caption><b>UTF-8 escaped</b></caption>
+  <tr>
+    <th>Name</th>
+    <th style="text-align: right">IPS</th>
+    <th style="text-align: right">Slower</th>
+  <tr>
+    <td style="white-space: nowrap">jiffy</td>
+    <td style="white-space: nowrap;text-align: right">10.41 K</td>
+    <td>&nbsp;</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">thoas</td>
+    <td style="white-space: nowrap; text-align: right">1.70 K</td>
+    <td style="white-space: nowrap; text-align: right">6.14x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">Jason</td>
+    <td style="white-space: nowrap; text-align: right">1.69 K</td>
+    <td style="white-space: nowrap; text-align: right">6.18x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">euneus</td>
+    <td style="white-space: nowrap; text-align: right">1.47 K</td>
+    <td style="white-space: nowrap; text-align: right">7.09x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">jsone</td>
+    <td style="white-space: nowrap; text-align: right">1.29 K</td>
+    <td style="white-space: nowrap; text-align: right">8.09x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">jsx</td>
+    <td style="white-space: nowrap; text-align: right">1.16 K</td>
+    <td style="white-space: nowrap; text-align: right">8.97x</td>
+  </tr>
+
+</table>
+
+<table style="width: 1%">
+  <caption><b>UTF-8 unescaped</b></caption>
+  <tr>
+    <th>Name</th>
+    <th style="text-align: right">IPS</th>
+    <th style="text-align: right">Slower</th>
+  <tr>
+    <td style="white-space: nowrap">jiffy</td>
+    <td style="white-space: nowrap;text-align: right">18.12 K</td>
+    <td>&nbsp;</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">euneus</td>
+    <td style="white-space: nowrap; text-align: right">10.44 K</td>
+    <td style="white-space: nowrap; text-align: right">1.74x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">Jason</td>
+    <td style="white-space: nowrap; text-align: right">10.19 K</td>
+    <td style="white-space: nowrap; text-align: right">1.78x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">thoas</td>
+    <td style="white-space: nowrap; text-align: right">9.60 K</td>
+    <td style="white-space: nowrap; text-align: right">1.89x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">jsone</td>
+    <td style="white-space: nowrap; text-align: right">9.44 K</td>
+    <td style="white-space: nowrap; text-align: right">1.92x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">jsx</td>
+    <td style="white-space: nowrap; text-align: right">6.57 K</td>
+    <td style="white-space: nowrap; text-align: right">2.76x</td>
+  </tr>
+
+</table>
+
+</div>
+
+</div>
+
+All benchmark details are available [here](./euneus_bench/runs/decode.md).
+
+#### Decoding with empty map as option
+
+This benchmark passes the input and options parsed as the `euneus:decode_parsed/2` function arguments. There is no option set, just an empty map, so all the default options are used. This function it's a bit slower than the smart one, but all options are analyzed in the run.
+
+<div style="overflow: auto;">
+
+<div style="display: grid; grid-auto-flow: column; column-gap: 5px;">
+
+<table style="width: 1%">
+  <caption><b>Blockchain</b></caption>
+  <tr>
+    <th>Name</th>
+    <th style="text-align: right">IPS</th>
+    <th style="text-align: right">Slower</th>
+  <tr>
+    <td style="white-space: nowrap">jiffy</td>
+    <td style="white-space: nowrap;text-align: right">5.98 K</td>
+    <td>&nbsp;</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">Jason</td>
+    <td style="white-space: nowrap; text-align: right">5.55 K</td>
+    <td style="white-space: nowrap; text-align: right">1.08x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">thoas</td>
+    <td style="white-space: nowrap; text-align: right">4.87 K</td>
+    <td style="white-space: nowrap; text-align: right">1.23x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">jsone</td>
+    <td style="white-space: nowrap; text-align: right">4.28 K</td>
+    <td style="white-space: nowrap; text-align: right">1.4x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">euneus</td>
+    <td style="white-space: nowrap; text-align: right">3.59 K</td>
+    <td style="white-space: nowrap; text-align: right">1.67x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">jsx</td>
+    <td style="white-space: nowrap; text-align: right">1.83 K</td>
+    <td style="white-space: nowrap; text-align: right">3.26x</td>
+  </tr>
+
+</table>
+
+<table style="width: 1%">
+  <caption><b>Giphy</b></caption>
+  <tr>
+    <th>Name</th>
+    <th style="text-align: right">IPS</th>
+    <th style="text-align: right">Slower</th>
+  <tr>
+    <td style="white-space: nowrap">jiffy</td>
+    <td style="white-space: nowrap;text-align: right">990.34</td>
+    <td>&nbsp;</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">thoas</td>
+    <td style="white-space: nowrap; text-align: right">497.98</td>
+    <td style="white-space: nowrap; text-align: right">1.99x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">Jason</td>
+    <td style="white-space: nowrap; text-align: right">456.78</td>
+    <td style="white-space: nowrap; text-align: right">2.17x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">euneus</td>
+    <td style="white-space: nowrap; text-align: right">278.42</td>
+    <td style="white-space: nowrap; text-align: right">3.56x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">jsone</td>
+    <td style="white-space: nowrap; text-align: right">277.71</td>
+    <td style="white-space: nowrap; text-align: right">3.57x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">jsx</td>
+    <td style="white-space: nowrap; text-align: right">167.26</td>
+    <td style="white-space: nowrap; text-align: right">5.92x</td>
+  </tr>
+
+</table>
+
+<table style="width: 1%">
+  <caption><b>GitHub</b></caption>
+  <tr>
+    <th>Name</th>
+    <th style="text-align: right">IPS</th>
+    <th style="text-align: right">Slower</th>
+  <tr>
+    <td style="white-space: nowrap">jiffy</td>
+    <td style="white-space: nowrap;text-align: right">2.70 K</td>
+    <td>&nbsp;</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">Jason</td>
+    <td style="white-space: nowrap; text-align: right">2.01 K</td>
+    <td style="white-space: nowrap; text-align: right">1.35x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">thoas</td>
+    <td style="white-space: nowrap; text-align: right">1.82 K</td>
+    <td style="white-space: nowrap; text-align: right">1.49x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">jsone</td>
+    <td style="white-space: nowrap; text-align: right">1.42 K</td>
+    <td style="white-space: nowrap; text-align: right">1.91x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">euneus</td>
+    <td style="white-space: nowrap; text-align: right">1.17 K</td>
+    <td style="white-space: nowrap; text-align: right">2.3x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">jsx</td>
+    <td style="white-space: nowrap; text-align: right">0.52 K</td>
+    <td style="white-space: nowrap; text-align: right">5.2x</td>
+  </tr>
+
+</table>
+
+<table style="width: 1%">
+  <caption><b>GovTrack</b></caption>
+  <tr>
+    <th>Name</th>
+    <th style="text-align: right">IPS</th>
+    <th style="text-align: right">Slower</th>
+  <tr>
+    <td style="white-space: nowrap">jiffy</td>
+    <td style="white-space: nowrap;text-align: right">27.25</td>
+    <td>&nbsp;</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">Jason</td>
+    <td style="white-space: nowrap; text-align: right">17.27</td>
+    <td style="white-space: nowrap; text-align: right">1.58x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">thoas</td>
+    <td style="white-space: nowrap; text-align: right">15.78</td>
+    <td style="white-space: nowrap; text-align: right">1.73x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">jsone</td>
+    <td style="white-space: nowrap; text-align: right">9.55</td>
+    <td style="white-space: nowrap; text-align: right">2.85x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">euneus</td>
+    <td style="white-space: nowrap; text-align: right">7.82</td>
+    <td style="white-space: nowrap; text-align: right">3.49x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">jsx</td>
+    <td style="white-space: nowrap; text-align: right">4.45</td>
+    <td style="white-space: nowrap; text-align: right">6.13x</td>
+  </tr>
+
+</table>
+
+<table style="width: 1%">
+  <caption><b>Issue 90</b></caption>
+  <tr>
+    <th>Name</th>
+    <th style="text-align: right">IPS</th>
+    <th style="text-align: right">Slower</th>
+  <tr>
+    <td style="white-space: nowrap">jiffy</td>
+    <td style="white-space: nowrap;text-align: right">49.74</td>
+    <td>&nbsp;</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">Jason</td>
+    <td style="white-space: nowrap; text-align: right">25.26</td>
+    <td style="white-space: nowrap; text-align: right">1.97x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">euneus</td>
+    <td style="white-space: nowrap; text-align: right">25.23</td>
+    <td style="white-space: nowrap; text-align: right">1.97x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">jsone</td>
+    <td style="white-space: nowrap; text-align: right">23.29</td>
+    <td style="white-space: nowrap; text-align: right">2.14x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">thoas</td>
+    <td style="white-space: nowrap; text-align: right">17.98</td>
+    <td style="white-space: nowrap; text-align: right">2.77x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">jsx</td>
+    <td style="white-space: nowrap; text-align: right">9.97</td>
+    <td style="white-space: nowrap; text-align: right">4.99x</td>
+  </tr>
+
+</table>
+
+<table style="width: 1%">
+  <caption><b>JSON Generator (Pretty)</b></caption>
+  <tr>
+    <th>Name</th>
+    <th style="text-align: right">IPS</th>
+    <th style="text-align: right">Slower</th>
+  <tr>
+    <td style="white-space: nowrap">jiffy</td>
+    <td style="white-space: nowrap;text-align: right">1162.25</td>
+    <td>&nbsp;</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">Jason</td>
+    <td style="white-space: nowrap; text-align: right">694.53</td>
+    <td style="white-space: nowrap; text-align: right">1.67x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">thoas</td>
+    <td style="white-space: nowrap; text-align: right">625.05</td>
+    <td style="white-space: nowrap; text-align: right">1.86x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">jsone</td>
+    <td style="white-space: nowrap; text-align: right">436.44</td>
+    <td style="white-space: nowrap; text-align: right">2.66x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">euneus</td>
+    <td style="white-space: nowrap; text-align: right">347.69</td>
+    <td style="white-space: nowrap; text-align: right">3.34x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">jsx</td>
+    <td style="white-space: nowrap; text-align: right">191.09</td>
+    <td style="white-space: nowrap; text-align: right">6.08x</td>
+  </tr>
+
+</table>
+
+<table style="width: 1%">
+  <caption><b>JSON Generator</b></caption>
+  <tr>
+    <th>Name</th>
+    <th style="text-align: right">IPS</th>
+    <th style="text-align: right">Slower</th>
+  <tr>
+    <td style="white-space: nowrap">jiffy</td>
+    <td style="white-space: nowrap;text-align: right">696.27</td>
+    <td>&nbsp;</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">Jason</td>
+    <td style="white-space: nowrap; text-align: right">586.85</td>
+    <td style="white-space: nowrap; text-align: right">1.19x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">thoas</td>
+    <td style="white-space: nowrap; text-align: right">541.03</td>
+    <td style="white-space: nowrap; text-align: right">1.29x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">jsone</td>
+    <td style="white-space: nowrap; text-align: right">400.67</td>
+    <td style="white-space: nowrap; text-align: right">1.74x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">euneus</td>
+    <td style="white-space: nowrap; text-align: right">317.16</td>
+    <td style="white-space: nowrap; text-align: right">2.2x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">jsx</td>
+    <td style="white-space: nowrap; text-align: right">181.31</td>
+    <td style="white-space: nowrap; text-align: right">3.84x</td>
+  </tr>
+
+</table>
+
+<table style="width: 1%">
+  <caption><b>Pokedex</b></caption>
+  <tr>
+    <th>Name</th>
+    <th style="text-align: right">IPS</th>
+    <th style="text-align: right">Slower</th>
+  <tr>
+    <td style="white-space: nowrap">jiffy</td>
+    <td style="white-space: nowrap;text-align: right">1.35 K</td>
+    <td>&nbsp;</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">thoas</td>
+    <td style="white-space: nowrap; text-align: right">1.15 K</td>
+    <td style="white-space: nowrap; text-align: right">1.18x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">Jason</td>
+    <td style="white-space: nowrap; text-align: right">1.04 K</td>
+    <td style="white-space: nowrap; text-align: right">1.3x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">jsone</td>
+    <td style="white-space: nowrap; text-align: right">0.59 K</td>
+    <td style="white-space: nowrap; text-align: right">2.29x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">euneus</td>
+    <td style="white-space: nowrap; text-align: right">0.40 K</td>
+    <td style="white-space: nowrap; text-align: right">3.34x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">jsx</td>
+    <td style="white-space: nowrap; text-align: right">0.26 K</td>
+    <td style="white-space: nowrap; text-align: right">5.27x</td>
+  </tr>
+
+</table>
+
+<table style="width: 1%">
+  <caption><b>UTF-8 escaped</b></caption>
+  <tr>
+    <th>Name</th>
+    <th style="text-align: right">IPS</th>
+    <th style="text-align: right">Slower</th>
+  <tr>
+    <td style="white-space: nowrap">jiffy</td>
+    <td style="white-space: nowrap;text-align: right">10.38 K</td>
+    <td>&nbsp;</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">Jason</td>
+    <td style="white-space: nowrap; text-align: right">1.70 K</td>
+    <td style="white-space: nowrap; text-align: right">6.09x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">thoas</td>
+    <td style="white-space: nowrap; text-align: right">1.70 K</td>
+    <td style="white-space: nowrap; text-align: right">6.11x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">euneus</td>
+    <td style="white-space: nowrap; text-align: right">1.45 K</td>
+    <td style="white-space: nowrap; text-align: right">7.18x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">jsone</td>
+    <td style="white-space: nowrap; text-align: right">1.30 K</td>
+    <td style="white-space: nowrap; text-align: right">7.97x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">jsx</td>
+    <td style="white-space: nowrap; text-align: right">1.18 K</td>
+    <td style="white-space: nowrap; text-align: right">8.83x</td>
+  </tr>
+
+</table>
+
+<table style="width: 1%">
+  <caption><b>UTF-8 unescaped</b></caption>
+  <tr>
+    <th>Name</th>
+    <th style="text-align: right">IPS</th>
+    <th style="text-align: right">Slower</th>
+  <tr>
+    <td style="white-space: nowrap">jiffy</td>
+    <td style="white-space: nowrap;text-align: right">18.07 K</td>
+    <td>&nbsp;</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">euneus</td>
+    <td style="white-space: nowrap; text-align: right">10.37 K</td>
+    <td style="white-space: nowrap; text-align: right">1.74x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">Jason</td>
+    <td style="white-space: nowrap; text-align: right">10.20 K</td>
+    <td style="white-space: nowrap; text-align: right">1.77x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">thoas</td>
+    <td style="white-space: nowrap; text-align: right">9.59 K</td>
+    <td style="white-space: nowrap; text-align: right">1.89x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">jsone</td>
+    <td style="white-space: nowrap; text-align: right">9.51 K</td>
+    <td style="white-space: nowrap; text-align: right">1.9x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">jsx</td>
+    <td style="white-space: nowrap; text-align: right">6.58 K</td>
+    <td style="white-space: nowrap; text-align: right">2.75x</td>
+  </tr>
+
+</table>
+
+</div>
+
+</div>
+
+All benchmark details are available [here](./euneus_bench/runs/decode_parsed.md).
+
+#### Decoding with all built-in plugins
+
+This benchmark passes all the decode built-in plugins to the plugins option:
+
+```erlang
+euneus:parse_decode_opts(#{
+  plugins => [
+    datetime,
+    timestamp,
+    pid,
+    port,
+    reference,
+    inet
+  ]
+}).
+```
+
+> [!NOTE]
+>
+> The `proplist` plugin is only available for encoding.
+
+It's the slowest euneus decode run, but at the same time it is very efficient.
+
+<div style="overflow: auto;">
+
+<div style="display: grid; grid-auto-flow: column; column-gap: 5px;">
+
+<table style="width: 1%">
+  <caption><b>Blockchain</b></caption>
+  <tr>
+    <th>Name</th>
+    <th style="text-align: right">IPS</th>
+    <th style="text-align: right">Slower</th>
+  <tr>
+    <td style="white-space: nowrap">jiffy</td>
+    <td style="white-space: nowrap;text-align: right">5.98 K</td>
+    <td>&nbsp;</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">Jason</td>
+    <td style="white-space: nowrap; text-align: right">5.55 K</td>
+    <td style="white-space: nowrap; text-align: right">1.08x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">thoas</td>
+    <td style="white-space: nowrap; text-align: right">4.87 K</td>
+    <td style="white-space: nowrap; text-align: right">1.23x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">jsone</td>
+    <td style="white-space: nowrap; text-align: right">4.28 K</td>
+    <td style="white-space: nowrap; text-align: right">1.4x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">euneus</td>
+    <td style="white-space: nowrap; text-align: right">3.59 K</td>
+    <td style="white-space: nowrap; text-align: right">1.67x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">jsx</td>
+    <td style="white-space: nowrap; text-align: right">1.83 K</td>
+    <td style="white-space: nowrap; text-align: right">3.26x</td>
+  </tr>
+
+</table>
+
+<table style="width: 1%">
+  <caption><b>Giphy</b></caption>
+  <tr>
+    <th>Name</th>
+    <th style="text-align: right">IPS</th>
+    <th style="text-align: right">Slower</th>
+  <tr>
+    <td style="white-space: nowrap">jiffy</td>
+    <td style="white-space: nowrap;text-align: right">990.34</td>
+    <td>&nbsp;</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">thoas</td>
+    <td style="white-space: nowrap; text-align: right">497.98</td>
+    <td style="white-space: nowrap; text-align: right">1.99x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">Jason</td>
+    <td style="white-space: nowrap; text-align: right">456.78</td>
+    <td style="white-space: nowrap; text-align: right">2.17x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">euneus</td>
+    <td style="white-space: nowrap; text-align: right">278.42</td>
+    <td style="white-space: nowrap; text-align: right">3.56x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">jsone</td>
+    <td style="white-space: nowrap; text-align: right">277.71</td>
+    <td style="white-space: nowrap; text-align: right">3.57x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">jsx</td>
+    <td style="white-space: nowrap; text-align: right">167.26</td>
+    <td style="white-space: nowrap; text-align: right">5.92x</td>
+  </tr>
+
+</table>
+
+<table style="width: 1%">
+  <caption><b>GitHub</b></caption>
+  <tr>
+    <th>Name</th>
+    <th style="text-align: right">IPS</th>
+    <th style="text-align: right">Slower</th>
+  <tr>
+    <td style="white-space: nowrap">jiffy</td>
+    <td style="white-space: nowrap;text-align: right">2.70 K</td>
+    <td>&nbsp;</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">Jason</td>
+    <td style="white-space: nowrap; text-align: right">2.01 K</td>
+    <td style="white-space: nowrap; text-align: right">1.35x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">thoas</td>
+    <td style="white-space: nowrap; text-align: right">1.82 K</td>
+    <td style="white-space: nowrap; text-align: right">1.49x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">jsone</td>
+    <td style="white-space: nowrap; text-align: right">1.42 K</td>
+    <td style="white-space: nowrap; text-align: right">1.91x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">euneus</td>
+    <td style="white-space: nowrap; text-align: right">1.17 K</td>
+    <td style="white-space: nowrap; text-align: right">2.3x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">jsx</td>
+    <td style="white-space: nowrap; text-align: right">0.52 K</td>
+    <td style="white-space: nowrap; text-align: right">5.2x</td>
+  </tr>
+
+</table>
+
+<table style="width: 1%">
+  <caption><b>GovTrack</b></caption>
+  <tr>
+    <th>Name</th>
+    <th style="text-align: right">IPS</th>
+    <th style="text-align: right">Slower</th>
+  <tr>
+    <td style="white-space: nowrap">jiffy</td>
+    <td style="white-space: nowrap;text-align: right">27.25</td>
+    <td>&nbsp;</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">Jason</td>
+    <td style="white-space: nowrap; text-align: right">17.27</td>
+    <td style="white-space: nowrap; text-align: right">1.58x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">thoas</td>
+    <td style="white-space: nowrap; text-align: right">15.78</td>
+    <td style="white-space: nowrap; text-align: right">1.73x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">jsone</td>
+    <td style="white-space: nowrap; text-align: right">9.55</td>
+    <td style="white-space: nowrap; text-align: right">2.85x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">euneus</td>
+    <td style="white-space: nowrap; text-align: right">7.82</td>
+    <td style="white-space: nowrap; text-align: right">3.49x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">jsx</td>
+    <td style="white-space: nowrap; text-align: right">4.45</td>
+    <td style="white-space: nowrap; text-align: right">6.13x</td>
+  </tr>
+
+</table>
+
+<table style="width: 1%">
+  <caption><b>Issue 90</b></caption>
+  <tr>
+    <th>Name</th>
+    <th style="text-align: right">IPS</th>
+    <th style="text-align: right">Slower</th>
+  <tr>
+    <td style="white-space: nowrap">jiffy</td>
+    <td style="white-space: nowrap;text-align: right">49.74</td>
+    <td>&nbsp;</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">Jason</td>
+    <td style="white-space: nowrap; text-align: right">25.26</td>
+    <td style="white-space: nowrap; text-align: right">1.97x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">euneus</td>
+    <td style="white-space: nowrap; text-align: right">25.23</td>
+    <td style="white-space: nowrap; text-align: right">1.97x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">jsone</td>
+    <td style="white-space: nowrap; text-align: right">23.29</td>
+    <td style="white-space: nowrap; text-align: right">2.14x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">thoas</td>
+    <td style="white-space: nowrap; text-align: right">17.98</td>
+    <td style="white-space: nowrap; text-align: right">2.77x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">jsx</td>
+    <td style="white-space: nowrap; text-align: right">9.97</td>
+    <td style="white-space: nowrap; text-align: right">4.99x</td>
+  </tr>
+
+</table>
+
+<table style="width: 1%">
+  <caption><b>JSON Generator (Pretty</b>)</caption>
+  <tr>
+    <th>Name</th>
+    <th style="text-align: right">IPS</th>
+    <th style="text-align: right">Slower</th>
+  <tr>
+    <td style="white-space: nowrap">jiffy</td>
+    <td style="white-space: nowrap;text-align: right">1162.25</td>
+    <td>&nbsp;</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">Jason</td>
+    <td style="white-space: nowrap; text-align: right">694.53</td>
+    <td style="white-space: nowrap; text-align: right">1.67x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">thoas</td>
+    <td style="white-space: nowrap; text-align: right">625.05</td>
+    <td style="white-space: nowrap; text-align: right">1.86x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">jsone</td>
+    <td style="white-space: nowrap; text-align: right">436.44</td>
+    <td style="white-space: nowrap; text-align: right">2.66x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">euneus</td>
+    <td style="white-space: nowrap; text-align: right">347.69</td>
+    <td style="white-space: nowrap; text-align: right">3.34x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">jsx</td>
+    <td style="white-space: nowrap; text-align: right">191.09</td>
+    <td style="white-space: nowrap; text-align: right">6.08x</td>
+  </tr>
+
+</table>
+
+<table style="width: 1%">
+  <caption><b>JSON Generator</b></caption>
+  <tr>
+    <th>Name</th>
+    <th style="text-align: right">IPS</th>
+    <th style="text-align: right">Slower</th>
+  <tr>
+    <td style="white-space: nowrap">jiffy</td>
+    <td style="white-space: nowrap;text-align: right">696.27</td>
+    <td>&nbsp;</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">Jason</td>
+    <td style="white-space: nowrap; text-align: right">586.85</td>
+    <td style="white-space: nowrap; text-align: right">1.19x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">thoas</td>
+    <td style="white-space: nowrap; text-align: right">541.03</td>
+    <td style="white-space: nowrap; text-align: right">1.29x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">jsone</td>
+    <td style="white-space: nowrap; text-align: right">400.67</td>
+    <td style="white-space: nowrap; text-align: right">1.74x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">euneus</td>
+    <td style="white-space: nowrap; text-align: right">317.16</td>
+    <td style="white-space: nowrap; text-align: right">2.2x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">jsx</td>
+    <td style="white-space: nowrap; text-align: right">181.31</td>
+    <td style="white-space: nowrap; text-align: right">3.84x</td>
+  </tr>
+
+</table>
+
+<table style="width: 1%">
+  <caption><b>Pokedex</b></caption>
+  <tr>
+    <th>Name</th>
+    <th style="text-align: right">IPS</th>
+    <th style="text-align: right">Slower</th>
+  <tr>
+    <td style="white-space: nowrap">jiffy</td>
+    <td style="white-space: nowrap;text-align: right">1.35 K</td>
+    <td>&nbsp;</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">thoas</td>
+    <td style="white-space: nowrap; text-align: right">1.15 K</td>
+    <td style="white-space: nowrap; text-align: right">1.18x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">Jason</td>
+    <td style="white-space: nowrap; text-align: right">1.04 K</td>
+    <td style="white-space: nowrap; text-align: right">1.3x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">jsone</td>
+    <td style="white-space: nowrap; text-align: right">0.59 K</td>
+    <td style="white-space: nowrap; text-align: right">2.29x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">euneus</td>
+    <td style="white-space: nowrap; text-align: right">0.40 K</td>
+    <td style="white-space: nowrap; text-align: right">3.34x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">jsx</td>
+    <td style="white-space: nowrap; text-align: right">0.26 K</td>
+    <td style="white-space: nowrap; text-align: right">5.27x</td>
+  </tr>
+
+</table>
+
+<table style="width: 1%">
+  <caption><b>UTF-8 escaped</b></caption>
+  <tr>
+    <th>Name</th>
+    <th style="text-align: right">IPS</th>
+    <th style="text-align: right">Slower</th>
+  <tr>
+    <td style="white-space: nowrap">jiffy</td>
+    <td style="white-space: nowrap;text-align: right">10.38 K</td>
+    <td>&nbsp;</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">Jason</td>
+    <td style="white-space: nowrap; text-align: right">1.70 K</td>
+    <td style="white-space: nowrap; text-align: right">6.09x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">thoas</td>
+    <td style="white-space: nowrap; text-align: right">1.70 K</td>
+    <td style="white-space: nowrap; text-align: right">6.11x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">euneus</td>
+    <td style="white-space: nowrap; text-align: right">1.45 K</td>
+    <td style="white-space: nowrap; text-align: right">7.18x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">jsone</td>
+    <td style="white-space: nowrap; text-align: right">1.30 K</td>
+    <td style="white-space: nowrap; text-align: right">7.97x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">jsx</td>
+    <td style="white-space: nowrap; text-align: right">1.18 K</td>
+    <td style="white-space: nowrap; text-align: right">8.83x</td>
+  </tr>
+
+</table>
+
+<table style="width: 1%">
+  <caption><b>UTF-8 unescaped</b></caption>
+  <tr>
+    <th>Name</th>
+    <th style="text-align: right">IPS</th>
+    <th style="text-align: right">Slower</th>
+  <tr>
+    <td style="white-space: nowrap">jiffy</td>
+    <td style="white-space: nowrap;text-align: right">18.07 K</td>
+    <td>&nbsp;</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">euneus</td>
+    <td style="white-space: nowrap; text-align: right">10.37 K</td>
+    <td style="white-space: nowrap; text-align: right">1.74x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">Jason</td>
+    <td style="white-space: nowrap; text-align: right">10.20 K</td>
+    <td style="white-space: nowrap; text-align: right">1.77x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">thoas</td>
+    <td style="white-space: nowrap; text-align: right">9.59 K</td>
+    <td style="white-space: nowrap; text-align: right">1.89x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">jsone</td>
+    <td style="white-space: nowrap; text-align: right">9.51 K</td>
+    <td style="white-space: nowrap; text-align: right">1.9x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">jsx</td>
+    <td style="white-space: nowrap; text-align: right">6.58 K</td>
+    <td style="white-space: nowrap; text-align: right">2.75x</td>
+  </tr>
+
+</table>
+
+</div>
+
+</div>
+
+All benchmark details are available [here](./euneus_bench/runs/decode_parsed_plugins.md).
 
 ## Tests
 
