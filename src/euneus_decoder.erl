@@ -130,6 +130,7 @@
 -define(key, 2).
 -define(object, 3).
 
+-define(range(X, Min, Max), is_integer(X) andalso X >= Min andalso X =< Max).
 -define(is_number(X), X >= $0, X =< $9).
 
 -define(NON_PRINTABLE_LAST, 31).
@@ -996,15 +997,48 @@ plugins([datetime | T], Term, Opts) ->
             plugins(T, Term, Opts)
     end;
 plugins([inet | T], Term, Opts) ->
-    case is_binary(Term) of
-        true ->
-            case inet:parse_address(binary_to_list(Term)) of
+    case Term of
+        <<A/integer, B/integer, C/integer, $., _/bitstring>>
+          when ?range(A, 0, 255); ?range(B, 0, 255); ?range(C, 0, 255) ->
+            case inet_parse:ipv4_address(binary_to_list(Term)) of
                 {ok, Ip} ->
                     {halt, Ip};
                 {error, einval} ->
                     plugins(T, Term, Opts)
             end;
-        false ->
+        <<A/integer, B/integer, $., _/bitstring>>
+          when ?range(A, 0, 255); ?range(B, 0, 255) ->
+            case inet_parse:ipv4_address(binary_to_list(Term)) of
+                {ok, Ip} ->
+                    {halt, Ip};
+                {error, einval} ->
+                    plugins(T, Term, Opts)
+            end;
+        <<A/integer, $., _/bitstring>>
+          when ?range(A, 0, 255) ->
+            case inet_parse:ipv4_address(binary_to_list(Term)) of
+                {ok, Ip} ->
+                    {halt, Ip};
+                {error, einval} ->
+                    plugins(T, Term, Opts)
+            end;
+        <<$:, $:>> ->
+            {halt, {0,0,0,0,0,0,0,0}};
+        <<$:, $:, _/bitstring>> ->
+            case inet_parse:ipv6strict_address(binary_to_list(Term)) of
+                {ok, Ipv6} ->
+                    {halt, Ipv6};
+                {error, einval} ->
+                    plugins(T, Term, Opts)
+            end;
+        <<_/integer, _/integer, _/integer, _/integer, $:, _/bitstring>> ->
+            case inet_parse:ipv6strict_address(binary_to_list(Term)) of
+                {ok, Ipv6} ->
+                    {halt, Ipv6};
+                {error, einval} ->
+                    plugins(T, Term, Opts)
+            end;
+        _ ->
             plugins(T, Term, Opts)
     end;
 plugins([pid | T], Term, Opts) ->
