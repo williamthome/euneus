@@ -1,6 +1,6 @@
 {application, euneus, [
     {description, "An incredibly flexible and performant JSON parser and generator"},
-    {vsn, "1.0.2"},
+    {vsn, "1.0.3"},
     {registered, []},
     {applications, [
         kernel,
