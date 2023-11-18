@@ -15,9 +15,11 @@ defmodule EuneusBench.MixProject do
   defp aliases() do
     [
       encode: ["run script/encode.exs"],
-      encode_opts: ["run script/encode_opts.exs"],
+      encode_parsed: ["run script/encode_parsed.exs"],
+      encode_parsed_plugins: ["run script/encode_parsed_plugins.exs"],
       decode: ["run script/decode.exs"],
-      decode_opts: ["run script/decode_opts.exs"]
+      decode_parsed: ["run script/decode_parsed.exs"],
+      decode_parsed_plugins: ["run script/decode_parsed_plugins.exs"]
     ]
   end
 
@@ -27,8 +29,12 @@ defmodule EuneusBench.MixProject do
       {:euneus, path: "../"},
       {:thoas, "~> 1.2"},
       {:jason, "~> 1.4"},
+      {:jsone, "~> 1.6"},
+      {:jsx, "~> 3.1"},
+      {:jiffy, "~> 1.1"},
       {:benchee, "~> 1.1"},
-      {:benchee_html, "~> 1.0"}
+      {:benchee_html, "~> 1.0"},
+      {:benchee_markdown, "~> 0.3"}
     ]
   end
 end

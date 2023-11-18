@@ -1,7 +1,20 @@
 Code.eval_file("helper.exs", "./script")
 
+opts =
+  :euneus.parse_encode_opts(%{
+    plugins: [
+      :datetime,
+      :timestamp,
+      :pid,
+      :port,
+      :proplist,
+      :reference,
+      :inet
+    ]
+  })
+
 jobs = %{
-  "euneus" => &:euneus.encode/1,
+  "euneus" => &:euneus.encode_parsed(&1, opts),
   "thoas" => &:thoas.encode_to_iodata/1,
   "jsone" => &:jsone.encode/1,
   "jsx" => &:jsx.encode/1,
@@ -29,7 +42,7 @@ inputs =
   end
 
 EuneusBench.Helper.run(
-  "encode",
+  "encode_parsed_plugins",
   jobs,
   inputs,
   %{
@@ -38,7 +51,7 @@ EuneusBench.Helper.run(
     # save: true,
     # parallel: 1,
     # warmup: 5,
-    # time: 5
+    # time: 5,
     # memory_time: 1,
   }
 )

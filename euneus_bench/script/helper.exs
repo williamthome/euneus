@@ -13,15 +13,39 @@ defmodule EuneusBench.Helper do
   def run(label, jobs, inputs, opts \\ %{}) do
     Benchee.run(jobs,
       parallel: Map.get(opts, :parallel, 1),
-      warmup: Map.get(opts, :warmup, 5),
-      time: Map.get(opts, :time, 30),
+      warmup: Map.get(opts, :warmup, 1),
+      time: Map.get(opts, :time, 10),
       memory_time: Map.get(opts, :memory_time, 1),
+      pre_check: true,
+      load:
+        if opts[:save] do
+          Path.join(__DIR__, "../runs/#{label}.benchee")
+        else
+          false
+        end,
+      save:
+        if opts[:save] do
+          [path: Path.join(__DIR__, "../runs/#{label}.benchee")]
+        else
+          false
+        end,
       inputs: inputs,
-      formatters: [
-        Benchee.Formatters.Console,
-      ] ++ if opts[:graph] do
-        [{Benchee.Formatters.HTML, file: Path.expand("../tmp/#{label}.html", __DIR__)}]
-      else [] end
+      formatters:
+        [
+          {Benchee.Formatters.Console, comparison: true, extended_statistics: false}
+        ] ++
+          if opts[:graph] do
+            [{Benchee.Formatters.HTML, file: Path.expand("../tmp/html/#{label}.html", __DIR__)}]
+          else
+            []
+          end ++
+          if opts[:markdown] do
+            [
+              {Benchee.Formatters.Markdown, file: Path.expand("../runs/#{label}.md", __DIR__)}
+            ]
+          else
+            []
+          end
     )
   end
 end

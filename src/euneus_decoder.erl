@@ -21,6 +21,7 @@
 %%%---------------------------------------------------------------------
 -module(euneus_decoder).
 
+-compile({ inline, plugins/3 }).
 -compile({ inline, string/6 }).
 -compile({ inline, string/7 }).
 -compile({ inline, number/6 }).
@@ -42,7 +43,6 @@
 -compile({ inline, chars_to_integer/3 }).
 -compile({ inline, chars_to_integer/4 }).
 -compile({ inline, maps_get/3 }).
--compile({ inline, maps_to_list/1 }).
 -compile({ inline_list_funcs, true }).
 
 -dialyzer({ no_return, throw_byte/5 }).
@@ -54,6 +54,13 @@
 
 -export([ decode/2 ]).
 -export([ parse_opts/1 ]).
+-export([ get_null_term_option/1 ]).
+-export([ get_keys_option/1 ]).
+-export([ get_values_option/1 ]).
+-export([ get_arrays_option/1 ]).
+-export([ get_objects_option/1 ]).
+-export([ get_error_handler_option/1 ]).
+-export([ get_plugins_option/1 ]).
 -export([ decode_parsed/2 ]).
 -export([ resume/6 ]).
 -export([ resume/7 ]).
@@ -68,23 +75,27 @@
 -export_type([ error_reason/0 ]).
 -export_type([ error_handler/0 ]).
 
+-record(opts, { null_term :: term()
+              , keys :: undefined
+                      | copy
+                      | to_atom
+                      | to_existing_atom
+                      | to_integer
+                      | normalizer(Key :: binary())
+              , values :: undefined
+                        | copy
+                        | to_atom
+                        | to_existing_atom
+                        | to_integer
+                        | normalizer(Value :: binary())
+              , arrays ::  undefined | normalizer(Array :: list())
+              , objects :: undefined | normalizer(Object :: map())
+              , error_handler :: error_handler()
+              , plugins :: [plugin()]
+              }).
+-opaque options() :: #opts{}.
+
 -type input() :: binary() | iolist().
--type options() :: #{ null_term => term()
-                    , keys => copy
-                            | to_atom
-                            | to_existing_atom
-                            | to_integer
-                            | normalizer(Key :: binary())
-                    , values => copy
-                              | to_atom
-                              | to_existing_atom
-                              | to_integer
-                              | normalizer(Value :: binary())
-                    , arrays => normalizer(Array :: list())
-                    , objects => normalizer(Object :: map())
-                    , error_handler => error_handler()
-                    , plugins => [plugin()]
-                    }.
 -type position() :: non_neg_integer().
 -type result() :: {ok, term()} | {error, error_reason()}.
 -type normalizer(Term) :: fun((Term, options()) -> term()).
@@ -119,6 +130,7 @@
 -define(key, 2).
 -define(object, 3).
 
+-define(range(X, Min, Max), is_integer(X) andalso X >= Min andalso X =< Max).
 -define(is_number(X), X >= $0, X =< $9).
 
 -define(NON_PRINTABLE_LAST, 31).
@@ -158,40 +170,83 @@ decode(Input, Opts) when is_map(Opts) ->
 %%----------------------------------------------------------------------
 -spec parse_opts(map()) -> options().
 
+% TODO: Optimize options parsing performance.
 parse_opts(Opts) ->
-    WithDefaults = Opts#{
-        null_term => maps_get(null_term, Opts, undefined),
-        error_handler => maps_get(error_handler, Opts, fun(C, R, S) ->
-            handle_error(C, R, S)
-        end),
-        plugins => maps_get(plugins, Opts, [])
-    },
-    Normalized = lists:map(fun normalize_option/1, maps_to_list(WithDefaults)),
-    maps:from_list(Normalized).
+    #opts{
+        null_term = maps_get(null_term, Opts, undefined),
+        keys = case maps_get(keys, Opts, undefined) of
+            undefined ->
+                undefined;
+            copy ->
+                fun(X, _O) -> binary:copy(X) end;
+            to_atom ->
+                fun(X, _O) -> binary_to_atom(X, utf8) end;
+            to_existing_atom ->
+                fun(X, _O) -> binary_to_existing_atom(X, utf8) end;
+            to_integer ->
+                fun(X, _O) -> binary_to_integer(X) end;
+            Fun when is_function(Fun, 2) ->
+                Fun
+        end,
+        values = case maps_get(values, Opts, undefined) of
+            undefined ->
+                undefined;
+            copy ->
+                fun(X, _O) -> binary:copy(X) end;
+            to_atom ->
+                fun(X, _O) -> binary_to_atom(X, utf8) end;
+            to_existing_atom ->
+                fun(X, _O) -> binary_to_existing_atom(X, utf8) end;
+            to_integer ->
+                fun(X, _O) -> binary_to_integer(X) end;
+            Fun when is_function(Fun, 2) ->
+                Fun
+        end,
+        arrays = case maps_get(arrays, Opts, undefined) of
+            undefined ->
+                undefined;
+            Fun when is_function(Fun, 2) ->
+                Fun
+        end,
+        objects = case maps_get(objects, Opts, undefined) of
+            undefined ->
+                undefined;
+            Fun when is_function(Fun, 2) ->
+                Fun
+        end,
+        error_handler = case maps_get(error_handler, Opts, undefined) of
+            undefined ->
+                fun(C, R, S) -> handle_error(C, R, S) end;
+            Fun when is_function(Fun, 3) ->
+                Fun
+        end,
+        plugins = maps_get(plugins, Opts, [])
+    }.
 
-normalize_option({null_term, Term}) ->
-    {null_term, Term};
-normalize_option({error_handler, Handler}) when is_function(Handler, 3) ->
-    {error_handler, Handler};
-normalize_option({K, copy}) when K =:= keys; K =:= values ->
-    {K, fun(X, _O) -> binary:copy(X) end};
-normalize_option({K, to_atom}) when K =:= keys; K =:= values ->
-    {K, fun(X, _O) -> binary_to_atom(X, utf8) end};
-normalize_option({K, to_existing_atom}) when K =:= keys; K =:= values ->
-    {K, fun(X, _O) -> binary_to_existing_atom(X, utf8) end};
-normalize_option({K, to_integer}) when K =:= keys; K =:= values ->
-    {K, fun(X, _O) -> binary_to_integer(X) end};
-normalize_option({K, V})
-  when is_function(V, 2) andalso
-       ( K =:= keys orelse
-         K =:= values orelse
-         K =:= arrays orelse
-         K =:= objects ) ->
-    {K, V};
-normalize_option({plugins, Plugins}) when is_list(Plugins) ->
-    {plugins, Plugins};
-normalize_option({K, _}) ->
-    throw({invalid_option, K}).
+%%%---------------------------------------------------------------------
+%%% Options
+%%%---------------------------------------------------------------------
+
+get_null_term_option(#opts{null_term = Null}) ->
+    Null.
+
+get_keys_option(#opts{keys = Keys}) ->
+    Keys.
+
+get_values_option(#opts{values = Values}) ->
+    Values.
+
+get_arrays_option(#opts{arrays = Arrays}) ->
+    Arrays.
+
+get_objects_option(#opts{objects = Objects}) ->
+    Objects.
+
+get_error_handler_option(#opts{error_handler = Handler}) ->
+    Handler.
+
+get_plugins_option(#opts{plugins = Plugins}) ->
+    Plugins.
 
 %%----------------------------------------------------------------------
 %% @doc Parses JSON to Erlang term.
@@ -211,7 +266,7 @@ decode_parsed(JSON, Opts) when is_binary(JSON) ->
         {ok, value(JSON, Opts, JSON, 0, [?terminate])}
     catch
         Class:Reason:Stacktrace ->
-            Handle = maps:get(error_handler, Opts),
+            Handle = Opts#opts.error_handler,
             Handle(Class, Reason, Stacktrace)
     end;
 decode_parsed(IOList, Opts) ->
@@ -247,7 +302,7 @@ decode_parsed(IOList, Opts) ->
     Buffer :: list(),
     Result :: result().
 
-resume(Token, Rest0, #{null_term := Null} = Opts, Input, Pos0, Buffer) ->
+resume(Token, Rest0, #opts{null_term = Null} = Opts, Input, Pos0, Buffer) ->
     resume(Token, Null, Rest0, Opts, Input, Pos0, Buffer).
 
 %%----------------------------------------------------------------------
@@ -281,7 +336,7 @@ resume(Token, Replacement, Rest0, Opts, Input, Pos0, Buffer) ->
         {ok, continue(Rest0, Opts, Input, Pos, Buffer, Replacement)}
     catch
         Class:Reason:Stacktrace ->
-            Handle = maps:get(error_handler, Opts),
+            Handle = Opts#opts.error_handler,
             Handle(Class, Reason, Stacktrace)
     end.
 
@@ -409,8 +464,7 @@ value(Data, Opts, Input, Pos, Buffer) ->
         <<"false", Rest/bitstring>> ->
             continue(Rest, Opts, Input, Pos + 5, Buffer, false);
         <<"null", Rest/bitstring>> ->
-            Null = maps:get(null_term, Opts),
-            continue(Rest, Opts, Input, Pos + 4, Buffer, Null);
+            continue(Rest, Opts, Input, Pos + 4, Buffer, Opts#opts.null_term);
         <<"true", Rest/bitstring>> ->
             continue(Rest, Opts, Input, Pos + 4, Buffer, true);
         <<_/integer, Rest/bitstring>> ->
@@ -426,27 +480,25 @@ string(Data, Opts, Input, Pos, Buffer, Len) ->
             Value =
                 case Buffer of
                     [?key | _] ->
-                        Plugins = maps:get(plugins, Opts),
-                        case plugins(Plugins, Last, Opts) of
+                        case plugins(Opts#opts.plugins, Last, Opts) of
                             next ->
                                 case Opts of
-                                    #{keys := Normalize} ->
-                                        Normalize(Last, Opts);
-                                    #{} ->
-                                        Last
+                                    #opts{keys = undefined} ->
+                                        Last;
+                                    #opts{keys = Normalize} ->
+                                        Normalize(Last, Opts)
                                 end;
                             {halt, Term} ->
                                 Term
                         end;
                     [_|_] ->
-                        Plugins = maps:get(plugins, Opts),
-                        case plugins(Plugins, Last, Opts) of
+                        case plugins(Opts#opts.plugins, Last, Opts) of
                             next ->
                                 case Opts of
-                                    #{values := Normalize} ->
-                                        Normalize(Last, Opts);
-                                    #{} ->
-                                        Last
+                                    #opts{values = undefined} ->
+                                        Last;
+                                    #opts{values = Normalize} ->
+                                        Normalize(Last, Opts)
                                 end;
                             {halt, Term} ->
                                 Term
@@ -846,16 +898,15 @@ object(Data, Opts, Input, Pos, Buffer, Value) ->
             key(Rest, Opts, Input, Pos + 1, [Acc2 | Buffer2]);
         <<$}/integer, Rest/bitstring>> ->
             [Key, Acc2 | Buffer2] = Buffer,
-            Plugins = maps:get(plugins, Opts),
             Map = maps:from_list([{Key, Value} | Acc2]),
             Value1 =
-                case plugins(Plugins, Map, Opts) of
+                case plugins(Opts#opts.plugins, Map, Opts) of
                     next ->
                         case Opts of
-                            #{objects := Normalize} ->
-                                Normalize(Map, Opts);
-                            #{} ->
-                                Map
+                            #opts{objects = undefined} ->
+                                Map;
+                            #opts{objects = Normalize} ->
+                                Normalize(Map, Opts)
                         end;
                     {halt, Term} ->
                         Term
@@ -882,16 +933,15 @@ array(Data, Opts, Input, Pos, Buffer, Value) ->
             value(Rest, Opts, Input, Pos + 1, [?array, [Value | Acc] | Buffer2]);
         <<$]/integer, Rest/bitstring>> ->
             [Acc | Buffer2] = Buffer,
-            Plugins = maps:get(plugins, Opts),
             List = lists:reverse(Acc, [Value]),
             Value1 =
-                case plugins(Plugins, List, Opts) of
+                case plugins(Opts#opts.plugins, List, Opts) of
                     next ->
                         case Opts of
-                            #{arrays := Normalize} ->
-                                Normalize(List, Opts);
-                            #{} ->
-                                List
+                            #opts{arrays = undefined} ->
+                                List;
+                            #opts{arrays = Normalize} ->
+                                Normalize(List, Opts)
                         end;
                     {halt, Term} ->
                         Term
@@ -907,10 +957,10 @@ empty_array(Rest, Opts, Input, Pos, Buffer) ->
     case Buffer of
         [?array, [] | Buffer1] ->
             List = case Opts of
-                #{arrays := Normalize} ->
-                    Normalize([], Opts);
-                #{} ->
-                    []
+                #opts{arrays = undefined} ->
+                    [];
+                #opts{arrays = Normalize} ->
+                    Normalize([], Opts)
             end,
             continue(Rest, Opts, Input, Pos, Buffer1, List);
         [_|_] ->
@@ -947,20 +997,53 @@ plugins([datetime | T], Term, Opts) ->
             plugins(T, Term, Opts)
     end;
 plugins([inet | T], Term, Opts) ->
-    case is_binary(Term) of
-        true ->
-            case inet:parse_address(binary_to_list(Term)) of
+    case Term of
+        <<A/integer, B/integer, C/integer, $., _/bitstring>>
+          when ?range(A, 0, 255); ?range(B, 0, 255); ?range(C, 0, 255) ->
+            case inet_parse:ipv4_address(binary_to_list(Term)) of
                 {ok, Ip} ->
                     {halt, Ip};
                 {error, einval} ->
                     plugins(T, Term, Opts)
             end;
-        false ->
+        <<A/integer, B/integer, $., _/bitstring>>
+          when ?range(A, 0, 255); ?range(B, 0, 255) ->
+            case inet_parse:ipv4_address(binary_to_list(Term)) of
+                {ok, Ip} ->
+                    {halt, Ip};
+                {error, einval} ->
+                    plugins(T, Term, Opts)
+            end;
+        <<A/integer, $., _/bitstring>>
+          when ?range(A, 0, 255) ->
+            case inet_parse:ipv4_address(binary_to_list(Term)) of
+                {ok, Ip} ->
+                    {halt, Ip};
+                {error, einval} ->
+                    plugins(T, Term, Opts)
+            end;
+        <<$:, $:>> ->
+            {halt, {0,0,0,0,0,0,0,0}};
+        <<$:, $:, _/bitstring>> ->
+            case inet_parse:ipv6strict_address(binary_to_list(Term)) of
+                {ok, Ipv6} ->
+                    {halt, Ipv6};
+                {error, einval} ->
+                    plugins(T, Term, Opts)
+            end;
+        <<_/integer, _/integer, _/integer, _/integer, $:, _/bitstring>> ->
+            case inet_parse:ipv6strict_address(binary_to_list(Term)) of
+                {ok, Ipv6} ->
+                    {halt, Ipv6};
+                {error, einval} ->
+                    plugins(T, Term, Opts)
+            end;
+        _ ->
             plugins(T, Term, Opts)
     end;
 plugins([pid | T], Term, Opts) ->
-    case is_binary(Term) of
-        true ->
+    case Term of
+        <<$<, _/bitstring>> ->
             try
                 Pid = list_to_pid(binary_to_list(Term)),
                 {halt, Pid}
@@ -968,12 +1051,12 @@ plugins([pid | T], Term, Opts) ->
                 error:badarg ->
                     plugins(T, Term, Opts)
             end;
-        false ->
+        _ ->
             plugins(T, Term, Opts)
     end;
 plugins([port | T], Term, Opts) ->
-    case is_binary(Term) of
-        true ->
+    case Term of
+        <<"#Port<", _/bitstring>> ->
             try
                 Port = list_to_port(binary_to_list(Term)),
                 {halt, Port}
@@ -981,12 +1064,12 @@ plugins([port | T], Term, Opts) ->
                 error:badarg ->
                     plugins(T, Term, Opts)
             end;
-        false ->
+        _ ->
             plugins(T, Term, Opts)
     end;
 plugins([reference | T], Term, Opts) ->
-    case is_binary(Term) of
-        true ->
+    case Term of
+        <<"#Ref<", _/bitstring>> ->
             try
                 Ref = list_to_ref(binary_to_list(Term)),
                 {halt, Ref}
@@ -994,7 +1077,7 @@ plugins([reference | T], Term, Opts) ->
                 error:badarg ->
                     plugins(T, Term, Opts)
             end;
-        false ->
+        _ ->
             plugins(T, Term, Opts)
     end;
 plugins([timestamp | T], Term, Opts) ->
@@ -1837,14 +1920,6 @@ maps_get(Key, Map, Default) ->
         #{Key := Value} -> Value;
         #{} -> Default
     end.
-
-maps_to_list(Map) ->
-    do_maps_to_list(erts_internal:map_next(0, Map, [])).
-
-do_maps_to_list([Iter, Map | Acc]) when is_integer(Iter) ->
-    do_maps_to_list(erts_internal:map_next(Iter, Map, Acc));
-do_maps_to_list(Acc) ->
-    Acc.
 
 %%%=====================================================================
 %%% Eunit tests
