@@ -21,6 +21,8 @@
 %%%---------------------------------------------------------------------
 -module(euneus).
 
+-compile({ inline, do_encode_to_bin/1 }).
+
 %% API functions
 
 -export([ encode/1 ]).
@@ -53,11 +55,11 @@
 %% Types
 
 -export_type([ encode_input/0 ]).
--export_type([ encode_opts/0 ]).
+-export_type([ encode_parsed_opts/0 ]).
 -export_type([ encode_result/0 ]).
 -export_type([ encode_to_bin_result/0 ]).
 -export_type([ decode_input/0 ]).
--export_type([ decode_opts/0 ]).
+-export_type([ decode_parsed_opts/0 ]).
 -export_type([ decode_result/0 ]).
 -export_type([ format_input/0 ]).
 -export_type([ format_opts/0 ]).
@@ -65,12 +67,14 @@
 
 -type encode_input() :: euneus_encoder:input().
 -type encode_opts() :: euneus_encoder:options().
+-type encode_parsed_opts() :: euneus_encoder:parsed_options().
 -type encode_result() :: euneus_encoder:result().
 -type encode_to_bin_result() :: {ok, binary()}
                               | {error, euneus_encoder:error_reason()}.
 
 -type decode_input() :: euneus_decoder:input().
 -type decode_opts() :: euneus_decoder:options().
+-type decode_parsed_opts() :: euneus_decoder:parsed_options().
 -type decode_result() :: euneus_decoder:result().
 
 -type format_input() :: euneus_formatter:input().
@@ -97,7 +101,7 @@
 %%----------------------------------------------------------------------
 -spec encode(Input, Opts) -> Return when
     Input :: encode_input(),
-    Opts :: map() | encode_opts(),
+    Opts :: encode_opts(),
     Return :: encode_result().
 
 encode(Input, Opts) ->
@@ -114,14 +118,14 @@ encode(Input, Opts) ->
 %%----------------------------------------------------------------------
 -spec encode_to_binary(Input, Opts) -> Return when
     Input :: encode_input(),
-    Opts :: map() | encode_opts(),
+    Opts :: encode_opts(),
     Return :: encode_to_bin_result().
 
 encode_to_binary(Input, Opts) ->
     do_encode_to_bin(encode(Input, Opts)).
 
 %%----------------------------------------------------------------------
-%% @doc Parses {@link erlang:map()} to {@link euneus_encoder:options()}.
+%% @doc Parses {@link euneus_encoder:options()} to {@link euneus_encoder:parsed_options()}.
 %%
 %% @equiv euneus_encoder:parse_opts/1
 %%
@@ -131,8 +135,8 @@ encode_to_binary(Input, Opts) ->
 %% @end
 %%----------------------------------------------------------------------
 -spec parse_encode_opts(Opts) -> Result when
-    Opts :: map(),
-    Result :: encode_opts().
+    Opts :: encode_opts(),
+    Result :: encode_parsed_opts().
 
 parse_encode_opts(Opts) ->
     euneus_encoder:parse_opts(Opts).
@@ -148,7 +152,7 @@ parse_encode_opts(Opts) ->
 %%----------------------------------------------------------------------
 -spec encode_parsed(Input, ParsedOpts) -> Result when
     Input :: encode_input(),
-    ParsedOpts :: encode_opts(),
+    ParsedOpts :: encode_parsed_opts(),
     Result :: encode_result().
 
 encode_parsed(Input, ParsedOpts) ->
@@ -165,7 +169,7 @@ encode_parsed(Input, ParsedOpts) ->
 %%----------------------------------------------------------------------
 -spec encode_parsed_to_binary(Input, ParsedOpts) -> Result when
     Input :: encode_input(),
-    ParsedOpts :: encode_opts(),
+    ParsedOpts :: encode_parsed_opts(),
     Result :: encode_to_bin_result().
 
 encode_parsed_to_binary(Input, ParsedOpts) ->
@@ -362,14 +366,14 @@ decode(Input) ->
 %%----------------------------------------------------------------------
 -spec decode(Input, Opts) -> Result when
     Input :: decode_input(),
-    Opts :: map() | decode_opts(),
+    Opts :: decode_opts(),
     Result :: decode_result().
 
 decode(Input, Opts) ->
     euneus_decoder:decode(Input, Opts).
 
 %%----------------------------------------------------------------------
-%% @doc Parses {@link erlang:map()} to {@link euneus_decoder:options()}.
+%% @doc Parses {@link euneus_decoder:options()} to {@link euneus_decoder:parsed_options()}.
 %%
 %% @equiv euneus_decoder:parse_opts/1
 %%
@@ -379,8 +383,8 @@ decode(Input, Opts) ->
 %% @end
 %%----------------------------------------------------------------------
 -spec parse_decode_opts(Opts) -> Result when
-    Opts :: map(),
-    Result :: decode_opts().
+    Opts :: decode_opts(),
+    Result :: decode_parsed_opts().
 
 parse_decode_opts(Opts) ->
     euneus_decoder:parse_opts(Opts).
@@ -396,7 +400,7 @@ parse_decode_opts(Opts) ->
 %%----------------------------------------------------------------------
 -spec decode_parsed(Input, ParsedOpts) -> Result when
     Input :: decode_input(),
-    ParsedOpts :: decode_opts(),
+    ParsedOpts :: decode_parsed_opts(),
     Result :: decode_result().
 
 decode_parsed(Input, ParsedOpts) ->
