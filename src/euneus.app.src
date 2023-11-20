@@ -1,6 +1,6 @@
 {application, euneus, [
-    {description, "An incredibly flexible and performant JSON parser, generator and formatter"},
-    {vsn, "1.1.0"},
+    {description, "An incredibly flexible and performant JSON parser, generator and formatter in pure Erlang"},
+    {vsn, "1.2.0"},
     {registered, []},
     {applications, [
         kernel,

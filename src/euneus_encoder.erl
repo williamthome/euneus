@@ -22,6 +22,7 @@
 -module(euneus_encoder).
 
 -compile({ inline, plugins/3 }).
+-compile({ inline, drop_nulls/2 }).
 -compile({ inline, encode_binary/2 }).
 -compile({ inline, encode_atom/2 }).
 -compile({ inline, encode_integer/2 }).
@@ -129,6 +130,7 @@
                 | proplist
                 | reference
                 | timestamp
+                | drop_nulls
                 | module()
                 .
 
@@ -779,8 +781,14 @@ plugins([port | T], Term, Opts) ->
 plugins([proplist | T], Term, Opts) ->
     case Term of
         [{X, _} | _] = Proplist when ?is_proplist_key(X) ->
-            Map = proplists:to_map(Proplist),
-            {halt, encode_map(Map, Opts)};
+            Map = case lists:member(drop_nulls, Opts#opts.plugins) of
+                true ->
+                    drop_nulls(proplists:to_map(Proplist), Opts);
+                false ->
+                    proplists:to_map(Proplist)
+            end,
+            Encode = Opts#opts.map_encoder,
+            {halt, Encode(Map, Opts)};
         _ ->
             plugins(T, Term, Opts)
     end;
@@ -806,6 +814,15 @@ plugins([timestamp | T], Term, Opts) ->
         _ ->
             plugins(T, Term, Opts)
     end;
+plugins([drop_nulls | T], Term, Opts) ->
+    case is_map(Term) of
+        true ->
+            Map = drop_nulls(Term, Opts),
+            Encode = Opts#opts.map_encoder,
+            {halt, Encode(Map, Opts)};
+        false ->
+            plugins(T, Term, Opts)
+    end;
 plugins([Plugin | T], Term, Opts) when is_atom(Plugin) ->
     case Plugin:encode(Term, Opts) of
         next ->
@@ -813,6 +830,10 @@ plugins([Plugin | T], Term, Opts) when is_atom(Plugin) ->
         {halt, IOData} when is_binary(IOData); is_list(IOData) ->
             {halt, IOData}
     end.
+
+drop_nulls(Map0, Opts) ->
+    Nulls = euneus_encoder:get_nulls_option(Opts),
+    maps:filter(fun(_, V) -> not lists:member(V, Nulls) end, Map0).
 
 encode_term(Bin, #opts{binary_encoder = Encode} = Opts) when is_binary(Bin) ->
     Encode(Bin, Opts);
@@ -970,6 +991,23 @@ timestamp_plugin_test() ->
         { {ok, <<"\"1970-01-01T00:00:00.000Z\"">>}
         , {0,0,0}
         , #{plugins => [timestamp]}
+        }
+    ]].
+
+drop_nulls_plugin_test() ->
+    [ ?assertEqual(Expect, encode_to_bin(Input, Opts))
+        || {Expect, Input, Opts} <- [
+        { {ok, <<"{\"a\":1}">>}
+        , #{a => 1, b => undefined}
+        , #{plugins => [drop_nulls]}
+        },
+        { {ok, <<"{\"a\":1}">>}
+        , #{a => 1, b => undefined, c => foo}
+        , #{nulls => [undefined, foo], plugins => [drop_nulls]}
+        },
+        { {ok, <<"{\"a\":1}">>}
+        , [{a, 1}, {b, undefined}, {c, foo}]
+        , #{nulls => [undefined, foo], plugins => [proplist, drop_nulls]}
         }
     ]].
 
