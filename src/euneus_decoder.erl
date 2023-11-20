@@ -70,6 +70,7 @@
 
 -export_type([ input/0 ]).
 -export_type([ options/0 ]).
+-export_type([ parsed_options/0 ]).
 -export_type([ result/0 ]).
 -export_type([ normalizer/1 ]).
 -export_type([ error_reason/0 ]).
@@ -93,12 +94,13 @@
               , error_handler :: error_handler()
               , plugins :: [plugin()]
               }).
--opaque options() :: #opts{}.
 
 -type input() :: binary() | iolist().
+-type options() :: map().
+-type parsed_options() :: #opts{}.
 -type position() :: non_neg_integer().
 -type result() :: {ok, term()} | {error, error_reason()}.
--type normalizer(Term) :: fun((Term, options()) -> term()).
+-type normalizer(Term) :: fun((Term, parsed_options()) -> term()).
 -type error_class() :: error | exit | throw.
 -type unexpected_end_of_input_error() :: unexpected_end_of_input.
 -type unexpected_byte_error() :: {unexpected_byte, binary(), position()}.
@@ -146,31 +148,31 @@
 %% @doc Parses JSON to Erlang term.
 %%
 %% @param Input :: {@link euneus_decoder:input()}.
-%% @param Opts :: {@link erlang:map()}.
+%% @param Opts :: {@link euneus_decoder:options()}.
 %%
 %% @returns {@link euneus_decoder:result()}.
 %%
 %% @end
 %%----------------------------------------------------------------------
--spec decode(input(), map()) -> result().
+-spec decode(input(), options()) -> result().
 
 decode(Input, Opts) when is_map(Opts) ->
     decode_parsed(Input, parse_opts(Opts)).
 
 %%----------------------------------------------------------------------
-%% @doc Parses {@link erlang:map()} to {@link euneus_encoder:options()}.
+%% @doc Parses {@link euneus_decoder:options()} to {@link euneus_decoder:parsed_options()}.
 %%
 %% The parsed map can be expanded in compile time or stored to be
 %% reused, avoiding parsing the options in every encoding.
 %%
-%% @see euneus_encoder:parse_opts/1
-%% @see euneus_encoder:encode_parsed/2
+%% @param Opts :: {@link euneus_decoder:options()}.
+%%
+%% @returns {@link euneus_decoder:parsed_options()}.
 %%
 %% @end
 %%----------------------------------------------------------------------
--spec parse_opts(map()) -> options().
+-spec parse_opts(options()) -> parsed_options().
 
-% TODO: Optimize options parsing performance.
 parse_opts(Opts) ->
     #opts{
         null_term = maps_get(null_term, Opts, undefined),
@@ -253,13 +255,13 @@ get_plugins_option(#opts{plugins = Plugins}) ->
 %%
 %% @param JSON :: {@link erlang:binary()}.
 %% @param IOList :: {@link erlang:iolist()}.
-%% @param Opts :: {@link euneus_decoder:options()}.
+%% @param Opts :: {@link euneus_decoder:parsed_options()}.
 %%
 %% @returns {@link euneus_decoder:result()}.
 %%
 %% @end
 %%----------------------------------------------------------------------
--spec decode_parsed(input(), options()) -> result().
+-spec decode_parsed(input(), parsed_options()) -> result().
 
 decode_parsed(JSON, Opts) when is_binary(JSON) ->
     try
@@ -284,7 +286,7 @@ decode_parsed(IOList, Opts) ->
 %%
 %% @param Token :: {@link erlang:binary()}.
 %% @param Rest :: {@link erlang:bitstring()}.
-%% @param Opts :: {@link euneus_decoder:options()}.
+%% @param Opts :: {@link euneus_decoder:parsed_options()}.
 %% @param Input :: {@link erlang:binary()}.
 %% @param Pos :: {@link erlang:non_neg_integer()}.
 %% @param Buffer :: {@link erlang:list()}.
@@ -296,7 +298,7 @@ decode_parsed(IOList, Opts) ->
 -spec resume(Token, Rest, Opts, Input, Pos, Buffer) -> Result when
     Token :: binary(),
     Rest :: bitstring(),
-    Opts :: options(),
+    Opts :: parsed_options(),
     Input :: binary(),
     Pos :: non_neg_integer(),
     Buffer :: list(),
@@ -311,7 +313,7 @@ resume(Token, Rest0, #opts{null_term = Null} = Opts, Input, Pos0, Buffer) ->
 %% @param :: Token {@link erlang:binary()}.
 %% @param :: Replacement {@link erlang:term()}.
 %% @param :: Rest {@link erlang:bitstring()}.
-%% @param :: Opts {@link euneus_decoder:options()}.
+%% @param :: Opts {@link euneus_decoder:parsed_options()}.
 %% @param :: Input {@link erlang:binary()}.
 %% @param :: Pos {@link erlang:non_neg_integer()}.
 %% @param :: Buffer {@link erlang:list()}.
@@ -324,7 +326,7 @@ resume(Token, Rest0, #opts{null_term = Null} = Opts, Input, Pos0, Buffer) ->
     Token :: binary(),
     Replacement :: term(),
     Rest :: bitstring(),
-    Opts :: options(),
+    Opts :: parsed_options(),
     Input :: binary(),
     Pos :: non_neg_integer(),
     Buffer :: list(),

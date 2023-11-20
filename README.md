@@ -1,6 +1,6 @@
 # Euneus
 
-An incredibly flexible and performant JSON parser and generator.
+An incredibly flexible and performant JSON parser, generator and formatter.
 
 Euneus is a rewrite of [Thoas][thoas].
 
@@ -33,6 +33,10 @@ Like Thoas, both the parser and generator fully conform to
     - [Encode](#encode-1)
     - [Decode](#decode-1)
         - [Resuming](#resuming)
+    - [Format](#format)
+        - [Miniffy](#minify)
+        - [Prettify](#prettify)
+        - [Custom](#custom)
     - [Why Euneus over Thoas?](#why-euneus-over-thoas)
 - [Benchmarks](#benchmarks)
     - [Encode](#encode-2)
@@ -60,7 +64,7 @@ Like Thoas, both the parser and generator fully conform to
 
 ```erlang
 % rebar.config
-{deps, [{euneus, "1.0.3"}]}
+{deps, [{euneus, "1.1.0"}]}
 ```
 
 ### Elixir
@@ -68,7 +72,7 @@ Like Thoas, both the parser and generator fully conform to
 ```elixir
 # mix.exs
 def deps do
-  [{:euneus, "~> 1.0"}]
+  [{:euneus, "~> 1.1"}]
 end
 ```
 
@@ -451,6 +455,55 @@ Euneus permits resuming the decoding when an invalid token is found. Any value c
 > [!NOTE]
 >
 > By using `euneus_decoder:resume/6` the replacement will be the `null_term` option.
+
+### Format
+
+#### Minify
+
+Remove extra spaces and line feeds from JSON, e.g.:
+
+```erlang
+1> euneus:minify_to_binary(<<"{\n  \"foo\": \"bar\",\n  \"baz\": {\n    \"foo\": \"bar\",\n    \"0\": [\n      \"foo\",\n      0\n    ]\n  }\n}">>).
+<<"{\"foo\":\"bar\",\"baz\":{\"foo\":\"bar\",\"0\":[\"foo\",0]}}">>
+```
+
+#### Prettify
+
+Format JSON for printing, e.g.:
+
+```erlang
+1> io:format("~s~n", [euneus:prettify(<<"{\"foo\":\"bar\",\"baz\":{\"foo\":\"bar\",\"0\":[\"foo\",0]}}">>)]).
+{
+  "foo": "bar",
+  "baz": {
+    "foo": "bar",
+    "0": [
+      "foo",
+      0
+    ]
+  }
+}
+```
+
+#### Custom
+
+Use `euneus:format/2` or `euneus:format_parsed/2` for custom formatting, e.g.:
+
+```erlang
+1> Opts = #{spaces => <<$\t>>, indent => <<$\t, $\t>>, crlf => <<$\n>>}.
+
+2> io:format("~s~n", [euneus:format(<<"{\"foo\":\"bar\",\"baz\":{\"foo\":\"bar\",\"0\":[\"foo\",0]}}">>, Opts)]).
+{
+                "foo":  "bar",
+                "baz":  {
+                                "foo":  "bar",
+                                "0":    [
+                                                "foo",
+                                                0
+                                ]
+                }
+}
+```
 
 ### Why Euneus over Thoas?
 

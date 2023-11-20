@@ -84,6 +84,7 @@
 
 -export_type([ input/0 ]).
 -export_type([ options/0 ]).
+-export_type([ parsed_options/0 ]).
 -export_type([ result/0 ]).
 -export_type([ encoder/1 ]).
 -export_type([ escaper/1 ]).
@@ -106,12 +107,13 @@
               , error_handler :: error_handler()
               , plugins :: [plugin()]
               }).
--opaque options() :: #opts{}.
 
 -type input() :: term().
+-type options() :: map().
+-type parsed_options() :: #opts{}.
 -type result() :: {ok, iolist()} | {error, error_reason()}.
--type encoder(Input) :: fun((Input, options()) -> iolist()).
--type escaper(Input) :: fun((Input, options()) -> iolist()).
+-type encoder(Input) :: fun((Input, parsed_options()) -> iolist()).
+-type escaper(Input) :: fun((Input, parsed_options()) -> iolist()).
 -type error_class() :: error | exit | throw.
 -type unsupported_type_error() :: {unsupported_type, Unsupported :: term()}.
 -type invalid_byte_error() :: {invalid_byte, Byte :: byte(), Input :: binary()}.
@@ -149,19 +151,19 @@
 %% @doc Generates a JSON from Erlang term.
 %%
 %% @param Term :: {@link euneus_encoder:input()}.
-%% @param Opts :: {@link erlang:map()}.
+%% @param Opts :: {@link euneus_encoder:options()}.
 %%
 %% @returns {@link euneus_encoder:result()}.
 %%
 %% @end
 %%----------------------------------------------------------------------
--spec encode(input(), map()) -> result().
+-spec encode(input(), options()) -> result().
 
 encode(Term, Opts) ->
     encode_parsed(Term, parse_opts(Opts)).
 
 %%----------------------------------------------------------------------
-%% @doc Parses {@link erlang:map()} to {@link euneus_encoder:options()}.
+%% @doc Parses {@link euneus_encoder:options()} to {@link euneus_encoder:parsed_options()}.
 %%
 %% The parsed map can be expanded in compile time or stored to be
 %% reused, avoiding parsing the options in every encoding.
@@ -171,12 +173,13 @@ encode(Term, Opts) ->
 %% NOTE: The explicit call of functions wrapped in another function is
 %% required for the inline optimization.
 %%
-%% @see euneus_encoder:parse_opts/1
-%% @see euneus_encoder:encode_parsed/2
+%% @param Opts :: {@link euneus_encoder:options()}.
+%%
+%% @returns {@link euneus_encoder:parsed_options()}.
 %%
 %% @end
 %%----------------------------------------------------------------------
--spec parse_opts(map()) -> options().
+-spec parse_opts(options()) -> parsed_options().
 
 parse_opts(Opts) ->
     #opts{
@@ -262,7 +265,7 @@ get_plugins_option(#opts{plugins = Plugins}) ->
 %% @doc Generates a JSON from Erlang term.
 %%
 %% @param Term :: {@link euneus_encoder:input()}.
-%% @param Opts :: {@link euneus_encoder:options()}.
+%% @param Opts :: {@link euneus_encoder:parsed_options()}.
 %%
 %% @returns {@link euneus_encoder:result()}.
 %%
@@ -270,7 +273,7 @@ get_plugins_option(#opts{plugins = Plugins}) ->
 %%
 %% @end
 %%----------------------------------------------------------------------
--spec encode_parsed(input(), options()) -> result().
+-spec encode_parsed(input(), parsed_options()) -> result().
 
 encode_parsed(Term, Opts) ->
     try
