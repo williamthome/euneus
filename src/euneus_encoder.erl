@@ -129,6 +129,7 @@
                 | proplist
                 | reference
                 | timestamp
+                | drop_nulls
                 | module()
                 .
 
@@ -806,6 +807,16 @@ plugins([timestamp | T], Term, Opts) ->
         _ ->
             plugins(T, Term, Opts)
     end;
+plugins([drop_nulls | T], Term, Opts) ->
+    case is_map(Term) of
+        true ->
+            Nulls = euneus_encoder:get_nulls_option(Opts),
+            Map = maps:filter(fun(_, V) -> not lists:member(V, Nulls) end, Term),
+            Encode = Opts#opts.map_encoder,
+            {halt, Encode(Map, Opts)};
+        false ->
+            plugins(T, Term, Opts)
+    end;
 plugins([Plugin | T], Term, Opts) when is_atom(Plugin) ->
     case Plugin:encode(Term, Opts) of
         next ->
@@ -970,6 +981,19 @@ timestamp_plugin_test() ->
         { {ok, <<"\"1970-01-01T00:00:00.000Z\"">>}
         , {0,0,0}
         , #{plugins => [timestamp]}
+        }
+    ]].
+
+drop_nulls_plugin_test() ->
+    [ ?assertEqual(Expect, encode_to_bin(Input, Opts))
+        || {Expect, Input, Opts} <- [
+        { {ok, <<"{\"a\":1}">>}
+        , #{a => 1, b => undefined}
+        , #{plugins => [drop_nulls]}
+        },
+        { {ok, <<"{\"a\":1}">>}
+        , #{a => 1, b => undefined, c => foo}
+        , #{nulls => [undefined, foo], plugins => [drop_nulls]}
         }
     ]].
 

@@ -29,6 +29,7 @@ Like Thoas, both the parser and generator fully conform to
         - [proplist](#proplist)
         - [reference](#reference)
         - [timestamp](#timestamp)
+        - [drop_nulls](#drop_nulls)
 - [Differences to Thoas](#differences-to-thoas)
     - [Encode](#encode-1)
     - [Decode](#decode-1)
@@ -137,9 +138,11 @@ end
 | {16#3ffe,16#b80,16#1f8d,16#2,16#204,16#acff,16#fe17,16#bf38} 	| #{plugins => [inet]}                                                                                                                     	| "3ffe:b80:1f8d:2:204:acff:fe17:bf38" 	| #{plugins => [inet]}                                                                                            	| {16#3ffe,16#b80,16#1f8d,16#2,16#204,16#acff,16#fe17,16#bf38} 	|
 | <0.92.0>                                                     	| #{plugins => [pid]}                                                                                                                      	| "<0.92.0>"                           	| #{plugins => [pid]}                                                                                             	| <0.92.0>                                                     	|
 | #Port<0.1>                                                   	| #{plugins => [port]}                                                                                                                     	| "#Port<0.1>"                         	| #{plugins => [port]}                                                                                            	| #Port<0.1>                                                   	|
-| [{foo, bar}]                                                 	| #{plugins => [proplist]}                                                                                                                 	| {\"foo\":\"bar\"}                    	| #{plugins => [proplist]}                                                                                        	| #{<<"foo">> => <<"bar">>}                                    	|
+| [{foo, bar}]                                                 	| #{plugins => [proplist]}                                                                                                                 	| {"foo":"bar"}                        	| #{plugins => [proplist]}                                                                                        	| #{<<"foo">> => <<"bar">>}                                    	|
 | #Ref<0.957048870.857473026.108035>                           	| #{plugins => [reference]}                                                                                                                	| "#Ref<0.957048870.857473026.108035>" 	| #{plugins => [reference]}                                                                                       	| #Ref<0.957048870.857473026.108035>                           	|
 | {0,0,0}                                                      	| #{plugins => [timestamp]}                                                                                                                	| "1970-01-01T00:00:00.000Z"           	| #{plugins => [timestamp]}                                                                                       	| {0,0,0}                                                      	|
+| #{foo => bar, baz => undefined}                              	| #{plugins => [drop_nulls]}                                                                                                               	| {"foo":"bar"}                        	| #{}                                                                                                             	| #{<<"foo">> => <<"bar">>}                                    	|
+| #{foo => bar, baz => undefined, fizz => nil}                 	| #{nulls => [undefined, nil], plugins => [drop_nulls]}                                                                                    	| {"foo":"bar"}                        	| #{}                                                                                                             	| #{<<"foo">> => <<"bar">>}                                    	|
 | {myrecord, val}                                              	| #{unhandled_encoder => fun({myrecord, Val}, Opts) ->    <br>    euneus_encoder:encode_list([myrecord, #{key => Val}], Opts)<br><br>end}) 	| ["myrecord", {"key":"val"}]          	| #{arrays => fun([<<"myrecord">>, #{<<"key">> := Val}], _Opts) -><br>    {myrecord, binary_to_atom(Val)}<br>end} 	| {myrecord, val}                                              	|
 
 ### Why not more built-in types?
@@ -283,6 +286,18 @@ Encodes `erlang:timestamp()` to ISO8601 as JSON string and decodes it back, for 
 
 2> euneus:decode(JSON, #{plugins => [timestamp]}).
 {ok,{0,0,0}}
+```
+
+#### drop_nulls
+
+Remove keys from maps whose terms are members of the encode 'nulls' option, for example:
+
+```erlang
+1> {ok, JSON} = euneus:encode_to_binary(#{a => 1, b => undefined}, #{plugins => [drop_nulls]}).
+{ok,<<"{\"a\":1}">>}
+
+1> {ok, JSON} = euneus:encode_to_binary(#{a => 1, b => undefined, c => foo}, #{nulls => [undefined, foo], plugins => [drop_nulls]}).
+{ok,<<"{\"a\":1}">>}
 ```
 
 ## Differences to Thoas
