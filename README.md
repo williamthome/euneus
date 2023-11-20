@@ -595,6 +595,10 @@ euneus:parse_encode_opts(#{
 }).
 ```
 
+> [!IMPORTANT]
+>
+> The `drop_nulls` plugin was introduced in v1.2.0 and was not included yet in the built-in plugins benchmarks.
+
 It's the slowest euneus encode run, but at the same time it is very efficient.
 
 <div style="overflow-x: auto;">
