@@ -65,7 +65,7 @@ Like Thoas, both the parser and generator fully conform to
 
 ```erlang
 % rebar.config
-{deps, [{euneus, "1.1.0"}]}
+{deps, [{euneus, "1.2.0"}]}
 ```
 
 ### Elixir
@@ -73,7 +73,7 @@ Like Thoas, both the parser and generator fully conform to
 ```elixir
 # mix.exs
 def deps do
-  [{:euneus, "~> 1.1"}]
+  [{:euneus, "~> 1.2"}]
 end
 ```
 
