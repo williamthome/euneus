@@ -1,6 +1,6 @@
 # Euneus
 
-An incredibly flexible and performant JSON parser and generator.
+An incredibly flexible and performant JSON parser, generator and formatter.
 
 Euneus is a rewrite of [Thoas][thoas].
 
