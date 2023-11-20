@@ -142,6 +142,7 @@ end
 | #Ref<0.957048870.857473026.108035>                           	| #{plugins => [reference]}                                                                                                                	| "#Ref<0.957048870.857473026.108035>" 	| #{plugins => [reference]}                                                                                       	| #Ref<0.957048870.857473026.108035>                           	|
 | {0,0,0}                                                      	| #{plugins => [timestamp]}                                                                                                                	| "1970-01-01T00:00:00.000Z"           	| #{plugins => [timestamp]}                                                                                       	| {0,0,0}                                                      	|
 | #{foo => bar, baz => undefined}                              	| #{plugins => [drop_nulls]}                                                                                                               	| {"foo":"bar"}                        	| #{}                                                                                                             	| #{<<"foo">> => <<"bar">>}                                    	|
+| [{foo, bar}, {baz, undefined}]                               	| #{plugins => [drop_nulls, proplist]}                                                                                                     	| {"foo":"bar"}                        	| #{}                                                                                                             	| #{<<"foo">> => <<"bar">>}                                    	|
 | #{foo => bar, baz => undefined, fizz => nil}                 	| #{nulls => [undefined, nil], plugins => [drop_nulls]}                                                                                    	| {"foo":"bar"}                        	| #{}                                                                                                             	| #{<<"foo">> => <<"bar">>}                                    	|
 | {myrecord, val}                                              	| #{unhandled_encoder => fun({myrecord, Val}, Opts) ->    <br>    euneus_encoder:encode_list([myrecord, #{key => Val}], Opts)<br><br>end}) 	| ["myrecord", {"key":"val"}]          	| #{arrays => fun([<<"myrecord">>, #{<<"key">> := Val}], _Opts) -><br>    {myrecord, binary_to_atom(Val)}<br>end} 	| {myrecord, val}                                              	|
 
@@ -299,6 +300,10 @@ Remove keys from maps whose terms are members of the encode 'nulls' option, for 
 1> {ok, JSON} = euneus:encode_to_binary(#{a => 1, b => undefined, c => foo}, #{nulls => [undefined, foo], plugins => [drop_nulls]}).
 {ok,<<"{\"a\":1}">>}
 ```
+
+> [!IMPORTANT]
+>
+> The `drop_nulls` plugin also works for `proplists`.
 
 ## Differences to Thoas
 
