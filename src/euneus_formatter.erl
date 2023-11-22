@@ -37,20 +37,20 @@
 
 -export_type([ input/0 ]).
 -export_type([ options/0 ]).
--export_type([ parsed_options/0 ]).
+-export_type([ settings/0 ]).
 -export_type([ result/0 ]).
 
--record(opts, { spaces :: binary()
-              , indent :: binary()
-              , crlf :: binary()
-              }).
+-record(settings, { spaces :: binary()
+                  , indent :: binary()
+                  , crlf :: binary()
+                  }).
 
 -type input() :: binary() | iolist().
 -type options() :: #{ spaces => binary() | non_neg_integer()
                     , indent => binary() | non_neg_integer()
                     , crlf => binary() | cr | lf | crlf
                     }.
--type parsed_options() :: #opts{}.
+-type settings() :: #settings{}.
 -type result() :: iolist().
 
 %%%=====================================================================
@@ -71,7 +71,7 @@
 -spec minify(input()) -> result().
 
 minify(JSON) ->
-    Opts = #opts{
+    Opts = #settings{
         spaces = <<>>,
         indent = <<>>,
         crlf = <<>>
@@ -92,7 +92,7 @@ minify(JSON) ->
 -spec prettify(input()) -> result().
 
 prettify(JSON) ->
-    Opts = #opts{
+    Opts = #settings{
         spaces = <<$\s>>,
         indent = <<$\s, $\s>>,
         crlf = <<$\n>>
@@ -126,10 +126,10 @@ format(JSON, Opts) ->
 %%
 %% @end
 %%----------------------------------------------------------------------
--spec parse_opts(options()) -> parsed_options().
+-spec parse_opts(options()) -> settings().
 
 parse_opts(Opts) ->
-    #opts{
+    #settings{
         spaces = case maps:get(spaces, Opts, <<>>) of
             N when is_integer(N), N >= 0 ->
                 binary:copy(<<$\s>>, N);
@@ -166,7 +166,7 @@ parse_opts(Opts) ->
 %%
 %% @end
 %%----------------------------------------------------------------------
--spec format_parsed(input(), parsed_options()) -> result().
+-spec format_parsed(input(), settings()) -> result().
 
 format_parsed(JSON, Opts) when is_binary(JSON) ->
     pp_value(JSON, Opts, 0, 0, []);
@@ -190,13 +190,13 @@ pp_value(Data, Opts, Prev, Depth, Buffer) ->
         <<$", Rest/bitstring>> ->
             case Prev =:= ${ orelse Prev =:= $[ of
                 true ->
-                    Newline = pp_newline(Opts#opts.crlf, Opts#opts.indent, Depth),
+                    Newline = pp_newline(Opts#settings.crlf, Opts#settings.indent, Depth),
                     pp_string(Rest, Opts, Prev, Depth, <<$">>, [Newline | Buffer]);
                 false ->
                     pp_string(Rest, Opts, Prev, Depth, <<$">>, Buffer)
             end;
         <<$,, Rest/bitstring>> ->
-            Newline = pp_newline(Opts#opts.crlf, Opts#opts.indent, Depth),
+            Newline = pp_newline(Opts#settings.crlf, Opts#settings.indent, Depth),
             pp_value(Rest, Opts, $,, Depth, [Newline, $, | Buffer]);
         <<${, Rest/bitstring>> ->
             pp_object(Rest, Opts, Prev, Depth, Buffer);
@@ -206,7 +206,7 @@ pp_value(Data, Opts, Prev, Depth, Buffer) ->
                     pp_value(Rest, Opts, $}, Depth - 1, [$} | Buffer]);
                 false ->
                     Depth1 = Depth - 1,
-                    Newline = pp_newline(Opts#opts.crlf, Opts#opts.indent, Depth1),
+                    Newline = pp_newline(Opts#settings.crlf, Opts#settings.indent, Depth1),
                     pp_value(Rest, Opts, $}, Depth1, [$}, Newline | Buffer])
             end;
         <<$[, Rest/bitstring>> ->
@@ -217,7 +217,7 @@ pp_value(Data, Opts, Prev, Depth, Buffer) ->
                     pp_value(Rest, Opts, $], Depth - 1, [$] | Buffer]);
                 false ->
                     Depth1 = Depth - 1,
-                    Newline = pp_newline(Opts#opts.crlf, Opts#opts.indent, Depth1),
+                    Newline = pp_newline(Opts#settings.crlf, Opts#settings.indent, Depth1),
                     pp_value(Rest, Opts, $], Depth1, [$], Newline | Buffer])
             end;
         <<Rest/bitstring>> ->
@@ -245,9 +245,9 @@ pp_number(Data, Opts, Prev, Depth, Value, Buffer) ->
         <<$\n, Rest/binary>> ->
             pp_value(Rest, Opts, Prev, Depth, [Value | Buffer]);
         <<$:, Rest/binary>> ->
-            pp_value(Rest, Opts, $:, Depth, [Value, Opts#opts.spaces, $: | Buffer]);
+            pp_value(Rest, Opts, $:, Depth, [Value, Opts#settings.spaces, $: | Buffer]);
         <<$,, Rest/binary>> ->
-            Newline = pp_newline(Opts#opts.crlf, Opts#opts.indent, Depth),
+            Newline = pp_newline(Opts#settings.crlf, Opts#settings.indent, Depth),
             pp_value(Rest, Opts, $,, Depth, [Newline, $,, Value | Buffer]);
         <<$], Rest/bitstring>> ->
             case Prev =:= $[ of
@@ -255,7 +255,7 @@ pp_number(Data, Opts, Prev, Depth, Value, Buffer) ->
                     pp_value(Rest, Opts, $], Depth - 1, [$], Value | Buffer]);
                 false ->
                     Depth1 = Depth - 1,
-                    Newline = pp_newline(Opts#opts.crlf, Opts#opts.indent, Depth1),
+                    Newline = pp_newline(Opts#settings.crlf, Opts#settings.indent, Depth1),
                     pp_value(Rest, Opts, $], Depth1, [$], Newline, Value | Buffer])
             end;
         <<$}, Rest/bitstring>> ->
@@ -264,7 +264,7 @@ pp_number(Data, Opts, Prev, Depth, Value, Buffer) ->
                     pp_value(Rest, Opts, $}, Depth - 1, [$}, Value | Buffer]);
                 false ->
                     Depth1 = Depth - 1,
-                    Newline = pp_newline(Opts#opts.crlf, Opts#opts.indent, Depth1),
+                    Newline = pp_newline(Opts#settings.crlf, Opts#settings.indent, Depth1),
                     pp_value(Rest, Opts, $}, Depth1, [$}, Newline, Value | Buffer])
             end;
         <<H, Rest/bitstring>> ->
@@ -282,7 +282,7 @@ pp_object(Data, Opts, Prev, Depth, Buffer) ->
                 true ->
                     pp_value(Data, Opts, ${, Depth + 1, [${ | Buffer]);
                 false ->
-                    Newline = pp_newline(Opts#opts.crlf, Opts#opts.indent, Depth),
+                    Newline = pp_newline(Opts#settings.crlf, Opts#settings.indent, Depth),
                     pp_value(Data, Opts, ${, Depth + 1, [${, Newline | Buffer])
             end
     end.
@@ -296,7 +296,7 @@ pp_array(Data, Opts, Prev, Depth, Buffer) ->
                 true ->
                     pp_value(Data, Opts, $[, Depth + 1, [$[ | Buffer]);
                 false ->
-                    Newline = pp_newline(Opts#opts.crlf, Opts#opts.indent, Depth),
+                    Newline = pp_newline(Opts#settings.crlf, Opts#settings.indent, Depth),
                     pp_value(Data, Opts, $[, Depth + 1, [$[, Newline | Buffer])
             end
     end.

@@ -69,6 +69,8 @@
 -define(TWO_BYTE_LAST, 2_047).
 -define(THREE_BYTE_LAST, 65_535).
 
+-define(DEFAULT_NULL_VALUE, null).
+
 %%%=====================================================================
 %%% API functions
 %%%=====================================================================
@@ -182,7 +184,7 @@ value(Data, Input, Pos, Buffer) ->
         <<"false", Rest/bitstring>> ->
             continue(Rest, Input, Pos + 5, Buffer, false);
         <<"null", Rest/bitstring>> ->
-            continue(Rest, Input, Pos + 4, Buffer, undefined);
+            continue(Rest, Input, Pos + 4, Buffer, ?DEFAULT_NULL_VALUE);
         <<"true", Rest/bitstring>> ->
             continue(Rest, Input, Pos + 4, Buffer, true);
         <<_/integer, Rest/bitstring>> ->
@@ -1426,7 +1428,7 @@ decode_test() ->
         , <<"{\"foo\": \"bar\", \"bar\": \"baz\"}">>},
         {{ok, true}, <<"true">>},
         {{ok, false}, <<"false">>},
-        {{ok, undefined}, <<"null">>},
+        {{ok, ?DEFAULT_NULL_VALUE}, <<"null">>},
         {{ok, <<"ABC">>}, <<"\"\\u0041\\u0042\\u0043\"">>}
     ]].
 

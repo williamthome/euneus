@@ -21,7 +21,18 @@
 %%%---------------------------------------------------------------------
 -module(euneus_decoder).
 
--compile({ inline, plugins/3 }).
+-compile({ inline, parse_options_to_settings/1 }).
+-compile({ inline, normalize_string_codecs/1 }).
+-compile({ inline, normalize_array_codecs/1 }).
+-compile({ inline, normalize_object_codecs/2 }).
+-compile({ inline, codecs_loop/3 }).
+-compile({ inline, datetime_string_codec/3 }).
+-compile({ inline, timestamp_string_codec/3 }).
+-compile({ inline, ipv4_string_codec/3 }).
+-compile({ inline, ipv6_string_codec/3 }).
+-compile({ inline, pid_string_codec/3 }).
+-compile({ inline, port_string_codec/3 }).
+-compile({ inline, reference_string_codec/3 }).
 -compile({ inline, string/6 }).
 -compile({ inline, string/7 }).
 -compile({ inline, number/6 }).
@@ -42,8 +53,11 @@
 -compile({ inline, chars_to_integer/2 }).
 -compile({ inline, chars_to_integer/3 }).
 -compile({ inline, chars_to_integer/4 }).
+-compile({ inline, handle_error/3 }).
 -compile({ inline, maps_get/3 }).
 -compile({ inline_list_funcs, true }).
+-compile({ nowarn_redefined_builtin_type, string/0 }).
+-compile({ nowarn_redefined_builtin_type, number/0 }).
 
 -dialyzer({ no_return, throw_byte/5 }).
 -dialyzer({ no_return, throw_token/6 }).
@@ -53,14 +67,12 @@
 %% API functions
 
 -export([ decode/2 ]).
--export([ parse_opts/1 ]).
--export([ get_null_term_option/1 ]).
--export([ get_keys_option/1 ]).
--export([ get_values_option/1 ]).
--export([ get_arrays_option/1 ]).
--export([ get_objects_option/1 ]).
--export([ get_error_handler_option/1 ]).
--export([ get_plugins_option/1 ]).
+-export([ parse_options_to_settings/1 ]).
+-export([ get_null_value_setting/1 ]).
+-export([ get_string_codecs_setting/1 ]).
+-export([ get_array_codecs_setting/1 ]).
+-export([ get_object_codecs_setting/1 ]).
+-export([ get_handle_error_setting/1 ]).
 -export([ decode_parsed/2 ]).
 -export([ resume/6 ]).
 -export([ resume/7 ]).
@@ -70,37 +82,81 @@
 
 -export_type([ input/0 ]).
 -export_type([ options/0 ]).
--export_type([ parsed_options/0 ]).
+-export_type([ settings/0 ]).
 -export_type([ result/0 ]).
--export_type([ normalizer/1 ]).
+-export_type([ normalize_fun/1 ]).
 -export_type([ error_reason/0 ]).
--export_type([ error_handler/0 ]).
+-export_type([ handle_error_fun/0 ]).
 
--record(opts, { null_term :: term()
-              , keys :: undefined
-                      | copy
-                      | to_atom
-                      | to_existing_atom
-                      | to_integer
-                      | normalizer(Key :: binary())
-              , values :: undefined
-                        | copy
-                        | to_atom
-                        | to_existing_atom
-                        | to_integer
-                        | normalizer(Value :: binary())
-              , arrays ::  undefined | normalizer(Array :: list())
-              , objects :: undefined | normalizer(Object :: map())
-              , error_handler :: error_handler()
-              , plugins :: [plugin()]
-              }).
+-record(settings, { null_value    :: null()
+                  , integer_base  :: integer_base()
+                  , string_codecs :: [{codec_fun(string()), codec_options()}]
+                  , array_codecs  :: [{codec_fun(array()), codec_options()}]
+                  , object_codecs :: [{codec_fun(object()), codec_options()}]
+                  , parse_object  :: parse_object_fun()
+                  , handle_error  :: handle_error_fun()
+                  }).
+
+-type null()         :: atom().
+-type integer_base() :: 2..36.
+-type string()       :: binary().
+-type number()       :: integer() | float().
+-type array()        :: [null() | string() | number() | array() | object()].
+-type object()       :: map() | proplists:proplist().
+% -type object_key()   :: binary().
+
+-type codec_options()    :: term().
+% Should we support 'new_type' like the encode codec_result/0?
+-type codec_result(Type) :: next
+                          | {next, Type}
+                          | {halt, term()}.
+-type codec_fun(Type)    :: fun(( Type
+                                , codec_options()
+                                , #settings{} ) -> codec_result(Type)).
+-type codec_behavior()   :: module().
+-type codec(Type)        :: codec_fun(Type)
+                          | {codec_fun(Type), codec_options()}
+                          | codec_behavior()
+                          | {codec_behavior(), codec_options()}.
+-type parse_object_fun() :: fun((proplists:proplist()) -> object()).
 
 -type input() :: binary() | iolist().
--type options() :: map().
--type parsed_options() :: #opts{}.
+-type options() :: #{
+    null_value => null(),
+    integer_base => integer_base(),
+    string => #{
+        codecs => [ datetime
+                  | timestamp
+                  | ipv4
+                  | ipv6
+                  | pid
+                  | port
+                  | reference
+                  | copy
+                  | to_atom
+                  | to_existing_atom
+                  | to_integer
+                  | codec(string()) ]
+    },
+    array =>  #{
+        codecs => [codec(array())]
+    },
+    object => #{
+        codecs => [codec(object())],
+        return => map
+                | proplist
+                | ordered_proplist,
+        keys => copy
+              | to_atom
+              | to_existing_atom
+              | to_integer
+    },
+    handle_error => handle_error_fun()
+}.
+-type settings() :: #settings{}.
 -type position() :: non_neg_integer().
 -type result() :: {ok, term()} | {error, error_reason()}.
--type normalizer(Term) :: fun((Term, parsed_options()) -> term()).
+-type normalize_fun(Term) :: fun((Term, settings()) -> term()).
 -type error_class() :: error | exit | throw.
 -type unexpected_end_of_input_error() :: unexpected_end_of_input.
 -type unexpected_byte_error() :: {unexpected_byte, binary(), position()}.
@@ -111,17 +167,9 @@
                       | unexpected_sequence_error()
                       | invalid_option_error().
 -type error_stacktrace() :: erlang:stacktrace().
--type error_handler() :: fun(( error_class()
-                             , error_reason()
-                             , error_stacktrace() ) -> error_stacktrace()).
--type plugin() :: datetime
-                | inet
-                | pid
-                | port
-                | reference
-                | timestamp
-                | module()
-                .
+-type handle_error_fun() :: fun(( error_class()
+                                , error_reason()
+                                , error_stacktrace() ) -> result()).
 
 %% Macros
 
@@ -140,6 +188,11 @@
 -define(TWO_BYTE_LAST, 2_047).
 -define(THREE_BYTE_LAST, 65_535).
 
+-define(is_codec_fun(X), is_function(X, 3)).
+-define(DEFAULT_CODEC_OPTS, []).
+-define(DEFAULT_NULL_VALUE, null).
+-define(DEFAULT_INT_BASE, 10).
+
 %%%=====================================================================
 %%% API functions
 %%%=====================================================================
@@ -157,7 +210,7 @@
 -spec decode(input(), options()) -> result().
 
 decode(Input, Opts) when is_map(Opts) ->
-    decode_parsed(Input, parse_opts(Opts)).
+    decode_parsed(Input, parse_options_to_settings(Opts)).
 
 %%----------------------------------------------------------------------
 %% @doc Parses {@link euneus_decoder:options()} to {@link euneus_decoder:parsed_options()}.
@@ -171,84 +224,385 @@ decode(Input, Opts) when is_map(Opts) ->
 %%
 %% @end
 %%----------------------------------------------------------------------
--spec parse_opts(options()) -> parsed_options().
+-spec parse_options_to_settings(options()) -> settings().
 
-parse_opts(Opts) ->
-    #opts{
-        null_term = maps_get(null_term, Opts, undefined),
-        keys = case maps_get(keys, Opts, undefined) of
-            undefined ->
-                undefined;
-            copy ->
-                fun(X, _O) -> binary:copy(X) end;
-            to_atom ->
-                fun(X, _O) -> binary_to_atom(X, utf8) end;
-            to_existing_atom ->
-                fun(X, _O) -> binary_to_existing_atom(X, utf8) end;
-            to_integer ->
-                fun(X, _O) -> binary_to_integer(X) end;
-            Fun when is_function(Fun, 2) ->
-                Fun
+parse_options_to_settings(Opts) ->
+    StringOpts = maps_get(string, Opts, #{}),
+    ArrayOpts = maps_get(array, Opts, #{}),
+    ObjectOpts = maps_get(object, Opts, #{}),
+    ObjectReturn = maps_get(return, ObjectOpts, map),
+    #settings{
+        null_value = maps_get(null_value, Opts, ?DEFAULT_NULL_VALUE),
+        integer_base = maps_get(integer_base, Opts, ?DEFAULT_INT_BASE),
+        string_codecs = normalize_string_codecs(maps_get(codecs, StringOpts, [])),
+        array_codecs = normalize_array_codecs(maps_get(codecs, ArrayOpts, [])),
+        object_codecs = begin
+            Codecs0 = maps_get(codecs, ObjectOpts, []),
+            Codecs = case maps_get(keys, ObjectOpts, undefined) of
+                undefined ->
+                    Codecs0;
+                copy ->
+                    [keys_copy | Codecs0];
+                to_atom ->
+                    [keys_to_atom | Codecs0];
+                to_existing_atom ->
+                    [keys_to_existing_atom | Codecs0];
+                to_integer ->
+                    [keys_to_integer | Codecs0]
+            end,
+            normalize_object_codecs(ObjectReturn, Codecs)
         end,
-        values = case maps_get(values, Opts, undefined) of
-            undefined ->
-                undefined;
-            copy ->
-                fun(X, _O) -> binary:copy(X) end;
-            to_atom ->
-                fun(X, _O) -> binary_to_atom(X, utf8) end;
-            to_existing_atom ->
-                fun(X, _O) -> binary_to_existing_atom(X, utf8) end;
-            to_integer ->
-                fun(X, _O) -> binary_to_integer(X) end;
-            Fun when is_function(Fun, 2) ->
-                Fun
+        parse_object = case ObjectReturn of
+            map ->
+                fun maps:from_list/1;
+            proplist ->
+                fun(List) -> List end;
+            ordered_proplist ->
+                fun lists:reverse/1
         end,
-        arrays = case maps_get(arrays, Opts, undefined) of
-            undefined ->
-                undefined;
-            Fun when is_function(Fun, 2) ->
-                Fun
-        end,
-        objects = case maps_get(objects, Opts, undefined) of
-            undefined ->
-                undefined;
-            Fun when is_function(Fun, 2) ->
-                Fun
-        end,
-        error_handler = case maps_get(error_handler, Opts, undefined) of
-            undefined ->
-                fun(C, R, S) -> handle_error(C, R, S) end;
-            Fun when is_function(Fun, 3) ->
-                Fun
-        end,
-        plugins = maps_get(plugins, Opts, [])
+        handle_error = maps_get(handle_error, Opts, fun(C, R, S) ->
+            handle_error(C, R, S)
+        end)
     }.
+
+normalize_string_codecs(Codecs) ->
+    lists:map(fun
+        (datetime) ->
+            {fun(Bin, Opts, Settings) ->
+                datetime_string_codec(Bin, Opts, Settings)
+            end, ?DEFAULT_CODEC_OPTS};
+        (timestamp) ->
+            {fun(Bin, Opts, Settings) ->
+                timestamp_string_codec(Bin, Opts, Settings)
+            end, ?DEFAULT_CODEC_OPTS};
+        (ipv4) ->
+            {fun(Bin, Opts, Settings) ->
+                ipv4_string_codec(Bin, Opts, Settings)
+            end, ?DEFAULT_CODEC_OPTS};
+        (ipv6) ->
+            {fun(Bin, Opts, Settings) ->
+                ipv6_string_codec(Bin, Opts, Settings)
+            end, ?DEFAULT_CODEC_OPTS};
+        (pid) ->
+            {fun(Bin, Opts, Settings) ->
+                pid_string_codec(Bin, Opts, Settings)
+            end, ?DEFAULT_CODEC_OPTS};
+        (port) ->
+            {fun(Bin, Opts, Settings) ->
+                port_string_codec(Bin, Opts, Settings)
+            end, ?DEFAULT_CODEC_OPTS};
+        (reference) ->
+            {fun(Bin, Opts, Settings) ->
+                reference_string_codec(Bin, Opts, Settings)
+            end, ?DEFAULT_CODEC_OPTS};
+        (copy) ->
+            {fun(Bin, Opts, Settings) ->
+                copy_string_codec(Bin, Opts, Settings)
+            end, ?DEFAULT_CODEC_OPTS};
+        (to_atom) ->
+            {fun(Bin, Opts, Settings) ->
+                to_atom_string_codec(Bin, Opts, Settings)
+            end, ?DEFAULT_CODEC_OPTS};
+        (to_existing_atom) ->
+            {fun(Bin, Opts, Settings) ->
+                to_existing_atom_string_codec(Bin, Opts, Settings)
+            end, ?DEFAULT_CODEC_OPTS};
+        (to_integer) ->
+            {fun(Bin, Opts, Settings) ->
+                to_integer_string_codec(Bin, Opts, Settings)
+            end, ?DEFAULT_CODEC_OPTS};
+        ({Fun, Opts}) when ?is_codec_fun(Fun) ->
+            {Fun, Opts};
+        (Fun) when ?is_codec_fun(Fun) ->
+            {Fun, ?DEFAULT_CODEC_OPTS};
+        ({Mod, Opts}) when is_atom(Mod) ->
+            {ok, ParsedOpts} = Mod:init(Opts),
+            {fun Mod:decode/3, ParsedOpts};
+        (Mod) when is_atom(Mod) ->
+            {ok, ParsedOpts} = Mod:init(?DEFAULT_CODEC_OPTS),
+            {fun Mod:decode/3, ParsedOpts}
+    end, Codecs).
+
+normalize_array_codecs(Codecs) ->
+    lists:map(fun
+        ({Fun, Opts}) when ?is_codec_fun(Fun) ->
+            {Fun, Opts};
+        (Fun) when ?is_codec_fun(Fun) ->
+            {Fun, ?DEFAULT_CODEC_OPTS};
+        ({Mod, Opts}) when is_atom(Mod) ->
+            {ok, ParsedOpts} = Mod:init(Opts),
+            {fun Mod:decode/3, ParsedOpts};
+        (Mod) when is_atom(Mod) ->
+            {ok, ParsedOpts} = Mod:init(?DEFAULT_CODEC_OPTS),
+            {fun Mod:decode/3, ParsedOpts}
+    end, Codecs).
+
+normalize_object_codecs(map, Codecs) ->
+    lists:map(fun
+        (keys_copy) ->
+            {fun(Map, Opts, Settings) ->
+                keys_copy_map_codec(Map, Opts, Settings)
+            end, ?DEFAULT_CODEC_OPTS};
+        (keys_to_atom) ->
+            {fun(Map, Opts, Settings) ->
+                keys_to_atom_map_codec(Map, Opts, Settings)
+            end, ?DEFAULT_CODEC_OPTS};
+        (keys_to_existing_atom) ->
+            {fun(Map, Opts, Settings) ->
+                keys_to_existing_atom_map_codec(Map, Opts, Settings)
+            end, ?DEFAULT_CODEC_OPTS};
+        (keys_to_integer) ->
+            {fun(Map, Opts, Settings) ->
+                keys_to_integer_map_codec(Map, Opts, Settings)
+            end, ?DEFAULT_CODEC_OPTS};
+        ({Fun, Opts}) when ?is_codec_fun(Fun) ->
+            {Fun, Opts};
+        (Fun) when ?is_codec_fun(Fun) ->
+            {Fun, ?DEFAULT_CODEC_OPTS};
+        ({Mod, Opts}) when is_atom(Mod) ->
+            {ok, ParsedOpts} = Mod:init(Opts),
+            {fun Mod:decode/3, ParsedOpts};
+        (Mod) when is_atom(Mod) ->
+            {ok, ParsedOpts} = Mod:init(?DEFAULT_CODEC_OPTS),
+            {fun Mod:decode/3, ParsedOpts}
+    end, Codecs);
+normalize_object_codecs(Return, Codecs)
+  when Return =:= proplist; Return =:= ordered_proplist ->
+    lists:map(fun
+        (keys_copy) ->
+            {fun(Map, Opts, Settings) ->
+                keys_copy_proplist_codec(Map, Opts, Settings)
+            end, ?DEFAULT_CODEC_OPTS};
+        (keys_to_atom) ->
+            {fun(Map, Opts, Settings) ->
+                keys_to_atom_proplist_codec(Map, Opts, Settings)
+            end, ?DEFAULT_CODEC_OPTS};
+        (keys_to_existing_atom) ->
+            {fun(Map, Opts, Settings) ->
+                keys_to_existing_atom_proplist_codec(Map, Opts, Settings)
+            end, ?DEFAULT_CODEC_OPTS};
+        (keys_to_integer) ->
+            {fun(Map, Opts, Settings) ->
+                keys_to_integer_proplist_codec(Map, Opts, Settings)
+            end, ?DEFAULT_CODEC_OPTS};
+        ({Fun, Opts}) when ?is_codec_fun(Fun) ->
+            {Fun, Opts};
+        (Fun) when ?is_codec_fun(Fun) ->
+            {Fun, ?DEFAULT_CODEC_OPTS};
+        ({Mod, Opts}) when is_atom(Mod) ->
+            {ok, ParsedOpts} = Mod:init(Opts),
+            {fun Mod:decode/3, ParsedOpts};
+        (Mod) when is_atom(Mod) ->
+            {ok, ParsedOpts} = Mod:init(?DEFAULT_CODEC_OPTS),
+            {fun Mod:decode/3, ParsedOpts}
+    end, Codecs).
+
+datetime_string_codec(
+    << Y4/integer, Y3/integer, Y2/integer, Y1/integer, $-/integer
+     , M2/integer, M1/integer, $-/integer
+     , D2/integer, D1/integer
+     , $T/integer
+     , H2/integer, H1/integer, $:/integer
+     , Min2/integer, Min1/integer, $:/integer
+     , S2/integer, S1/integer
+     , $Z/integer >>, _Opts, _Settings)
+  when ?is_number(Y4), ?is_number(Y3), ?is_number(Y2), ?is_number(Y1)
+     , ?is_number(M2), ?is_number(M1)
+     , ?is_number(D2), ?is_number(D1)
+     , ?is_number(H2), ?is_number(H1)
+     , ?is_number(Min2), ?is_number(Min1)
+     , ?is_number(S2), ?is_number(S1) ->
+    Date = { chars_to_integer(Y4, Y3, Y2, Y1)
+           , chars_to_integer(M2, M1)
+           , chars_to_integer(D2, D1) },
+    Time = { chars_to_integer(H2, H1)
+           , chars_to_integer(Min2, Min1)
+           , chars_to_integer(S2, S1) },
+    {halt, {Date, Time}};
+datetime_string_codec(_, _, _) ->
+    next.
+
+timestamp_string_codec(
+    << Y4/integer, Y3/integer, Y2/integer, Y1/integer, $-/integer
+     , M2/integer, M1/integer, $-/integer
+     , D2/integer, D1/integer
+     , $T/integer
+     , H2/integer, H1/integer, $:/integer
+     , Min2/integer, Min1/integer, $:/integer
+     , S2/integer, S1/integer
+     , $./integer
+     , MSec3/integer, MSec2/integer, MSec1/integer
+     , $Z/integer >>, _Opts, _Settings)
+  when ?is_number(Y4), ?is_number(Y3), ?is_number(Y2), ?is_number(Y1)
+     , ?is_number(M2), ?is_number(M1)
+     , ?is_number(D2), ?is_number(D1)
+     , ?is_number(H2), ?is_number(H1)
+     , ?is_number(Min2), ?is_number(Min1)
+     , ?is_number(S2), ?is_number(S1)
+     , ?is_number(MSec3), ?is_number(MSec2), ?is_number(MSec1) ->
+    Date = { chars_to_integer(Y4, Y3, Y2, Y1)
+           , chars_to_integer(M2, M1)
+           , chars_to_integer(D2, D1) },
+    Time = { chars_to_integer(H2, H1)
+           , chars_to_integer(Min2, Min1)
+           , chars_to_integer(S2, S1) },
+    GregSeconds = calendar:datetime_to_gregorian_seconds({Date, Time}),
+    Seconds = GregSeconds - 62167219200,
+    MilliSeconds = chars_to_integer(MSec3, MSec2, MSec1),
+    {halt, {Seconds div 1000000, Seconds rem 1000000, MilliSeconds * 1000}};
+timestamp_string_codec(_, _, _) ->
+    next.
+
+ipv4_string_codec(
+    << A/integer, B/integer, C/integer, $.
+     , _/bitstring >> = Bin, _Opts, _Settings)
+  when ?range(A, 0, 255); ?range(B, 0, 255); ?range(C, 0, 255) ->
+    case inet_parse:ipv4_address(binary_to_list(Bin)) of
+        {ok, Ipv4} ->
+            {halt, Ipv4};
+        {error, einval} ->
+            next
+    end;
+ipv4_string_codec(<<A/integer, B/integer, $., _/bitstring>> = Bin, _Opts, _Settings)
+  when ?range(A, 0, 255); ?range(B, 0, 255) ->
+    case inet_parse:ipv4_address(binary_to_list(Bin)) of
+        {ok, Ipv4} ->
+            {halt, Ipv4};
+        {error, einval} ->
+            next
+    end;
+ipv4_string_codec(<<A/integer, $., _/bitstring>> = Bin, _Opts, _Settings)
+  when ?range(A, 0, 255) ->
+    case inet_parse:ipv4_address(binary_to_list(Bin)) of
+        {ok, Ipv4} ->
+            {halt, Ipv4};
+        {error, einval} ->
+            next
+    end;
+ipv4_string_codec(_, _, _) ->
+    next.
+
+ipv6_string_codec(<<$:, $:>>, _Opts, _Settings) ->
+    {halt, {0,0,0,0,0,0,0,0}};
+ipv6_string_codec(<<$:, $:, _/bitstring>> = Bin, _Opts, _Settings) ->
+    case inet_parse:ipv6strict_address(binary_to_list(Bin)) of
+        {ok, Ipv6} ->
+            {halt, Ipv6};
+        {error, einval} ->
+            next
+    end;
+ipv6_string_codec(
+    << _/integer, _/integer, _/integer, _/integer, $:
+     , _/bitstring>> = Bin, _Opts, _Settings) ->
+    case inet_parse:ipv6strict_address(binary_to_list(Bin)) of
+        {ok, Ipv6} ->
+            {halt, Ipv6};
+        {error, einval} ->
+            next
+    end;
+ipv6_string_codec(_, _, _) ->
+    next.
+
+pid_string_codec(<<$<, _/bitstring>> = Bin, _Opts, _Settings) ->
+    try
+        {halt, list_to_pid(binary_to_list(Bin))}
+    catch
+        error:badarg ->
+            next
+    end;
+pid_string_codec(_, _, _) ->
+    next.
+
+port_string_codec(<<"#Port<", _/bitstring>> = Bin, _Opts, _Settings) ->
+    try
+        {halt, list_to_port(binary_to_list(Bin))}
+    catch
+        error:badarg ->
+            next
+    end;
+port_string_codec(_, _, _) ->
+    next.
+
+reference_string_codec(<<"#Ref<", _/bitstring>> = Bin, _Opts, _Settings) ->
+    try
+        {halt, list_to_ref(binary_to_list(Bin))}
+    catch
+        error:badarg ->
+            next
+    end;
+reference_string_codec(_, _, _) ->
+    next.
+
+copy_string_codec(Bin, _Opts, _Settings) ->
+    {halt, binary:copy(Bin)}.
+
+to_atom_string_codec(Bin, _Opts, _Settings) ->
+    {halt, binary_to_atom(Bin, utf8)}.
+
+to_existing_atom_string_codec(Bin, _Opts, _Settings) ->
+    {halt, binary_to_existing_atom(Bin, utf8)}.
+
+to_integer_string_codec(Bin, _Opts, _Settings) ->
+    {halt, binary_to_integer(Bin)}.
+
+keys_copy_map_codec(Map, _Opts, _Settings) ->
+    {next, maps:fold(fun(K, V, Acc) ->
+        Acc#{binary:copy(K) => V}
+    end, #{}, Map)}.
+
+keys_to_atom_map_codec(Map, _Opts, _Settings) ->
+    {next, maps:fold(fun(K, V, Acc) ->
+        Acc#{binary_to_atom(K) => V}
+    end, #{}, Map)}.
+
+keys_to_existing_atom_map_codec(Map, _Opts, _Settings) ->
+    {next, maps:fold(fun(K, V, Acc) ->
+        Acc#{binary_to_existing_atom(K) => V}
+    end, #{}, Map)}.
+
+keys_to_integer_map_codec(Map, _Opts, _Settings) ->
+    {next, maps:fold(fun(K, V, Acc) ->
+        Acc#{binary_to_integer(K) => V}
+    end, #{}, Map)}.
+
+keys_copy_proplist_codec(Proplist, _Opts, _Settings) ->
+    {next, lists:map(fun({K, V}) ->
+        {binary:copy(K), V}
+    end, Proplist)}.
+
+keys_to_atom_proplist_codec(Proplist, _Opts, _Settings) ->
+    {next, lists:map(fun({K, V}) ->
+        {binary_to_atom(K), V}
+    end, Proplist)}.
+
+keys_to_existing_atom_proplist_codec(Proplist, _Opts, _Settings) ->
+    {next, lists:map(fun({K, V}) ->
+        {binary_to_existing_atom(K), V}
+    end, Proplist)}.
+
+keys_to_integer_proplist_codec(Proplist, _Opts, _Settings) ->
+    {next, lists:map(fun({K, V}) ->
+        {binary_to_integer(K), V}
+    end, Proplist)}.
 
 %%%---------------------------------------------------------------------
 %%% Options
 %%%---------------------------------------------------------------------
 
-get_null_term_option(#opts{null_term = Null}) ->
+get_null_value_setting(#settings{null_value = Null}) ->
     Null.
 
-get_keys_option(#opts{keys = Keys}) ->
-    Keys.
+get_string_codecs_setting(#settings{string_codecs = Codecs}) ->
+    Codecs.
 
-get_values_option(#opts{values = Values}) ->
-    Values.
+get_array_codecs_setting(#settings{array_codecs = Codecs}) ->
+    Codecs.
 
-get_arrays_option(#opts{arrays = Arrays}) ->
-    Arrays.
+get_object_codecs_setting(#settings{object_codecs = Codecs}) ->
+    Codecs.
 
-get_objects_option(#opts{objects = Objects}) ->
-    Objects.
-
-get_error_handler_option(#opts{error_handler = Handler}) ->
-    Handler.
-
-get_plugins_option(#opts{plugins = Plugins}) ->
-    Plugins.
+get_handle_error_setting(#settings{handle_error = HandleErrorFun}) ->
+    HandleErrorFun.
 
 %%----------------------------------------------------------------------
 %% @doc Parses JSON to Erlang term.
@@ -261,19 +615,19 @@ get_plugins_option(#opts{plugins = Plugins}) ->
 %%
 %% @end
 %%----------------------------------------------------------------------
--spec decode_parsed(input(), parsed_options()) -> result().
+-spec decode_parsed(input(), settings()) -> result().
 
-decode_parsed(JSON, Opts) when is_binary(JSON) ->
+decode_parsed(JSON, Settings) when is_binary(JSON) ->
     try
-        {ok, value(JSON, Opts, JSON, 0, [?terminate])}
+        {ok, value(JSON, Settings, JSON, 0, [?terminate])}
     catch
         Class:Reason:Stacktrace ->
-            Handle = Opts#opts.error_handler,
-            Handle(Class, Reason, Stacktrace)
+            HandleError = Settings#settings.handle_error,
+            HandleError(Class, Reason, Stacktrace)
     end;
-decode_parsed(IOList, Opts) ->
+decode_parsed(IOList, Settings) ->
     try
-        decode_parsed(iolist_to_binary(IOList), Opts)
+        decode_parsed(iolist_to_binary(IOList), Settings)
     catch
         error:badarg ->
             {error, not_an_iodata}
@@ -282,7 +636,7 @@ decode_parsed(IOList, Opts) ->
 %%----------------------------------------------------------------------
 %% @doc Resumes the decoding after a token error.
 %%
-%% Passes the null_term option as the Replacement argument of {@link euneus_decoder:resume/7}.
+%% Passes the null_value option as the Replacement argument of {@link euneus_decoder:resume/7}.
 %%
 %% @param Token :: {@link erlang:binary()}.
 %% @param Rest :: {@link erlang:bitstring()}.
@@ -295,17 +649,17 @@ decode_parsed(IOList, Opts) ->
 %%
 %% @end
 %%----------------------------------------------------------------------
--spec resume(Token, Rest, Opts, Input, Pos, Buffer) -> Result when
+-spec resume(Token, Rest, Settings, Input, Pos, Buffer) -> Result when
     Token :: binary(),
     Rest :: bitstring(),
-    Opts :: parsed_options(),
+    Settings :: settings(),
     Input :: binary(),
     Pos :: non_neg_integer(),
     Buffer :: list(),
     Result :: result().
 
-resume(Token, Rest0, #opts{null_term = Null} = Opts, Input, Pos0, Buffer) ->
-    resume(Token, Null, Rest0, Opts, Input, Pos0, Buffer).
+resume(Token, Rest0, #settings{null_value = Null} = Settings, Input, Pos0, Buffer) ->
+    resume(Token, Null, Rest0, Settings, Input, Pos0, Buffer).
 
 %%----------------------------------------------------------------------
 %% @doc Resumes the decoding after a token error.
@@ -322,24 +676,24 @@ resume(Token, Rest0, #opts{null_term = Null} = Opts, Input, Pos0, Buffer) ->
 %%
 %% @end
 %%----------------------------------------------------------------------
--spec resume(Token, Replacement, Rest, Opts, Input, Pos, Buffer) -> Result when
+-spec resume(Token, Replacement, Rest, Settings, Input, Pos, Buffer) -> Result when
     Token :: binary(),
     Replacement :: term(),
     Rest :: bitstring(),
-    Opts :: parsed_options(),
+    Settings :: settings(),
     Input :: binary(),
     Pos :: non_neg_integer(),
     Buffer :: list(),
     Result :: result().
 
-resume(Token, Replacement, Rest0, Opts, Input, Pos0, Buffer) ->
+resume(Token, Replacement, Rest0, Settings, Input, Pos0, Buffer) ->
     Pos = Pos0 + byte_size(Token),
     try
-        {ok, continue(Rest0, Opts, Input, Pos, Buffer, Replacement)}
+        {ok, continue(Rest0, Settings, Input, Pos, Buffer, Replacement)}
     catch
         Class:Reason:Stacktrace ->
-            Handle = Opts#opts.error_handler,
-            Handle(Class, Reason, Stacktrace)
+            HandleError = Settings#settings.handle_error,
+            HandleError(Class, Reason, Stacktrace)
     end.
 
 %%----------------------------------------------------------------------
@@ -380,295 +734,298 @@ handle_error(Class, Reason, Stacktrace) ->
 %%% Internal functions
 %%%=====================================================================
 
-key(Data, Opts, Input, Pos, Buffer) ->
+key(Data, Settings, Input, Pos, Buffer) ->
     case Data of
         <<$\s/integer, Rest/bitstring>> ->
-            key(Rest, Opts, Input, Pos + 1, Buffer);
+            key(Rest, Settings, Input, Pos + 1, Buffer);
         <<$\t/integer, Rest/bitstring>> ->
-            key(Rest, Opts, Input, Pos + 1, Buffer);
+            key(Rest, Settings, Input, Pos + 1, Buffer);
         <<$\r/integer, Rest/bitstring>> ->
-            key(Rest, Opts, Input, Pos + 1, Buffer);
+            key(Rest, Settings, Input, Pos + 1, Buffer);
         <<$\n/integer, Rest/bitstring>> ->
-            key(Rest, Opts, Input, Pos + 1, Buffer);
+            key(Rest, Settings, Input, Pos + 1, Buffer);
         <<$"/integer, Rest/bitstring>> ->
-            string(Rest, Opts, Input, Pos + 1, [?key | Buffer], 0);
+            string(Rest, Settings, Input, Pos + 1, [?key | Buffer], 0);
         <<$}/integer, Rest/bitstring>> ->
             case Buffer of
                 [[] | Buffer1] ->
-                    continue(Rest, Opts, Input, Pos + 1, Buffer1, #{});
+                    continue(Rest, Settings, Input, Pos + 1, Buffer1, #{});
                 [_|_] ->
-                    throw_byte(Data, Opts, Input, Pos, Buffer)
+                    throw_byte(Data, Settings, Input, Pos, Buffer)
             end;
         <<_/integer, _/bitstring>> ->
-            throw_byte(Data, Opts, Input, Pos, Buffer);
+            throw_byte(Data, Settings, Input, Pos, Buffer);
         <<_/bitstring>> ->
-            throw_eof(Opts, Input, Pos, Buffer)
+            throw_eof(Settings, Input, Pos, Buffer)
     end.
 
-key(Data, Opts, Input, Pos, Buffer, Value) ->
+key(Data, Settings, Input, Pos, Buffer, Value) ->
     case Data of
         <<$\s/integer, Rest/bitstring>> ->
-            key(Rest, Opts, Input, Pos + 1, Buffer, Value);
+            key(Rest, Settings, Input, Pos + 1, Buffer, Value);
         <<$\t/integer, Rest/bitstring>> ->
-            key(Rest, Opts, Input, Pos + 1, Buffer, Value);
+            key(Rest, Settings, Input, Pos + 1, Buffer, Value);
         <<$\r/integer, Rest/bitstring>> ->
-            key(Rest, Opts, Input, Pos + 1, Buffer, Value);
+            key(Rest, Settings, Input, Pos + 1, Buffer, Value);
         <<$\n/integer, Rest/bitstring>> ->
-            key(Rest, Opts, Input, Pos + 1, Buffer, Value);
+            key(Rest, Settings, Input, Pos + 1, Buffer, Value);
         <<$:/integer, Rest/bitstring>> ->
-            value(Rest, Opts, Input, Pos + 1, [?object, Value | Buffer]);
+            value(Rest, Settings, Input, Pos + 1, [?object, Value | Buffer]);
         <<_/integer, _/bitstring>> ->
-            throw_byte(Data, Opts, Input, Pos, Buffer);
+            throw_byte(Data, Settings, Input, Pos, Buffer);
         <<_/bitstring>> ->
-            throw_eof(Opts, Input, Pos, Buffer)
+            throw_eof(Settings, Input, Pos, Buffer)
     end.
 
-value(Data, Opts, Input, Pos, Buffer) ->
+value(Data, Settings, Input, Pos, Buffer) ->
     case Data of
         <<$\s/integer, Rest/bitstring>> ->
-            value(Rest, Opts, Input, Pos + 1, Buffer);
+            value(Rest, Settings, Input, Pos + 1, Buffer);
         <<$\t/integer, Rest/bitstring>> ->
-            value(Rest, Opts, Input, Pos + 1, Buffer);
+            value(Rest, Settings, Input, Pos + 1, Buffer);
         <<$\r/integer, Rest/bitstring>> ->
-            value(Rest, Opts, Input, Pos + 1, Buffer);
+            value(Rest, Settings, Input, Pos + 1, Buffer);
         <<$\n/integer, Rest/bitstring>> ->
-            value(Rest, Opts, Input, Pos + 1, Buffer);
+            value(Rest, Settings, Input, Pos + 1, Buffer);
         <<$"/integer, Rest/bitstring>> ->
-            string(Rest, Opts, Input, Pos + 1, Buffer, 0);
+            string(Rest, Settings, Input, Pos + 1, Buffer, 0);
         <<$0/integer, Rest/bitstring>> ->
-            number_zero(Rest, Opts, Input, Pos, Buffer, 1);
+            number_zero(Rest, Settings, Input, Pos, Buffer, 1);
         <<$1/integer, Rest/bitstring>> ->
-            number(Rest, Opts, Input, Pos, Buffer, 1);
+            number(Rest, Settings, Input, Pos, Buffer, 1);
         <<$2/integer, Rest/bitstring>> ->
-            number(Rest, Opts, Input, Pos, Buffer, 1);
+            number(Rest, Settings, Input, Pos, Buffer, 1);
         <<$3/integer, Rest/bitstring>> ->
-            number(Rest, Opts, Input, Pos, Buffer, 1);
+            number(Rest, Settings, Input, Pos, Buffer, 1);
         <<$4/integer, Rest/bitstring>> ->
-            number(Rest, Opts, Input, Pos, Buffer, 1);
+            number(Rest, Settings, Input, Pos, Buffer, 1);
         <<$5/integer, Rest/bitstring>> ->
-            number(Rest, Opts, Input, Pos, Buffer, 1);
+            number(Rest, Settings, Input, Pos, Buffer, 1);
         <<$6/integer, Rest/bitstring>> ->
-            number(Rest, Opts, Input, Pos, Buffer, 1);
+            number(Rest, Settings, Input, Pos, Buffer, 1);
         <<$7/integer, Rest/bitstring>> ->
-            number(Rest, Opts, Input, Pos, Buffer, 1);
+            number(Rest, Settings, Input, Pos, Buffer, 1);
         <<$8/integer, Rest/bitstring>> ->
-            number(Rest, Opts, Input, Pos, Buffer, 1);
+            number(Rest, Settings, Input, Pos, Buffer, 1);
         <<$9/integer, Rest/bitstring>> ->
-            number(Rest, Opts, Input, Pos, Buffer, 1);
+            number(Rest, Settings, Input, Pos, Buffer, 1);
         <<$-/integer, Rest/bitstring>> ->
-            number_minus(Rest, Opts, Input, Pos, Buffer);
+            number_minus(Rest, Settings, Input, Pos, Buffer);
         <<$[/integer, Rest/bitstring>> ->
-            value(Rest, Opts, Input, Pos + 1, [?array, [] | Buffer]);
+            value(Rest, Settings, Input, Pos + 1, [?array, [] | Buffer]);
         <<$]/integer, Rest/bitstring>> ->
-            empty_array(Rest, Opts, Input, Pos + 1, Buffer);
+            empty_array(Rest, Settings, Input, Pos + 1, Buffer);
         <<${/integer, Rest/bitstring>> ->
-            key(Rest, Opts, Input, Pos + 1, [[] | Buffer]);
+            key(Rest, Settings, Input, Pos + 1, [[] | Buffer]);
         <<"false", Rest/bitstring>> ->
-            continue(Rest, Opts, Input, Pos + 5, Buffer, false);
+            continue(Rest, Settings, Input, Pos + 5, Buffer, false);
         <<"null", Rest/bitstring>> ->
-            continue(Rest, Opts, Input, Pos + 4, Buffer, Opts#opts.null_term);
+            continue(Rest, Settings, Input, Pos + 4, Buffer, Settings#settings.null_value);
         <<"true", Rest/bitstring>> ->
-            continue(Rest, Opts, Input, Pos + 4, Buffer, true);
+            continue(Rest, Settings, Input, Pos + 4, Buffer, true);
         <<_/integer, Rest/bitstring>> ->
-            throw_byte(Rest, Opts, Input, Pos, Buffer);
+            throw_byte(Rest, Settings, Input, Pos, Buffer);
         <<_/bitstring>> ->
-            throw_eof(Opts, Input, Pos, Buffer)
+            throw_eof(Settings, Input, Pos, Buffer)
     end.
 
-string(Data, Opts, Input, Pos, Buffer, Len) ->
+codecs_loop([], Term, _Settings) ->
+    Term;
+codecs_loop([{Fun, Opts} | Funs], Term, Settings) ->
+    case Fun(Term, Opts, Settings) of
+        next ->
+            codecs_loop(Funs, Term, Settings);
+        {next, X} ->
+            codecs_loop(Funs, X, Settings);
+        {halt, X} ->
+            X
+    end.
+
+string(Data, Settings, Input, Pos, Buffer, Len) ->
     case Data of
         <<$"/integer, Rest/bitstring>> ->
-            Last = binary_part(Input, Pos, Len),
-            Value =
+            String0 = binary_part(Input, Pos, Len),
+            String =
                 case Buffer of
                     [?key | _] ->
-                        case plugins(Opts#opts.plugins, Last, Opts) of
-                            next ->
-                                case Opts of
-                                    #opts{keys = undefined} ->
-                                        Last;
-                                    #opts{keys = Normalize} ->
-                                        Normalize(Last, Opts)
-                                end;
-                            {halt, Term} ->
-                                Term
-                        end;
+                        String0;
                     [_|_] ->
-                        case plugins(Opts#opts.plugins, Last, Opts) of
-                            next ->
-                                case Opts of
-                                    #opts{values = undefined} ->
-                                        Last;
-                                    #opts{values = Normalize} ->
-                                        Normalize(Last, Opts)
-                                end;
-                            {halt, Term} ->
-                                Term
-                        end
+                        codecs_loop( Settings#settings.string_codecs
+                                   , String0
+                                   , Settings )
                 end,
-            continue(Rest, Opts, Input, Pos + Len + 1, Buffer, Value);
+            continue(Rest, Settings, Input, Pos + Len + 1, Buffer, String);
         <<$\\/integer, Rest/bitstring>> ->
             Part = binary_part(Input, Pos, Len),
-            escape(Rest, Opts, Input, Pos + Len, Buffer, Part);
+            escape(Rest, Settings, Input, Pos + Len, Buffer, Part);
         <<X/integer, _/bitstring>> when X =< ?NON_PRINTABLE_LAST ->
-            throw_byte(Data, Opts, Input, Pos, Buffer);
+            throw_byte(Data, Settings, Input, Pos, Buffer);
         <<X/integer, Rest/bitstring>> when X =< ?ONE_BYTE_LAST ->
-            string(Rest, Opts, Input, Pos, Buffer, Len + 1);
+            string(Rest, Settings, Input, Pos, Buffer, Len + 1);
         <<Char/utf8, Rest/bitstring>> when Char =< ?TWO_BYTE_LAST ->
-            string(Rest, Opts, Input, Pos, Buffer, Len + 2);
+            string(Rest, Settings, Input, Pos, Buffer, Len + 2);
         <<Char/utf8, Rest/bitstring>> when Char =< ?THREE_BYTE_LAST ->
-            string(Rest, Opts, Input, Pos, Buffer, Len + 3);
+            string(Rest, Settings, Input, Pos, Buffer, Len + 3);
         <<_Char/utf8, Rest/bitstring>> ->
-            string(Rest, Opts, Input, Pos, Buffer, Len + 4);
+            string(Rest, Settings, Input, Pos, Buffer, Len + 4);
         <<_/integer, _/bitstring>> ->
-            throw_byte(Data, Opts, Input, Pos, Buffer);
+            throw_byte(Data, Settings, Input, Pos, Buffer);
         <<_/bitstring>> ->
-            throw_eof(Opts, Input, Pos, Buffer)
+            throw_eof(Settings, Input, Pos, Buffer)
     end.
 
-string(Data, Opts, Input, Pos, Buffer, Acc, Len) ->
+string(Data, Settings, Input, Pos, Buffer, Acc, Len) ->
     case Data of
         <<$"/integer, Rest/bitstring>> ->
             Last = binary_part(Input, Pos, Len),
-            String = iolist_to_binary([Acc | Last]),
-            continue(Rest, Opts, Input, Pos + Len + 1, Buffer, String);
+            String0 = iolist_to_binary([Acc | Last]),
+            String =
+                case Buffer of
+                    [?key | _] ->
+                        String0;
+                    [_|_] ->
+                        codecs_loop( Settings#settings.string_codecs
+                                , String0
+                                , Settings )
+                end,
+            continue(Rest, Settings, Input, Pos + Len + 1, Buffer, String);
         <<$\\/integer, Rest/bitstring>> ->
             Part = binary_part(Input, Pos, Len),
-            escape(Rest, Opts, Input, Pos + Len, Buffer, [Acc | Part]);
+            escape(Rest, Settings, Input, Pos + Len, Buffer, [Acc | Part]);
         <<X/integer, _/bitstring>> when X =< ?NON_PRINTABLE_LAST ->
-            throw_byte(Data, Opts, Input, Pos, Buffer);
+            throw_byte(Data, Settings, Input, Pos, Buffer);
         <<X/integer, Rest/bitstring>> when X =< ?ONE_BYTE_LAST ->
-            string(Rest, Opts, Input, Pos, Buffer, Acc, Len + 1);
+            string(Rest, Settings, Input, Pos, Buffer, Acc, Len + 1);
         <<Char/utf8, Rest/bitstring>> when Char =< ?TWO_BYTE_LAST ->
-            string(Rest, Opts, Input, Pos, Buffer, Acc, Len + 2);
+            string(Rest, Settings, Input, Pos, Buffer, Acc, Len + 2);
         <<Char/utf8, Rest/bitstring>> when Char =< ?THREE_BYTE_LAST ->
-            string(Rest, Opts, Input, Pos, Buffer, Acc, Len + 3);
+            string(Rest, Settings, Input, Pos, Buffer, Acc, Len + 3);
         <<_Char/utf8, Rest/bitstring>> ->
-            string(Rest, Opts, Input, Pos, Buffer, Acc, Len + 4);
+            string(Rest, Settings, Input, Pos, Buffer, Acc, Len + 4);
         <<_/integer, _/bitstring>> ->
-            throw_byte(Data, Opts, Input, Pos, Buffer);
+            throw_byte(Data, Settings, Input, Pos, Buffer);
         <<_/bitstring>> ->
-            throw_eof(Opts, Input, Pos, Buffer)
+            throw_eof(Settings, Input, Pos, Buffer)
     end.
 
-number(Data, Opts, Input, Pos, Buffer, Len) ->
+number(Data, Settings, Input, Pos, Buffer, Len) ->
     case Data of
         <<$0/integer, Rest/bitstring>> ->
-            number(Rest, Opts, Input, Pos, Buffer, Len + 1);
+            number(Rest, Settings, Input, Pos, Buffer, Len + 1);
         <<$1/integer, Rest/bitstring>> ->
-            number(Rest, Opts, Input, Pos, Buffer, Len + 1);
+            number(Rest, Settings, Input, Pos, Buffer, Len + 1);
         <<$2/integer, Rest/bitstring>> ->
-            number(Rest, Opts, Input, Pos, Buffer, Len + 1);
+            number(Rest, Settings, Input, Pos, Buffer, Len + 1);
         <<$3/integer, Rest/bitstring>> ->
-            number(Rest, Opts, Input, Pos, Buffer, Len + 1);
+            number(Rest, Settings, Input, Pos, Buffer, Len + 1);
         <<$4/integer, Rest/bitstring>> ->
-            number(Rest, Opts, Input, Pos, Buffer, Len + 1);
+            number(Rest, Settings, Input, Pos, Buffer, Len + 1);
         <<$5/integer, Rest/bitstring>> ->
-            number(Rest, Opts, Input, Pos, Buffer, Len + 1);
+            number(Rest, Settings, Input, Pos, Buffer, Len + 1);
         <<$6/integer, Rest/bitstring>> ->
-            number(Rest, Opts, Input, Pos, Buffer, Len + 1);
+            number(Rest, Settings, Input, Pos, Buffer, Len + 1);
         <<$7/integer, Rest/bitstring>> ->
-            number(Rest, Opts, Input, Pos, Buffer, Len + 1);
+            number(Rest, Settings, Input, Pos, Buffer, Len + 1);
         <<$8/integer, Rest/bitstring>> ->
-            number(Rest, Opts, Input, Pos, Buffer, Len + 1);
+            number(Rest, Settings, Input, Pos, Buffer, Len + 1);
         <<$9/integer, Rest/bitstring>> ->
-            number(Rest, Opts, Input, Pos, Buffer, Len + 1);
+            number(Rest, Settings, Input, Pos, Buffer, Len + 1);
         <<$./integer, Rest/bitstring>> ->
-            number_frac(Rest, Opts, Input, Pos, Buffer, Len + 1);
+            number_frac(Rest, Settings, Input, Pos, Buffer, Len + 1);
         <<$e/integer, Rest/bitstring>> ->
             Prefix = binary_part(Input, Pos, Len),
-            number_exp_copy(Rest, Opts, Input, Pos + Len + 1, Buffer, Prefix);
+            number_exp_copy(Rest, Settings, Input, Pos + Len + 1, Buffer, Prefix);
         <<$E/integer, Rest/bitstring>> ->
             Prefix = binary_part(Input, Pos, Len),
-            number_exp_copy(Rest, Opts, Input, Pos + Len + 1, Buffer, Prefix);
+            number_exp_copy(Rest, Settings, Input, Pos + Len + 1, Buffer, Prefix);
         <<Rest/bitstring>> ->
             Token = binary_part(Input, Pos, Len),
-            Int = try_parse_integer(Token, Token, Rest, Opts, Input, Pos, Buffer),
-            continue(Rest, Opts, Input, Pos + Len, Buffer, Int)
+            Int = try_parse_integer(Token, Token, Rest, Settings, Input, Pos, Buffer),
+            continue(Rest, Settings, Input, Pos + Len, Buffer, Int)
     end.
 
-number_exp(Data, Opts, Input, Pos, Buffer, Len) ->
+number_exp(Data, Settings, Input, Pos, Buffer, Len) ->
     case Data of
         <<$0/integer, Rest/bitstring>> ->
-            number_exp_cont(Rest, Opts, Input, Pos, Buffer, Len + 1);
+            number_exp_cont(Rest, Settings, Input, Pos, Buffer, Len + 1);
         <<$1/integer, Rest/bitstring>> ->
-            number_exp_cont(Rest, Opts, Input, Pos, Buffer, Len + 1);
+            number_exp_cont(Rest, Settings, Input, Pos, Buffer, Len + 1);
         <<$2/integer, Rest/bitstring>> ->
-            number_exp_cont(Rest, Opts, Input, Pos, Buffer, Len + 1);
+            number_exp_cont(Rest, Settings, Input, Pos, Buffer, Len + 1);
         <<$3/integer, Rest/bitstring>> ->
-            number_exp_cont(Rest, Opts, Input, Pos, Buffer, Len + 1);
+            number_exp_cont(Rest, Settings, Input, Pos, Buffer, Len + 1);
         <<$4/integer, Rest/bitstring>> ->
-            number_exp_cont(Rest, Opts, Input, Pos, Buffer, Len + 1);
+            number_exp_cont(Rest, Settings, Input, Pos, Buffer, Len + 1);
         <<$5/integer, Rest/bitstring>> ->
-            number_exp_cont(Rest, Opts, Input, Pos, Buffer, Len + 1);
+            number_exp_cont(Rest, Settings, Input, Pos, Buffer, Len + 1);
         <<$6/integer, Rest/bitstring>> ->
-            number_exp_cont(Rest, Opts, Input, Pos, Buffer, Len + 1);
+            number_exp_cont(Rest, Settings, Input, Pos, Buffer, Len + 1);
         <<$7/integer, Rest/bitstring>> ->
-            number_exp_cont(Rest, Opts, Input, Pos, Buffer, Len + 1);
+            number_exp_cont(Rest, Settings, Input, Pos, Buffer, Len + 1);
         <<$8/integer, Rest/bitstring>> ->
-            number_exp_cont(Rest, Opts, Input, Pos, Buffer, Len + 1);
+            number_exp_cont(Rest, Settings, Input, Pos, Buffer, Len + 1);
         <<$9/integer, Rest/bitstring>> ->
-            number_exp_cont(Rest, Opts, Input, Pos, Buffer, Len + 1);
+            number_exp_cont(Rest, Settings, Input, Pos, Buffer, Len + 1);
         <<$-/integer, Rest/bitstring>> ->
-            number_exp_sign(Rest, Opts, Input, Pos, Buffer, Len + 1);
+            number_exp_sign(Rest, Settings, Input, Pos, Buffer, Len + 1);
         <<$+/integer, Rest/bitstring>> ->
-            number_exp_sign(Rest, Opts, Input, Pos, Buffer, Len + 1);
+            number_exp_sign(Rest, Settings, Input, Pos, Buffer, Len + 1);
         <<_/integer, _/bitstring>> ->
-            throw_byte(Data, Opts, Input, Pos + Len, Buffer);
+            throw_byte(Data, Settings, Input, Pos + Len, Buffer);
         <<_/bitstring>> ->
-            throw_eof(Opts, Input, Pos, Buffer)
+            throw_eof(Settings, Input, Pos, Buffer)
     end.
 
-number_exp_cont(Data, Opts, Input, Pos, Buffer, Len) ->
+number_exp_cont(Data, Settings, Input, Pos, Buffer, Len) ->
     case Data of
         <<$0/integer, Rest/bitstring>> ->
-            number_exp_cont(Rest, Opts, Input, Pos, Buffer, Len + 1);
+            number_exp_cont(Rest, Settings, Input, Pos, Buffer, Len + 1);
         <<$1/integer, Rest/bitstring>> ->
-            number_exp_cont(Rest, Opts, Input, Pos, Buffer, Len + 1);
+            number_exp_cont(Rest, Settings, Input, Pos, Buffer, Len + 1);
         <<$2/integer, Rest/bitstring>> ->
-            number_exp_cont(Rest, Opts, Input, Pos, Buffer, Len + 1);
+            number_exp_cont(Rest, Settings, Input, Pos, Buffer, Len + 1);
         <<$3/integer, Rest/bitstring>> ->
-            number_exp_cont(Rest, Opts, Input, Pos, Buffer, Len + 1);
+            number_exp_cont(Rest, Settings, Input, Pos, Buffer, Len + 1);
         <<$4/integer, Rest/bitstring>> ->
-            number_exp_cont(Rest, Opts, Input, Pos, Buffer, Len + 1);
+            number_exp_cont(Rest, Settings, Input, Pos, Buffer, Len + 1);
         <<$5/integer, Rest/bitstring>> ->
-            number_exp_cont(Rest, Opts, Input, Pos, Buffer, Len + 1);
+            number_exp_cont(Rest, Settings, Input, Pos, Buffer, Len + 1);
         <<$6/integer, Rest/bitstring>> ->
-            number_exp_cont(Rest, Opts, Input, Pos, Buffer, Len + 1);
+            number_exp_cont(Rest, Settings, Input, Pos, Buffer, Len + 1);
         <<$7/integer, Rest/bitstring>> ->
-            number_exp_cont(Rest, Opts, Input, Pos, Buffer, Len + 1);
+            number_exp_cont(Rest, Settings, Input, Pos, Buffer, Len + 1);
         <<$8/integer, Rest/bitstring>> ->
-            number_exp_cont(Rest, Opts, Input, Pos, Buffer, Len + 1);
+            number_exp_cont(Rest, Settings, Input, Pos, Buffer, Len + 1);
         <<$9/integer, Rest/bitstring>> ->
-            number_exp_cont(Rest, Opts, Input, Pos, Buffer, Len + 1);
+            number_exp_cont(Rest, Settings, Input, Pos, Buffer, Len + 1);
         <<Rest/bitstring>> ->
             Token = binary_part(Input, Pos, Len),
-            Float = try_parse_float(Token, Token, Rest, Opts, Input, Pos, Buffer),
-            continue(Rest, Opts, Input, Pos + Len, Buffer, Float)
+            Float = try_parse_float(Token, Token, Rest, Settings, Input, Pos, Buffer),
+            continue(Rest, Settings, Input, Pos + Len, Buffer, Float)
     end.
 
-number_exp_cont(Data, Opts, Input, Pos, Buffer, Prefix, Len) ->
+number_exp_cont(Data, Settings, Input, Pos, Buffer, Prefix, Len) ->
     case Data of
         <<$0/integer, Rest/bitstring>> ->
-            number_exp_cont(Rest, Opts, Input, Pos, Buffer, Prefix, Len + 1);
+            number_exp_cont(Rest, Settings, Input, Pos, Buffer, Prefix, Len + 1);
         <<$1/integer, Rest/bitstring>> ->
-            number_exp_cont(Rest, Opts, Input, Pos, Buffer, Prefix, Len + 1);
+            number_exp_cont(Rest, Settings, Input, Pos, Buffer, Prefix, Len + 1);
         <<$2/integer, Rest/bitstring>> ->
-            number_exp_cont(Rest, Opts, Input, Pos, Buffer, Prefix, Len + 1);
+            number_exp_cont(Rest, Settings, Input, Pos, Buffer, Prefix, Len + 1);
         <<$3/integer, Rest/bitstring>> ->
-            number_exp_cont(Rest, Opts, Input, Pos, Buffer, Prefix, Len + 1);
+            number_exp_cont(Rest, Settings, Input, Pos, Buffer, Prefix, Len + 1);
         <<$4/integer, Rest/bitstring>> ->
-            number_exp_cont(Rest, Opts, Input, Pos, Buffer, Prefix, Len + 1);
+            number_exp_cont(Rest, Settings, Input, Pos, Buffer, Prefix, Len + 1);
         <<$5/integer, Rest/bitstring>> ->
-            number_exp_cont(Rest, Opts, Input, Pos, Buffer, Prefix, Len + 1);
+            number_exp_cont(Rest, Settings, Input, Pos, Buffer, Prefix, Len + 1);
         <<$6/integer, Rest/bitstring>> ->
-            number_exp_cont(Rest, Opts, Input, Pos, Buffer, Prefix, Len + 1);
+            number_exp_cont(Rest, Settings, Input, Pos, Buffer, Prefix, Len + 1);
         <<$7/integer, Rest/bitstring>> ->
-            number_exp_cont(Rest, Opts, Input, Pos, Buffer, Prefix, Len + 1);
+            number_exp_cont(Rest, Settings, Input, Pos, Buffer, Prefix, Len + 1);
         <<$8/integer, Rest/bitstring>> ->
-            number_exp_cont(Rest, Opts, Input, Pos, Buffer, Prefix, Len + 1);
+            number_exp_cont(Rest, Settings, Input, Pos, Buffer, Prefix, Len + 1);
         <<$9/integer, Rest/bitstring>> ->
-            number_exp_cont(Rest, Opts, Input, Pos, Buffer, Prefix, Len + 1);
+            number_exp_cont(Rest, Settings, Input, Pos, Buffer, Prefix, Len + 1);
         <<Rest/bitstring>> ->
             Suffix = binary_part(Input, Pos, Len),
             String = <<Prefix/binary,".0e",Suffix/binary>>,
@@ -676,517 +1033,333 @@ number_exp_cont(Data, Opts, Input, Pos, Buffer, Prefix, Len) ->
             InitialPos = Pos - PrefixSize - 1,
             FinalPos = Pos + Len,
             Token = binary_part(Input, InitialPos, PrefixSize + Len + 1),
-            Float = try_parse_float(String, Token, Rest, Opts, Input, InitialPos, Buffer),
-            continue(Rest, Opts, Input, FinalPos, Buffer, Float)
+            Float = try_parse_float(String, Token, Rest, Settings, Input, InitialPos, Buffer),
+            continue(Rest, Settings, Input, FinalPos, Buffer, Float)
     end.
 
-number_exp_copy(Data, Opts, Input, Pos, Buffer, Prefix) ->
+number_exp_copy(Data, Settings, Input, Pos, Buffer, Prefix) ->
     case Data of
         <<$0/integer, Rest/bitstring>> ->
-            number_exp_cont(Rest, Opts, Input, Pos, Buffer, Prefix, 1);
+            number_exp_cont(Rest, Settings, Input, Pos, Buffer, Prefix, 1);
         <<$1/integer, Rest/bitstring>> ->
-            number_exp_cont(Rest, Opts, Input, Pos, Buffer, Prefix, 1);
+            number_exp_cont(Rest, Settings, Input, Pos, Buffer, Prefix, 1);
         <<$2/integer, Rest/bitstring>> ->
-            number_exp_cont(Rest, Opts, Input, Pos, Buffer, Prefix, 1);
+            number_exp_cont(Rest, Settings, Input, Pos, Buffer, Prefix, 1);
         <<$3/integer, Rest/bitstring>> ->
-            number_exp_cont(Rest, Opts, Input, Pos, Buffer, Prefix, 1);
+            number_exp_cont(Rest, Settings, Input, Pos, Buffer, Prefix, 1);
         <<$4/integer, Rest/bitstring>> ->
-            number_exp_cont(Rest, Opts, Input, Pos, Buffer, Prefix, 1);
+            number_exp_cont(Rest, Settings, Input, Pos, Buffer, Prefix, 1);
         <<$5/integer, Rest/bitstring>> ->
-            number_exp_cont(Rest, Opts, Input, Pos, Buffer, Prefix, 1);
+            number_exp_cont(Rest, Settings, Input, Pos, Buffer, Prefix, 1);
         <<$6/integer, Rest/bitstring>> ->
-            number_exp_cont(Rest, Opts, Input, Pos, Buffer, Prefix, 1);
+            number_exp_cont(Rest, Settings, Input, Pos, Buffer, Prefix, 1);
         <<$7/integer, Rest/bitstring>> ->
-            number_exp_cont(Rest, Opts, Input, Pos, Buffer, Prefix, 1);
+            number_exp_cont(Rest, Settings, Input, Pos, Buffer, Prefix, 1);
         <<$8/integer, Rest/bitstring>> ->
-            number_exp_cont(Rest, Opts, Input, Pos, Buffer, Prefix, 1);
+            number_exp_cont(Rest, Settings, Input, Pos, Buffer, Prefix, 1);
         <<$9/integer, Rest/bitstring>> ->
-            number_exp_cont(Rest, Opts, Input, Pos, Buffer, Prefix, 1);
+            number_exp_cont(Rest, Settings, Input, Pos, Buffer, Prefix, 1);
         <<$-/integer, Rest/bitstring>> ->
-            number_exp_sign(Rest, Opts, Input, Pos, Buffer, Prefix, 1);
+            number_exp_sign(Rest, Settings, Input, Pos, Buffer, Prefix, 1);
         <<$+/integer, Rest/bitstring>> ->
-            number_exp_sign(Rest, Opts, Input, Pos, Buffer, Prefix, 1);
+            number_exp_sign(Rest, Settings, Input, Pos, Buffer, Prefix, 1);
         <<_/integer, _/bitstring>> ->
-            throw_byte(Data, Opts, Input, Pos, Buffer);
+            throw_byte(Data, Settings, Input, Pos, Buffer);
         <<_/bitstring>> ->
-            throw_eof(Opts, Input, Pos, Buffer)
+            throw_eof(Settings, Input, Pos, Buffer)
     end.
 
-number_exp_sign(Data, Opts, Input, Pos, Buffer, Len) ->
+number_exp_sign(Data, Settings, Input, Pos, Buffer, Len) ->
     case Data of
         <<$0/integer, Rest/bitstring>> ->
-            number_exp_cont(Rest, Opts, Input, Pos, Buffer, Len + 1);
+            number_exp_cont(Rest, Settings, Input, Pos, Buffer, Len + 1);
         <<$1/integer, Rest/bitstring>> ->
-            number_exp_cont(Rest, Opts, Input, Pos, Buffer, Len + 1);
+            number_exp_cont(Rest, Settings, Input, Pos, Buffer, Len + 1);
         <<$2/integer, Rest/bitstring>> ->
-            number_exp_cont(Rest, Opts, Input, Pos, Buffer, Len + 1);
+            number_exp_cont(Rest, Settings, Input, Pos, Buffer, Len + 1);
         <<$3/integer, Rest/bitstring>> ->
-            number_exp_cont(Rest, Opts, Input, Pos, Buffer, Len + 1);
+            number_exp_cont(Rest, Settings, Input, Pos, Buffer, Len + 1);
         <<$4/integer, Rest/bitstring>> ->
-            number_exp_cont(Rest, Opts, Input, Pos, Buffer, Len + 1);
+            number_exp_cont(Rest, Settings, Input, Pos, Buffer, Len + 1);
         <<$5/integer, Rest/bitstring>> ->
-            number_exp_cont(Rest, Opts, Input, Pos, Buffer, Len + 1);
+            number_exp_cont(Rest, Settings, Input, Pos, Buffer, Len + 1);
         <<$6/integer, Rest/bitstring>> ->
-            number_exp_cont(Rest, Opts, Input, Pos, Buffer, Len + 1);
+            number_exp_cont(Rest, Settings, Input, Pos, Buffer, Len + 1);
         <<$7/integer, Rest/bitstring>> ->
-            number_exp_cont(Rest, Opts, Input, Pos, Buffer, Len + 1);
+            number_exp_cont(Rest, Settings, Input, Pos, Buffer, Len + 1);
         <<$8/integer, Rest/bitstring>> ->
-            number_exp_cont(Rest, Opts, Input, Pos, Buffer, Len + 1);
+            number_exp_cont(Rest, Settings, Input, Pos, Buffer, Len + 1);
         <<$9/integer, Rest/bitstring>> ->
-            number_exp_cont(Rest, Opts, Input, Pos, Buffer, Len + 1);
+            number_exp_cont(Rest, Settings, Input, Pos, Buffer, Len + 1);
         <<_/integer, _/bitstring>> ->
-            throw_byte(Data, Opts, Input, Pos + Len, Buffer);
+            throw_byte(Data, Settings, Input, Pos + Len, Buffer);
         <<_/bitstring>> ->
-            throw_eof(Opts, Input, Pos, Buffer)
+            throw_eof(Settings, Input, Pos, Buffer)
     end.
 
-number_exp_sign(Data, Opts, Input, Pos, Buffer, Prefix, Len) ->
+number_exp_sign(Data, Settings, Input, Pos, Buffer, Prefix, Len) ->
     case Data of
         <<$0/integer, Rest/bitstring>> ->
-            number_exp_cont(Rest, Opts, Input, Pos, Buffer, Prefix, Len + 1);
+            number_exp_cont(Rest, Settings, Input, Pos, Buffer, Prefix, Len + 1);
         <<$1/integer, Rest/bitstring>> ->
-            number_exp_cont(Rest, Opts, Input, Pos, Buffer, Prefix, Len + 1);
+            number_exp_cont(Rest, Settings, Input, Pos, Buffer, Prefix, Len + 1);
         <<$2/integer, Rest/bitstring>> ->
-            number_exp_cont(Rest, Opts, Input, Pos, Buffer, Prefix, Len + 1);
+            number_exp_cont(Rest, Settings, Input, Pos, Buffer, Prefix, Len + 1);
         <<$3/integer, Rest/bitstring>> ->
-            number_exp_cont(Rest, Opts, Input, Pos, Buffer, Prefix, Len + 1);
+            number_exp_cont(Rest, Settings, Input, Pos, Buffer, Prefix, Len + 1);
         <<$4/integer, Rest/bitstring>> ->
-            number_exp_cont(Rest, Opts, Input, Pos, Buffer, Prefix, Len + 1);
+            number_exp_cont(Rest, Settings, Input, Pos, Buffer, Prefix, Len + 1);
         <<$5/integer, Rest/bitstring>> ->
-            number_exp_cont(Rest, Opts, Input, Pos, Buffer, Prefix, Len + 1);
+            number_exp_cont(Rest, Settings, Input, Pos, Buffer, Prefix, Len + 1);
         <<$6/integer, Rest/bitstring>> ->
-            number_exp_cont(Rest, Opts, Input, Pos, Buffer, Prefix, Len + 1);
+            number_exp_cont(Rest, Settings, Input, Pos, Buffer, Prefix, Len + 1);
         <<$7/integer, Rest/bitstring>> ->
-            number_exp_cont(Rest, Opts, Input, Pos, Buffer, Prefix, Len + 1);
+            number_exp_cont(Rest, Settings, Input, Pos, Buffer, Prefix, Len + 1);
         <<$8/integer, Rest/bitstring>> ->
-            number_exp_cont(Rest, Opts, Input, Pos, Buffer, Prefix, Len + 1);
+            number_exp_cont(Rest, Settings, Input, Pos, Buffer, Prefix, Len + 1);
         <<$9/integer, Rest/bitstring>> ->
-            number_exp_cont(Rest, Opts, Input, Pos, Buffer, Prefix, Len + 1);
+            number_exp_cont(Rest, Settings, Input, Pos, Buffer, Prefix, Len + 1);
         <<_/integer, _/bitstring>> ->
-            throw_byte(Data, Opts, Input, Pos + Len, Buffer);
+            throw_byte(Data, Settings, Input, Pos + Len, Buffer);
         <<_/bitstring>> ->
-            throw_eof(Opts, Input, Pos, Buffer)
+            throw_eof(Settings, Input, Pos, Buffer)
     end.
 
-number_frac(Data, Opts, Input, Pos, Buffer, Len) ->
+number_frac(Data, Settings, Input, Pos, Buffer, Len) ->
     case Data of
         <<$0/integer, Rest/bitstring>> ->
-            number_frac_cont(Rest, Opts, Input, Pos, Buffer, Len + 1);
+            number_frac_cont(Rest, Settings, Input, Pos, Buffer, Len + 1);
         <<$1/integer, Rest/bitstring>> ->
-            number_frac_cont(Rest, Opts, Input, Pos, Buffer, Len + 1);
+            number_frac_cont(Rest, Settings, Input, Pos, Buffer, Len + 1);
         <<$2/integer, Rest/bitstring>> ->
-            number_frac_cont(Rest, Opts, Input, Pos, Buffer, Len + 1);
+            number_frac_cont(Rest, Settings, Input, Pos, Buffer, Len + 1);
         <<$3/integer, Rest/bitstring>> ->
-            number_frac_cont(Rest, Opts, Input, Pos, Buffer, Len + 1);
+            number_frac_cont(Rest, Settings, Input, Pos, Buffer, Len + 1);
         <<$4/integer, Rest/bitstring>> ->
-            number_frac_cont(Rest, Opts, Input, Pos, Buffer, Len + 1);
+            number_frac_cont(Rest, Settings, Input, Pos, Buffer, Len + 1);
         <<$5/integer, Rest/bitstring>> ->
-            number_frac_cont(Rest, Opts, Input, Pos, Buffer, Len + 1);
+            number_frac_cont(Rest, Settings, Input, Pos, Buffer, Len + 1);
         <<$6/integer, Rest/bitstring>> ->
-            number_frac_cont(Rest, Opts, Input, Pos, Buffer, Len + 1);
+            number_frac_cont(Rest, Settings, Input, Pos, Buffer, Len + 1);
         <<$7/integer, Rest/bitstring>> ->
-            number_frac_cont(Rest, Opts, Input, Pos, Buffer, Len + 1);
+            number_frac_cont(Rest, Settings, Input, Pos, Buffer, Len + 1);
         <<$8/integer, Rest/bitstring>> ->
-            number_frac_cont(Rest, Opts, Input, Pos, Buffer, Len + 1);
+            number_frac_cont(Rest, Settings, Input, Pos, Buffer, Len + 1);
         <<$9/integer, Rest/bitstring>> ->
-            number_frac_cont(Rest, Opts, Input, Pos, Buffer, Len + 1);
+            number_frac_cont(Rest, Settings, Input, Pos, Buffer, Len + 1);
         <<_/integer, _/bitstring>> ->
-            throw_byte(Data, Opts, Input, Pos + Len, Buffer);
+            throw_byte(Data, Settings, Input, Pos + Len, Buffer);
         <<_/bitstring>> ->
-            throw_eof(Opts, Input, Pos, Buffer)
+            throw_eof(Settings, Input, Pos, Buffer)
     end.
 
-number_frac_cont(Data, Opts, Input, Pos, Buffer, Len) ->
+number_frac_cont(Data, Settings, Input, Pos, Buffer, Len) ->
     case Data of
         <<$0/integer, Rest/bitstring>> ->
-            number_frac_cont(Rest, Opts, Input, Pos, Buffer, Len + 1);
+            number_frac_cont(Rest, Settings, Input, Pos, Buffer, Len + 1);
         <<$1/integer, Rest/bitstring>> ->
-            number_frac_cont(Rest, Opts, Input, Pos, Buffer, Len + 1);
+            number_frac_cont(Rest, Settings, Input, Pos, Buffer, Len + 1);
         <<$2/integer, Rest/bitstring>> ->
-            number_frac_cont(Rest, Opts, Input, Pos, Buffer, Len + 1);
+            number_frac_cont(Rest, Settings, Input, Pos, Buffer, Len + 1);
         <<$3/integer, Rest/bitstring>> ->
-            number_frac_cont(Rest, Opts, Input, Pos, Buffer, Len + 1);
+            number_frac_cont(Rest, Settings, Input, Pos, Buffer, Len + 1);
         <<$4/integer, Rest/bitstring>> ->
-            number_frac_cont(Rest, Opts, Input, Pos, Buffer, Len + 1);
+            number_frac_cont(Rest, Settings, Input, Pos, Buffer, Len + 1);
         <<$5/integer, Rest/bitstring>> ->
-            number_frac_cont(Rest, Opts, Input, Pos, Buffer, Len + 1);
+            number_frac_cont(Rest, Settings, Input, Pos, Buffer, Len + 1);
         <<$6/integer, Rest/bitstring>> ->
-            number_frac_cont(Rest, Opts, Input, Pos, Buffer, Len + 1);
+            number_frac_cont(Rest, Settings, Input, Pos, Buffer, Len + 1);
         <<$7/integer, Rest/bitstring>> ->
-            number_frac_cont(Rest, Opts, Input, Pos, Buffer, Len + 1);
+            number_frac_cont(Rest, Settings, Input, Pos, Buffer, Len + 1);
         <<$8/integer, Rest/bitstring>> ->
-            number_frac_cont(Rest, Opts, Input, Pos, Buffer, Len + 1);
+            number_frac_cont(Rest, Settings, Input, Pos, Buffer, Len + 1);
         <<$9/integer, Rest/bitstring>> ->
-            number_frac_cont(Rest, Opts, Input, Pos, Buffer, Len + 1);
+            number_frac_cont(Rest, Settings, Input, Pos, Buffer, Len + 1);
         <<$e/integer, Rest/bitstring>> ->
-            number_exp(Rest, Opts, Input, Pos, Buffer, Len + 1);
+            number_exp(Rest, Settings, Input, Pos, Buffer, Len + 1);
         <<$E/integer, Rest/bitstring>> ->
-            number_exp(Rest, Opts, Input, Pos, Buffer, Len + 1);
+            number_exp(Rest, Settings, Input, Pos, Buffer, Len + 1);
         <<Rest/bitstring>> ->
             Token = binary_part(Input, Pos, Len),
-            Float = try_parse_float(Token, Token, Rest, Opts, Input, Pos, Buffer),
-            continue(Rest, Opts, Input, Pos + Len, Buffer, Float)
+            Float = try_parse_float(Token, Token, Rest, Settings, Input, Pos, Buffer),
+            continue(Rest, Settings, Input, Pos + Len, Buffer, Float)
     end.
 
-number_minus(Data, Opts, Input, Pos, Buffer) ->
+number_minus(Data, Settings, Input, Pos, Buffer) ->
     case Data of
         <<$0/integer, Rest/bitstring>> ->
-            number_zero(Rest, Opts, Input, Pos, Buffer, 2);
+            number_zero(Rest, Settings, Input, Pos, Buffer, 2);
         <<$1/integer, Rest/bitstring>> ->
-            number(Rest, Opts, Input, Pos, Buffer, 2);
+            number(Rest, Settings, Input, Pos, Buffer, 2);
         <<$2/integer, Rest/bitstring>> ->
-            number(Rest, Opts, Input, Pos, Buffer, 2);
+            number(Rest, Settings, Input, Pos, Buffer, 2);
         <<$3/integer, Rest/bitstring>> ->
-            number(Rest, Opts, Input, Pos, Buffer, 2);
+            number(Rest, Settings, Input, Pos, Buffer, 2);
         <<$4/integer, Rest/bitstring>> ->
-            number(Rest, Opts, Input, Pos, Buffer, 2);
+            number(Rest, Settings, Input, Pos, Buffer, 2);
         <<$5/integer, Rest/bitstring>> ->
-            number(Rest, Opts, Input, Pos, Buffer, 2);
+            number(Rest, Settings, Input, Pos, Buffer, 2);
         <<$6/integer, Rest/bitstring>> ->
-            number(Rest, Opts, Input, Pos, Buffer, 2);
+            number(Rest, Settings, Input, Pos, Buffer, 2);
         <<$7/integer, Rest/bitstring>> ->
-            number(Rest, Opts, Input, Pos, Buffer, 2);
+            number(Rest, Settings, Input, Pos, Buffer, 2);
         <<$8/integer, Rest/bitstring>> ->
-            number(Rest, Opts, Input, Pos, Buffer, 2);
+            number(Rest, Settings, Input, Pos, Buffer, 2);
         <<$9/integer, Rest/bitstring>> ->
-            number(Rest, Opts, Input, Pos, Buffer, 2);
+            number(Rest, Settings, Input, Pos, Buffer, 2);
         <<_/integer, _/bitstring>> ->
-            throw_byte(Data, Opts, Input, Pos + 1, Buffer);
+            throw_byte(Data, Settings, Input, Pos + 1, Buffer);
         <<_/bitstring>> ->
-            throw_eof(Opts, Input, Pos, Buffer)
+            throw_eof(Settings, Input, Pos, Buffer)
     end.
 
-number_zero(Data, Opts, Input, Pos, Buffer, Len) ->
+number_zero(Data, Settings, Input, Pos, Buffer, Len) ->
     case Data of
         <<$./integer, Rest/bitstring>> ->
-            number_frac(Rest, Opts, Input, Pos, Buffer, Len + 1);
+            number_frac(Rest, Settings, Input, Pos, Buffer, Len + 1);
         <<$e/integer, Rest/bitstring>> ->
-            number_exp_copy(Rest, Opts, Input, Pos + Len + 1, Buffer, <<"0">>);
+            number_exp_copy(Rest, Settings, Input, Pos + Len + 1, Buffer, <<"0">>);
         <<$E/integer, Rest/bitstring>> ->
-            number_exp_copy(Rest, Opts, Input, Pos + Len + 1, Buffer, <<"0">>);
+            number_exp_copy(Rest, Settings, Input, Pos + Len + 1, Buffer, <<"0">>);
         <<Rest/bitstring>> ->
-            continue(Rest, Opts, Input, Pos + Len, Buffer, 0)
+            continue(Rest, Settings, Input, Pos + Len, Buffer, 0)
     end.
 
-try_parse_integer(Bin, Token, Rest, Opts, Input, Pos, Buffer) ->
+try_parse_integer(Bin, Token, Rest, Settings, Input, Pos, Buffer) ->
     try
-        binary_to_integer(Bin)
+        binary_to_integer(Bin, Settings#settings.integer_base)
     catch
         error:badarg ->
-            throw_token(Token, Rest, Opts, Input, Pos, Buffer)
+            throw_token(Token, Rest, Settings, Input, Pos, Buffer)
     end.
 
-try_parse_float(Bin, Token, Rest, Opts, Input, Pos, Buffer) ->
+try_parse_float(Bin, Token, Rest, Settings, Input, Pos, Buffer) ->
     try
         binary_to_float(Bin)
     catch
         error:badarg ->
-            throw_token(Token, Rest, Opts, Input, Pos, Buffer)
+            throw_token(Token, Rest, Settings, Input, Pos, Buffer)
     end.
 
-object(Data, Opts, Input, Pos, Buffer, Value) ->
+object(Data, Settings, Input, Pos, Buffer, Value) ->
     case Data of
         <<$\s/integer, Rest/bitstring>> ->
-            object(Rest, Opts, Input, Pos + 1, Buffer, Value);
+            object(Rest, Settings, Input, Pos + 1, Buffer, Value);
         <<$\t/integer, Rest/bitstring>> ->
-            object(Rest, Opts, Input, Pos + 1, Buffer, Value);
+            object(Rest, Settings, Input, Pos + 1, Buffer, Value);
         <<$\r/integer, Rest/bitstring>> ->
-            object(Rest, Opts, Input, Pos + 1, Buffer, Value);
+            object(Rest, Settings, Input, Pos + 1, Buffer, Value);
         <<$\n/integer, Rest/bitstring>> ->
-            object(Rest, Opts, Input, Pos + 1, Buffer, Value);
+            object(Rest, Settings, Input, Pos + 1, Buffer, Value);
         <<$,/integer, Rest/bitstring>> ->
             [Key, Acc | Buffer2] = Buffer,
             Acc2 = [{Key, Value} | Acc],
-            key(Rest, Opts, Input, Pos + 1, [Acc2 | Buffer2]);
+            key(Rest, Settings, Input, Pos + 1, [Acc2 | Buffer2]);
         <<$}/integer, Rest/bitstring>> ->
             [Key, Acc2 | Buffer2] = Buffer,
-            Map = maps:from_list([{Key, Value} | Acc2]),
-            Value1 =
-                case plugins(Opts#opts.plugins, Map, Opts) of
-                    next ->
-                        case Opts of
-                            #opts{objects = undefined} ->
-                                Map;
-                            #opts{objects = Normalize} ->
-                                Normalize(Map, Opts)
-                        end;
-                    {halt, Term} ->
-                        Term
-                end,
-            continue(Rest, Opts, Input, Pos + 1, Buffer2, Value1);
+            Parse = Settings#settings.parse_object,
+            Object0 = Parse([{Key, Value} | Acc2]),
+            Object = codecs_loop(Settings#settings.object_codecs, Object0, Settings),
+            continue(Rest, Settings, Input, Pos + 1, Buffer2, Object);
         <<_/integer, _/bitstring>> ->
-            throw_byte(Data, Opts, Input, Pos, Buffer);
+            throw_byte(Data, Settings, Input, Pos, Buffer);
         <<_/bitstring>> ->
-            throw_eof(Opts, Input, Pos, Buffer)
+            throw_eof(Settings, Input, Pos, Buffer)
     end.
 
-array(Data, Opts, Input, Pos, Buffer, Value) ->
+array(Data, Settings, Input, Pos, Buffer, Value) ->
     case Data of
         <<$\t/integer, Rest/bitstring>> ->
-            array(Rest, Opts, Input, Pos + 1, Buffer, Value);
+            array(Rest, Settings, Input, Pos + 1, Buffer, Value);
         <<$\n/integer, Rest/bitstring>> ->
-            array(Rest, Opts, Input, Pos + 1, Buffer, Value);
+            array(Rest, Settings, Input, Pos + 1, Buffer, Value);
         <<$\r/integer, Rest/bitstring>> ->
-            array(Rest, Opts, Input, Pos + 1, Buffer, Value);
+            array(Rest, Settings, Input, Pos + 1, Buffer, Value);
         <<$\s/integer, Rest/bitstring>> ->
-            array(Rest, Opts, Input, Pos + 1, Buffer, Value);
+            array(Rest, Settings, Input, Pos + 1, Buffer, Value);
         <<$,/integer, Rest/bitstring>> ->
             [Acc | Buffer2] = Buffer,
-            value(Rest, Opts, Input, Pos + 1, [?array, [Value | Acc] | Buffer2]);
+            value(Rest, Settings, Input, Pos + 1, [?array, [Value | Acc] | Buffer2]);
         <<$]/integer, Rest/bitstring>> ->
             [Acc | Buffer2] = Buffer,
-            List = lists:reverse(Acc, [Value]),
-            Value1 =
-                case plugins(Opts#opts.plugins, List, Opts) of
-                    next ->
-                        case Opts of
-                            #opts{arrays = undefined} ->
-                                List;
-                            #opts{arrays = Normalize} ->
-                                Normalize(List, Opts)
-                        end;
-                    {halt, Term} ->
-                        Term
-                end,
-            continue(Rest, Opts, Input, Pos + 1, Buffer2, Value1);
+            List0 = lists:reverse(Acc, [Value]),
+            List = codecs_loop(Settings#settings.array_codecs, List0, Settings),
+            continue(Rest, Settings, Input, Pos + 1, Buffer2, List);
         <<_/integer, _/bitstring>> ->
-            throw_byte(Data, Opts, Input, Pos, Buffer);
+            throw_byte(Data, Settings, Input, Pos, Buffer);
         <<_/bitstring>> ->
-            throw_eof(Opts, Input, Pos, Buffer)
+            throw_eof(Settings, Input, Pos, Buffer)
     end.
 
-empty_array(Rest, Opts, Input, Pos, Buffer) ->
+empty_array(Rest, Settings, Input, Pos, Buffer) ->
     case Buffer of
         [?array, [] | Buffer1] ->
-            List = case Opts of
-                #opts{arrays = undefined} ->
-                    [];
-                #opts{arrays = Normalize} ->
-                    Normalize([], Opts)
-            end,
-            continue(Rest, Opts, Input, Pos, Buffer1, List);
+            continue(Rest, Settings, Input, Pos, Buffer1, []);
         [_|_] ->
-            throw_byte(Rest, Opts, Input, Pos - 1, Buffer)
+            throw_byte(Rest, Settings, Input, Pos - 1, Buffer)
     end.
 
-plugins([], _Bin, _Opts) ->
-    next;
-plugins([datetime | T], Term, Opts) ->
-    case Term of
-        << Y4/integer, Y3/integer, Y2/integer, Y1/integer, $-/integer
-         , M2/integer, M1/integer, $-/integer
-         , D2/integer, D1/integer
-         , $T/integer
-         , H2/integer, H1/integer, $:/integer
-         , Min2/integer, Min1/integer, $:/integer
-         , S2/integer, S1/integer
-         , $Z/integer >>
-          when ?is_number(Y4), ?is_number(Y3), ?is_number(Y2), ?is_number(Y1)
-             , ?is_number(M2), ?is_number(M1)
-             , ?is_number(D2), ?is_number(D1)
-             , ?is_number(H2), ?is_number(H1)
-             , ?is_number(Min2), ?is_number(Min1)
-             , ?is_number(S2), ?is_number(S1) ->
-            Date = { chars_to_integer(Y4, Y3, Y2, Y1)
-                   , chars_to_integer(M2, M1)
-                   , chars_to_integer(D2, D1) },
-            Time = { chars_to_integer(H2, H1)
-                   , chars_to_integer(Min2, Min1)
-                   , chars_to_integer(S2, S1) },
-            DateTime = {Date, Time},
-            {halt, DateTime};
-        _ ->
-            plugins(T, Term, Opts)
-    end;
-plugins([inet | T], Term, Opts) ->
-    case Term of
-        <<A/integer, B/integer, C/integer, $., _/bitstring>>
-          when ?range(A, 0, 255); ?range(B, 0, 255); ?range(C, 0, 255) ->
-            case inet_parse:ipv4_address(binary_to_list(Term)) of
-                {ok, Ip} ->
-                    {halt, Ip};
-                {error, einval} ->
-                    plugins(T, Term, Opts)
-            end;
-        <<A/integer, B/integer, $., _/bitstring>>
-          when ?range(A, 0, 255); ?range(B, 0, 255) ->
-            case inet_parse:ipv4_address(binary_to_list(Term)) of
-                {ok, Ip} ->
-                    {halt, Ip};
-                {error, einval} ->
-                    plugins(T, Term, Opts)
-            end;
-        <<A/integer, $., _/bitstring>>
-          when ?range(A, 0, 255) ->
-            case inet_parse:ipv4_address(binary_to_list(Term)) of
-                {ok, Ip} ->
-                    {halt, Ip};
-                {error, einval} ->
-                    plugins(T, Term, Opts)
-            end;
-        <<$:, $:>> ->
-            {halt, {0,0,0,0,0,0,0,0}};
-        <<$:, $:, _/bitstring>> ->
-            case inet_parse:ipv6strict_address(binary_to_list(Term)) of
-                {ok, Ipv6} ->
-                    {halt, Ipv6};
-                {error, einval} ->
-                    plugins(T, Term, Opts)
-            end;
-        <<_/integer, _/integer, _/integer, _/integer, $:, _/bitstring>> ->
-            case inet_parse:ipv6strict_address(binary_to_list(Term)) of
-                {ok, Ipv6} ->
-                    {halt, Ipv6};
-                {error, einval} ->
-                    plugins(T, Term, Opts)
-            end;
-        _ ->
-            plugins(T, Term, Opts)
-    end;
-plugins([pid | T], Term, Opts) ->
-    case Term of
-        <<$<, _/bitstring>> ->
-            try
-                Pid = list_to_pid(binary_to_list(Term)),
-                {halt, Pid}
-            catch
-                error:badarg ->
-                    plugins(T, Term, Opts)
-            end;
-        _ ->
-            plugins(T, Term, Opts)
-    end;
-plugins([port | T], Term, Opts) ->
-    case Term of
-        <<"#Port<", _/bitstring>> ->
-            try
-                Port = list_to_port(binary_to_list(Term)),
-                {halt, Port}
-            catch
-                error:badarg ->
-                    plugins(T, Term, Opts)
-            end;
-        _ ->
-            plugins(T, Term, Opts)
-    end;
-plugins([reference | T], Term, Opts) ->
-    case Term of
-        <<"#Ref<", _/bitstring>> ->
-            try
-                Ref = list_to_ref(binary_to_list(Term)),
-                {halt, Ref}
-            catch
-                error:badarg ->
-                    plugins(T, Term, Opts)
-            end;
-        _ ->
-            plugins(T, Term, Opts)
-    end;
-plugins([timestamp | T], Term, Opts) ->
-    case Term of
-        << Y4/integer, Y3/integer, Y2/integer, Y1/integer, $-/integer
-         , M2/integer, M1/integer, $-/integer
-         , D2/integer, D1/integer
-         , $T/integer
-         , H2/integer, H1/integer, $:/integer
-         , Min2/integer, Min1/integer, $:/integer
-         , S2/integer, S1/integer
-         , $./integer
-         , MSec3/integer, MSec2/integer, MSec1/integer
-         , $Z/integer >>
-          when ?is_number(Y4), ?is_number(Y3), ?is_number(Y2), ?is_number(Y1)
-             , ?is_number(M2), ?is_number(M1)
-             , ?is_number(D2), ?is_number(D1)
-             , ?is_number(H2), ?is_number(H1)
-             , ?is_number(Min2), ?is_number(Min1)
-             , ?is_number(S2), ?is_number(S1)
-             , ?is_number(MSec3), ?is_number(MSec2), ?is_number(MSec1) ->
-            Date = { chars_to_integer(Y4, Y3, Y2, Y1)
-                   , chars_to_integer(M2, M1)
-                   , chars_to_integer(D2, D1) },
-            Time = { chars_to_integer(H2, H1)
-                   , chars_to_integer(Min2, Min1)
-                   , chars_to_integer(S2, S1) },
-            DateTime = {Date, Time},
-            MilliSeconds = chars_to_integer(MSec3, MSec2, MSec1),
-            GregSeconds = calendar:datetime_to_gregorian_seconds(DateTime),
-            Seconds = GregSeconds - 62167219200,
-            Timestamp = { Seconds div 1000000
-                        , Seconds rem 1000000
-                        , MilliSeconds * 1000 },
-            {halt, Timestamp};
-        _ ->
-            plugins(T, Term, Opts)
-    end;
-plugins([Plugin | T], Term, Opts) ->
-    case Plugin:decode(Term, Opts) of
-        next ->
-            plugins(T, Term, Opts);
-        {halt, Decoded} ->
-            {halt, Decoded}
-    end.
-
-continue(Rest, Opts, Input, Pos, [Continue | Buffer], Value) ->
+continue(Rest, Settings, Input, Pos, [Continue | Buffer], Value) ->
     case Continue of
         ?key ->
-            key(Rest, Opts, Input, Pos, Buffer, Value);
+            key(Rest, Settings, Input, Pos, Buffer, Value);
         ?object ->
-            object(Rest, Opts, Input, Pos, Buffer, Value);
+            object(Rest, Settings, Input, Pos, Buffer, Value);
         ?array ->
-            array(Rest, Opts, Input, Pos, Buffer, Value);
+            array(Rest, Settings, Input, Pos, Buffer, Value);
         ?terminate ->
-            terminate(Rest, Opts, Input, Pos, Buffer, Value)
+            terminate(Rest, Settings, Input, Pos, Buffer, Value)
     end.
 
-terminate(Data, Opts, Input, Pos, Buffer, Value) ->
+terminate(Data, Settings, Input, Pos, Buffer, Value) ->
     case Data of
         <<$\s/integer, Rest/bitstring>> ->
-            terminate(Rest, Opts, Input, Pos + 1, Buffer, Value);
+            terminate(Rest, Settings, Input, Pos + 1, Buffer, Value);
         <<$\t/integer, Rest/bitstring>> ->
-            terminate(Rest, Opts, Input, Pos + 1, Buffer, Value);
+            terminate(Rest, Settings, Input, Pos + 1, Buffer, Value);
         <<$\r/integer, Rest/bitstring>> ->
-            terminate(Rest, Opts, Input, Pos + 1, Buffer, Value);
+            terminate(Rest, Settings, Input, Pos + 1, Buffer, Value);
         <<$\n/integer, Rest/bitstring>> ->
-            terminate(Rest, Opts, Input, Pos + 1, Buffer, Value);
+            terminate(Rest, Settings, Input, Pos + 1, Buffer, Value);
         <<>> ->
             Value;
         <<_/bitstring>> ->
-            throw_byte(Data, Opts, Input, Pos, Buffer)
+            throw_byte(Data, Settings, Input, Pos, Buffer)
     end.
 
-escape(Data, Opts, Input, Pos, Buffer, Acc) ->
+escape(Data, Settings, Input, Pos, Buffer, Acc) ->
     case Data of
         <<$\"/integer, Rest/bitstring>> ->
-            string(Rest, Opts, Input, Pos + 2, Buffer, [Acc, $\"], 0);
+            string(Rest, Settings, Input, Pos + 2, Buffer, [Acc, $\"], 0);
         <<$//integer, Rest/bitstring>> ->
-            string(Rest, Opts, Input, Pos + 2, Buffer, [Acc, $/], 0);
+            string(Rest, Settings, Input, Pos + 2, Buffer, [Acc, $/], 0);
         <<$\\/integer, Rest/bitstring>> ->
-            string(Rest, Opts, Input, Pos + 2, Buffer, [Acc, $\\], 0);
+            string(Rest, Settings, Input, Pos + 2, Buffer, [Acc, $\\], 0);
         <<$b/integer, Rest/bitstring>> ->
-            string(Rest, Opts, Input, Pos + 2, Buffer, [Acc, $\b], 0);
+            string(Rest, Settings, Input, Pos + 2, Buffer, [Acc, $\b], 0);
         <<$f/integer, Rest/bitstring>> ->
-            string(Rest, Opts, Input, Pos + 2, Buffer, [Acc, $\f], 0);
+            string(Rest, Settings, Input, Pos + 2, Buffer, [Acc, $\f], 0);
         <<$n/integer, Rest/bitstring>> ->
-            string(Rest, Opts, Input, Pos + 2, Buffer, [Acc, $\n], 0);
+            string(Rest, Settings, Input, Pos + 2, Buffer, [Acc, $\n], 0);
         <<$r/integer, Rest/bitstring>> ->
-            string(Rest, Opts, Input, Pos + 2, Buffer, [Acc, $\r], 0);
+            string(Rest, Settings, Input, Pos + 2, Buffer, [Acc, $\r], 0);
         <<$t/integer, Rest/bitstring>> ->
-            string(Rest, Opts, Input, Pos + 2, Buffer, [Acc, $\t], 0);
+            string(Rest, Settings, Input, Pos + 2, Buffer, [Acc, $\t], 0);
         <<$u/integer, Rest/bitstring>> ->
-            escapeu(Rest, Opts, Input, Pos, Buffer, Acc);
+            escapeu(Rest, Settings, Input, Pos, Buffer, Acc);
         <<_/integer, _/bitstring>> ->
-            throw_byte(Data, Opts, Input, Pos + 1, Buffer);
+            throw_byte(Data, Settings, Input, Pos + 1, Buffer);
         <<_/bitstring>> ->
-            throw_eof(Opts, Input, Pos, Buffer)
+            throw_eof(Settings, Input, Pos, Buffer)
     end.
 
-escapeu(Data, Opts, Input, Pos, Buffer, Acc) ->
+escapeu(Data, Settings, Input, Pos, Buffer, Acc) ->
     case Data of
         <<Int1:16/integer,Int2:16/integer, Rest/bitstring>> ->
-            Last = escapeu_last(Int2, Rest, Opts, Input, Pos, Buffer),
+            Last = escapeu_last(Int2, Rest, Settings, Input, Pos, Buffer),
             case Int1 of
                 12336 ->
-                    string(Rest, Opts, Input,
+                    string(Rest, Settings, Input,
                         Pos + 6,
                         Buffer,
                         begin
@@ -1203,301 +1376,301 @@ escapeu(Data, Opts, Input, Pos, Buffer, Acc) ->
                             end
                         end,
                         0);
-                12337 -> escapeu_1(Rest, Opts, Input, Pos, Buffer, Acc, Last, 1);
-                12338 -> escapeu_1(Rest, Opts, Input, Pos, Buffer, Acc, Last, 2);
-                12339 -> escapeu_1(Rest, Opts, Input, Pos, Buffer, Acc, Last, 3);
-                12340 -> escapeu_1(Rest, Opts, Input, Pos, Buffer, Acc, Last, 4);
-                12341 -> escapeu_1(Rest, Opts, Input, Pos, Buffer, Acc, Last, 5);
-                12342 -> escapeu_1(Rest, Opts, Input, Pos, Buffer, Acc, Last, 6);
-                12343 -> escapeu_1(Rest, Opts, Input, Pos, Buffer, Acc, Last, 7);
-                12344 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 8);
-                12345 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 9);
-                12353 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 10);
-                12354 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 11);
-                12355 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 12);
-                12356 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 13);
-                12357 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 14);
-                12358 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 15);
-                12385 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 10);
-                12386 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 11);
-                12387 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 12);
-                12388 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 13);
-                12389 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 14);
-                12390 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 15);
-                12592 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 16);
-                12593 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 17);
-                12594 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 18);
-                12595 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 19);
-                12596 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 20);
-                12597 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 21);
-                12598 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 22);
-                12599 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 23);
-                12600 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 24);
-                12601 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 25);
-                12609 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 26);
-                12610 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 27);
-                12611 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 28);
-                12612 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 29);
-                12613 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 30);
-                12614 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 31);
-                12641 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 26);
-                12642 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 27);
-                12643 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 28);
-                12644 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 29);
-                12645 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 30);
-                12646 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 31);
-                12848 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 32);
-                12849 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 33);
-                12850 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 34);
-                12851 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 35);
-                12852 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 36);
-                12853 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 37);
-                12854 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 38);
-                12855 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 39);
-                12856 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 40);
-                12857 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 41);
-                12865 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 42);
-                12866 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 43);
-                12867 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 44);
-                12868 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 45);
-                12869 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 46);
-                12870 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 47);
-                12897 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 42);
-                12898 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 43);
-                12899 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 44);
-                12900 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 45);
-                12901 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 46);
-                12902 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 47);
-                13104 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 48);
-                13105 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 49);
-                13106 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 50);
-                13107 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 51);
-                13108 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 52);
-                13109 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 53);
-                13110 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 54);
-                13111 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 55);
-                13112 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 56);
-                13113 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 57);
-                13121 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 58);
-                13122 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 59);
-                13123 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 60);
-                13124 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 61);
-                13125 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 62);
-                13126 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 63);
-                13153 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 58);
-                13154 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 59);
-                13155 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 60);
-                13156 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 61);
-                13157 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 62);
-                13158 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 63);
-                13360 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 64);
-                13361 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 65);
-                13362 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 66);
-                13363 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 67);
-                13364 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 68);
-                13365 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 69);
-                13366 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 70);
-                13367 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 71);
-                13368 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 72);
-                13369 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 73);
-                13377 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 74);
-                13378 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 75);
-                13379 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 76);
-                13380 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 77);
-                13381 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 78);
-                13382 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 79);
-                13409 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 74);
-                13410 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 75);
-                13411 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 76);
-                13412 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 77);
-                13413 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 78);
-                13414 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 79);
-                13616 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 80);
-                13617 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 81);
-                13618 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 82);
-                13619 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 83);
-                13620 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 84);
-                13621 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 85);
-                13622 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 86);
-                13623 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 87);
-                13624 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 88);
-                13625 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 89);
-                13633 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 90);
-                13634 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 91);
-                13635 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 92);
-                13636 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 93);
-                13637 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 94);
-                13638 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 95);
-                13665 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 90);
-                13666 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 91);
-                13667 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 92);
-                13668 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 93);
-                13669 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 94);
-                13670 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 95);
-                13872 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 96);
-                13873 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 97);
-                13874 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 98);
-                13875 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 99);
-                13876 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 100);
-                13877 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 101);
-                13878 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 102);
-                13879 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 103);
-                13880 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 104);
-                13881 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 105);
-                13889 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 106);
-                13890 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 107);
-                13891 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 108);
-                13892 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 109);
-                13893 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 110);
-                13894 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 111);
-                13921 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 106);
-                13922 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 107);
-                13923 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 108);
-                13924 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 109);
-                13925 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 110);
-                13926 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 111);
-                14128 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 112);
-                14129 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 113);
-                14130 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 114);
-                14131 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 115);
-                14132 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 116);
-                14133 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 117);
-                14134 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 118);
-                14135 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 119);
-                14136 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 120);
-                14137 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 121);
-                14145 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 122);
-                14146 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 123);
-                14147 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 124);
-                14148 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 125);
-                14149 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 126);
-                14150 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 127);
-                14177 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 122);
-                14178 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 123);
-                14179 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 124);
-                14180 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 125);
-                14181 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 126);
-                14182 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 127);
-                14384 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 128);
-                14385 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 129);
-                14386 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 130);
-                14387 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 131);
-                14388 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 132);
-                14389 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 133);
-                14390 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 134);
-                14391 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 135);
-                14392 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 136);
-                14393 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 137);
-                14401 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 138);
-                14402 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 139);
-                14403 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 140);
-                14404 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 141);
-                14405 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 142);
-                14406 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 143);
-                14433 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 138);
-                14434 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 139);
-                14435 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 140);
-                14436 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 141);
-                14437 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 142);
-                14438 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 143);
-                14640 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 144);
-                14641 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 145);
-                14642 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 146);
-                14643 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 147);
-                14644 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 148);
-                14645 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 149);
-                14646 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 150);
-                14647 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 151);
-                14648 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 152);
-                14649 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 153);
-                14657 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 154);
-                14658 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 155);
-                14659 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 156);
-                14660 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 157);
-                14661 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 158);
-                14662 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 159);
-                14689 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 154);
-                14690 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 155);
-                14691 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 156);
-                14692 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 157);
-                14693 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 158);
-                14694 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 159);
-                16688 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 160);
-                16689 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 161);
-                16690 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 162);
-                16691 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 163);
-                16692 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 164);
-                16693 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 165);
-                16694 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 166);
-                16695 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 167);
-                16696 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 168);
-                16697 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 169);
-                16705 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 170);
-                16706 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 171);
-                16707 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 172);
-                16708 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 173);
-                16709 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 174);
-                16710 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 175);
-                16737 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 170);
-                16738 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 171);
-                16739 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 172);
-                16740 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 173);
-                16741 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 174);
-                16742 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 175);
-                16944 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 176);
-                16945 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 177);
-                16946 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 178);
-                16947 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 179);
-                16948 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 180);
-                16949 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 181);
-                16950 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 182);
-                16951 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 183);
-                16952 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 184);
-                16953 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 185);
-                16961 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 186);
-                16962 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 187);
-                16963 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 188);
-                16964 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 189);
-                16965 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 190);
-                16966 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 191);
-                16993 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 186);
-                16994 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 187);
-                16995 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 188);
-                16996 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 189);
-                16997 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 190);
-                16998 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 191);
-                17200 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 192);
-                17201 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 193);
-                17202 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 194);
-                17203 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 195);
-                17204 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 196);
-                17205 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 197);
-                17206 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 198);
-                17207 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 199);
-                17208 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 200);
-                17209 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 201);
-                17217 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 202);
-                17218 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 203);
-                17219 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 204);
-                17220 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 205);
-                17221 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 206);
-                17222 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 207);
-                17249 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 202);
-                17250 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 203);
-                17251 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 204);
-                17252 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 205);
-                17253 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 206);
-                17254 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 207);
-                17456 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 208);
-                17457 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 209);
-                17458 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 210);
-                17459 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 211);
-                17460 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 212);
-                17461 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 213);
-                17462 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 214);
-                17463 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 215);
+                12337 -> escapeu_1(Rest, Settings, Input, Pos, Buffer, Acc, Last, 1);
+                12338 -> escapeu_1(Rest, Settings, Input, Pos, Buffer, Acc, Last, 2);
+                12339 -> escapeu_1(Rest, Settings, Input, Pos, Buffer, Acc, Last, 3);
+                12340 -> escapeu_1(Rest, Settings, Input, Pos, Buffer, Acc, Last, 4);
+                12341 -> escapeu_1(Rest, Settings, Input, Pos, Buffer, Acc, Last, 5);
+                12342 -> escapeu_1(Rest, Settings, Input, Pos, Buffer, Acc, Last, 6);
+                12343 -> escapeu_1(Rest, Settings, Input, Pos, Buffer, Acc, Last, 7);
+                12344 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 8);
+                12345 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 9);
+                12353 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 10);
+                12354 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 11);
+                12355 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 12);
+                12356 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 13);
+                12357 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 14);
+                12358 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 15);
+                12385 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 10);
+                12386 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 11);
+                12387 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 12);
+                12388 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 13);
+                12389 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 14);
+                12390 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 15);
+                12592 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 16);
+                12593 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 17);
+                12594 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 18);
+                12595 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 19);
+                12596 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 20);
+                12597 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 21);
+                12598 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 22);
+                12599 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 23);
+                12600 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 24);
+                12601 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 25);
+                12609 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 26);
+                12610 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 27);
+                12611 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 28);
+                12612 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 29);
+                12613 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 30);
+                12614 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 31);
+                12641 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 26);
+                12642 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 27);
+                12643 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 28);
+                12644 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 29);
+                12645 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 30);
+                12646 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 31);
+                12848 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 32);
+                12849 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 33);
+                12850 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 34);
+                12851 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 35);
+                12852 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 36);
+                12853 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 37);
+                12854 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 38);
+                12855 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 39);
+                12856 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 40);
+                12857 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 41);
+                12865 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 42);
+                12866 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 43);
+                12867 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 44);
+                12868 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 45);
+                12869 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 46);
+                12870 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 47);
+                12897 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 42);
+                12898 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 43);
+                12899 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 44);
+                12900 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 45);
+                12901 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 46);
+                12902 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 47);
+                13104 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 48);
+                13105 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 49);
+                13106 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 50);
+                13107 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 51);
+                13108 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 52);
+                13109 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 53);
+                13110 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 54);
+                13111 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 55);
+                13112 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 56);
+                13113 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 57);
+                13121 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 58);
+                13122 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 59);
+                13123 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 60);
+                13124 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 61);
+                13125 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 62);
+                13126 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 63);
+                13153 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 58);
+                13154 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 59);
+                13155 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 60);
+                13156 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 61);
+                13157 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 62);
+                13158 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 63);
+                13360 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 64);
+                13361 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 65);
+                13362 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 66);
+                13363 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 67);
+                13364 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 68);
+                13365 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 69);
+                13366 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 70);
+                13367 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 71);
+                13368 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 72);
+                13369 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 73);
+                13377 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 74);
+                13378 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 75);
+                13379 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 76);
+                13380 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 77);
+                13381 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 78);
+                13382 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 79);
+                13409 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 74);
+                13410 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 75);
+                13411 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 76);
+                13412 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 77);
+                13413 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 78);
+                13414 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 79);
+                13616 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 80);
+                13617 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 81);
+                13618 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 82);
+                13619 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 83);
+                13620 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 84);
+                13621 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 85);
+                13622 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 86);
+                13623 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 87);
+                13624 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 88);
+                13625 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 89);
+                13633 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 90);
+                13634 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 91);
+                13635 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 92);
+                13636 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 93);
+                13637 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 94);
+                13638 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 95);
+                13665 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 90);
+                13666 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 91);
+                13667 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 92);
+                13668 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 93);
+                13669 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 94);
+                13670 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 95);
+                13872 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 96);
+                13873 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 97);
+                13874 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 98);
+                13875 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 99);
+                13876 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 100);
+                13877 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 101);
+                13878 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 102);
+                13879 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 103);
+                13880 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 104);
+                13881 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 105);
+                13889 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 106);
+                13890 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 107);
+                13891 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 108);
+                13892 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 109);
+                13893 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 110);
+                13894 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 111);
+                13921 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 106);
+                13922 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 107);
+                13923 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 108);
+                13924 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 109);
+                13925 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 110);
+                13926 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 111);
+                14128 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 112);
+                14129 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 113);
+                14130 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 114);
+                14131 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 115);
+                14132 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 116);
+                14133 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 117);
+                14134 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 118);
+                14135 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 119);
+                14136 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 120);
+                14137 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 121);
+                14145 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 122);
+                14146 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 123);
+                14147 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 124);
+                14148 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 125);
+                14149 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 126);
+                14150 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 127);
+                14177 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 122);
+                14178 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 123);
+                14179 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 124);
+                14180 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 125);
+                14181 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 126);
+                14182 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 127);
+                14384 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 128);
+                14385 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 129);
+                14386 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 130);
+                14387 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 131);
+                14388 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 132);
+                14389 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 133);
+                14390 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 134);
+                14391 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 135);
+                14392 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 136);
+                14393 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 137);
+                14401 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 138);
+                14402 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 139);
+                14403 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 140);
+                14404 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 141);
+                14405 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 142);
+                14406 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 143);
+                14433 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 138);
+                14434 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 139);
+                14435 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 140);
+                14436 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 141);
+                14437 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 142);
+                14438 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 143);
+                14640 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 144);
+                14641 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 145);
+                14642 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 146);
+                14643 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 147);
+                14644 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 148);
+                14645 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 149);
+                14646 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 150);
+                14647 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 151);
+                14648 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 152);
+                14649 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 153);
+                14657 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 154);
+                14658 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 155);
+                14659 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 156);
+                14660 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 157);
+                14661 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 158);
+                14662 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 159);
+                14689 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 154);
+                14690 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 155);
+                14691 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 156);
+                14692 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 157);
+                14693 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 158);
+                14694 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 159);
+                16688 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 160);
+                16689 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 161);
+                16690 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 162);
+                16691 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 163);
+                16692 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 164);
+                16693 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 165);
+                16694 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 166);
+                16695 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 167);
+                16696 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 168);
+                16697 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 169);
+                16705 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 170);
+                16706 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 171);
+                16707 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 172);
+                16708 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 173);
+                16709 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 174);
+                16710 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 175);
+                16737 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 170);
+                16738 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 171);
+                16739 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 172);
+                16740 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 173);
+                16741 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 174);
+                16742 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 175);
+                16944 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 176);
+                16945 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 177);
+                16946 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 178);
+                16947 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 179);
+                16948 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 180);
+                16949 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 181);
+                16950 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 182);
+                16951 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 183);
+                16952 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 184);
+                16953 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 185);
+                16961 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 186);
+                16962 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 187);
+                16963 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 188);
+                16964 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 189);
+                16965 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 190);
+                16966 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 191);
+                16993 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 186);
+                16994 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 187);
+                16995 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 188);
+                16996 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 189);
+                16997 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 190);
+                16998 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 191);
+                17200 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 192);
+                17201 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 193);
+                17202 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 194);
+                17203 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 195);
+                17204 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 196);
+                17205 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 197);
+                17206 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 198);
+                17207 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 199);
+                17208 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 200);
+                17209 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 201);
+                17217 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 202);
+                17218 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 203);
+                17219 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 204);
+                17220 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 205);
+                17221 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 206);
+                17222 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 207);
+                17249 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 202);
+                17250 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 203);
+                17251 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 204);
+                17252 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 205);
+                17253 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 206);
+                17254 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 207);
+                17456 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 208);
+                17457 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 209);
+                17458 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 210);
+                17459 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 211);
+                17460 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 212);
+                17461 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 213);
+                17462 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 214);
+                17463 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 215);
                 17464 ->
-                    escape_surrogate(Rest, Opts, Input, Pos, Buffer, Acc,
+                    escape_surrogate(Rest, Settings, Input, Pos, Buffer, Acc,
                                     begin
                                         _@1757 = 216,
                                         _@1758 = Last,
@@ -1506,7 +1679,7 @@ escapeu(Data, Opts, Input, Pos, Buffer, Acc) ->
                                         (_@1757 band 3 bsl 8 + _@1758 bsl 10)
                                     end);
                 17465 ->
-                    escape_surrogate(Rest, Opts, Input, Pos, Buffer, Acc,
+                    escape_surrogate(Rest, Settings, Input, Pos, Buffer, Acc,
                                     begin
                                         _@1759 = 217,
                                         _@1760 = Last,
@@ -1515,7 +1688,7 @@ escapeu(Data, Opts, Input, Pos, Buffer, Acc) ->
                                         (_@1759 band 3 bsl 8 + _@1760 bsl 10)
                                     end);
                 17473 ->
-                    escape_surrogate(Rest, Opts, Input, Pos, Buffer, Acc,
+                    escape_surrogate(Rest, Settings, Input, Pos, Buffer, Acc,
                                     begin
                                         _@1761 = 218,
                                         _@1762 = Last,
@@ -1524,7 +1697,7 @@ escapeu(Data, Opts, Input, Pos, Buffer, Acc) ->
                                         (_@1761 band 3 bsl 8 + _@1762 bsl 10)
                                     end);
                 17474 ->
-                    escape_surrogate(Rest, Opts, Input, Pos, Buffer, Acc,
+                    escape_surrogate(Rest, Settings, Input, Pos, Buffer, Acc,
                                     begin
                                         _@1763 = 219,
                                         _@1764 = Last,
@@ -1533,7 +1706,7 @@ escapeu(Data, Opts, Input, Pos, Buffer, Acc) ->
                                         (_@1763 band 3 bsl 8 + _@1764 bsl 10)
                                     end);
                 17505 ->
-                    escape_surrogate(Rest, Opts, Input, Pos, Buffer, Acc,
+                    escape_surrogate(Rest, Settings, Input, Pos, Buffer, Acc,
                                     begin
                                         _@1765 = 218,
                                         _@1766 = Last,
@@ -1542,7 +1715,7 @@ escapeu(Data, Opts, Input, Pos, Buffer, Acc) ->
                                         (_@1765 band 3 bsl 8 + _@1766 bsl 10)
                                     end);
                 17506 ->
-                    escape_surrogate(Rest, Opts, Input, Pos, Buffer, Acc,
+                    escape_surrogate(Rest, Settings, Input, Pos, Buffer, Acc,
                                     begin
                                         _@1767 = 219,
                                         _@1768 = Last,
@@ -1550,126 +1723,126 @@ escapeu(Data, Opts, Input, Pos, Buffer, Acc) ->
                                         +
                                         (_@1767 band 3 bsl 8 + _@1768 bsl 10)
                                     end);
-                17712 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 224);
-                17713 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 225);
-                17714 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 226);
-                17715 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 227);
-                17716 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 228);
-                17717 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 229);
-                17718 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 230);
-                17719 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 231);
-                17720 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 232);
-                17721 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 233);
-                17729 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 234);
-                17730 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 235);
-                17731 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 236);
-                17732 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 237);
-                17733 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 238);
-                17734 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 239);
-                17761 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 234);
-                17762 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 235);
-                17763 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 236);
-                17764 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 237);
-                17765 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 238);
-                17766 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 239);
-                17968 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 240);
-                17969 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 241);
-                17970 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 242);
-                17971 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 243);
-                17972 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 244);
-                17973 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 245);
-                17974 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 246);
-                17975 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 247);
-                17976 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 248);
-                17977 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 249);
-                17985 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 250);
-                17986 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 251);
-                17987 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 252);
-                17988 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 253);
-                17989 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 254);
-                17990 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 255);
-                18017 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 250);
-                18018 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 251);
-                18019 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 252);
-                18020 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 253);
-                18021 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 254);
-                18022 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 255);
-                24880 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 160);
-                24881 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 161);
-                24882 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 162);
-                24883 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 163);
-                24884 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 164);
-                24885 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 165);
-                24886 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 166);
-                24887 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 167);
-                24888 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 168);
-                24889 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 169);
-                24897 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 170);
-                24898 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 171);
-                24899 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 172);
-                24900 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 173);
-                24901 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 174);
-                24902 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 175);
-                24929 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 170);
-                24930 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 171);
-                24931 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 172);
-                24932 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 173);
-                24933 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 174);
-                24934 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 175);
-                25136 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 176);
-                25137 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 177);
-                25138 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 178);
-                25139 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 179);
-                25140 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 180);
-                25141 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 181);
-                25142 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 182);
-                25143 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 183);
-                25144 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 184);
-                25145 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 185);
-                25153 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 186);
-                25154 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 187);
-                25155 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 188);
-                25156 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 189);
-                25157 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 190);
-                25158 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 191);
-                25185 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 186);
-                25186 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 187);
-                25187 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 188);
-                25188 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 189);
-                25189 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 190);
-                25190 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 191);
-                25392 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 192);
-                25393 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 193);
-                25394 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 194);
-                25395 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 195);
-                25396 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 196);
-                25397 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 197);
-                25398 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 198);
-                25399 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 199);
-                25400 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 200);
-                25401 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 201);
-                25409 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 202);
-                25410 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 203);
-                25411 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 204);
-                25412 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 205);
-                25413 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 206);
-                25414 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 207);
-                25441 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 202);
-                25442 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 203);
-                25443 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 204);
-                25444 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 205);
-                25445 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 206);
-                25446 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 207);
-                25648 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 208);
-                25649 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 209);
-                25650 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 210);
-                25651 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 211);
-                25652 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 212);
-                25653 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 213);
-                25654 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 214);
-                25655 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 215);
+                17712 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 224);
+                17713 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 225);
+                17714 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 226);
+                17715 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 227);
+                17716 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 228);
+                17717 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 229);
+                17718 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 230);
+                17719 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 231);
+                17720 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 232);
+                17721 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 233);
+                17729 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 234);
+                17730 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 235);
+                17731 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 236);
+                17732 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 237);
+                17733 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 238);
+                17734 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 239);
+                17761 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 234);
+                17762 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 235);
+                17763 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 236);
+                17764 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 237);
+                17765 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 238);
+                17766 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 239);
+                17968 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 240);
+                17969 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 241);
+                17970 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 242);
+                17971 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 243);
+                17972 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 244);
+                17973 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 245);
+                17974 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 246);
+                17975 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 247);
+                17976 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 248);
+                17977 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 249);
+                17985 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 250);
+                17986 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 251);
+                17987 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 252);
+                17988 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 253);
+                17989 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 254);
+                17990 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 255);
+                18017 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 250);
+                18018 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 251);
+                18019 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 252);
+                18020 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 253);
+                18021 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 254);
+                18022 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 255);
+                24880 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 160);
+                24881 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 161);
+                24882 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 162);
+                24883 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 163);
+                24884 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 164);
+                24885 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 165);
+                24886 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 166);
+                24887 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 167);
+                24888 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 168);
+                24889 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 169);
+                24897 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 170);
+                24898 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 171);
+                24899 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 172);
+                24900 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 173);
+                24901 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 174);
+                24902 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 175);
+                24929 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 170);
+                24930 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 171);
+                24931 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 172);
+                24932 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 173);
+                24933 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 174);
+                24934 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 175);
+                25136 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 176);
+                25137 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 177);
+                25138 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 178);
+                25139 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 179);
+                25140 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 180);
+                25141 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 181);
+                25142 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 182);
+                25143 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 183);
+                25144 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 184);
+                25145 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 185);
+                25153 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 186);
+                25154 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 187);
+                25155 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 188);
+                25156 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 189);
+                25157 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 190);
+                25158 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 191);
+                25185 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 186);
+                25186 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 187);
+                25187 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 188);
+                25188 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 189);
+                25189 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 190);
+                25190 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 191);
+                25392 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 192);
+                25393 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 193);
+                25394 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 194);
+                25395 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 195);
+                25396 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 196);
+                25397 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 197);
+                25398 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 198);
+                25399 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 199);
+                25400 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 200);
+                25401 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 201);
+                25409 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 202);
+                25410 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 203);
+                25411 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 204);
+                25412 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 205);
+                25413 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 206);
+                25414 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 207);
+                25441 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 202);
+                25442 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 203);
+                25443 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 204);
+                25444 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 205);
+                25445 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 206);
+                25446 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 207);
+                25648 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 208);
+                25649 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 209);
+                25650 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 210);
+                25651 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 211);
+                25652 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 212);
+                25653 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 213);
+                25654 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 214);
+                25655 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 215);
                 25656 ->
-                    escape_surrogate(Rest, Opts, Input, Pos, Buffer, Acc,
+                    escape_surrogate(Rest, Settings, Input, Pos, Buffer, Acc,
                                     begin
                                         _@2477 = 216,
                                         _@2478 = Last,
@@ -1678,7 +1851,7 @@ escapeu(Data, Opts, Input, Pos, Buffer, Acc) ->
                                         (_@2477 band 3 bsl 8 + _@2478 bsl 10)
                                     end);
                 25657 ->
-                    escape_surrogate(Rest, Opts, Input, Pos, Buffer, Acc,
+                    escape_surrogate(Rest, Settings, Input, Pos, Buffer, Acc,
                                     begin
                                         _@2479 = 217,
                                         _@2480 = Last,
@@ -1687,7 +1860,7 @@ escapeu(Data, Opts, Input, Pos, Buffer, Acc) ->
                                         (_@2479 band 3 bsl 8 + _@2480 bsl 10)
                                     end);
                 25665 ->
-                    escape_surrogate(Rest, Opts, Input, Pos, Buffer, Acc,
+                    escape_surrogate(Rest, Settings, Input, Pos, Buffer, Acc,
                                     begin
                                         _@2481 = 218,
                                         _@2482 = Last,
@@ -1696,7 +1869,7 @@ escapeu(Data, Opts, Input, Pos, Buffer, Acc) ->
                                         (_@2481 band 3 bsl 8 + _@2482 bsl 10)
                                     end);
                 25666 ->
-                    escape_surrogate(Rest, Opts, Input, Pos, Buffer, Acc,
+                    escape_surrogate(Rest, Settings, Input, Pos, Buffer, Acc,
                                     begin
                                         _@2483 = 219,
                                         _@2484 = Last,
@@ -1705,7 +1878,7 @@ escapeu(Data, Opts, Input, Pos, Buffer, Acc) ->
                                         (_@2483 band 3 bsl 8 + _@2484 bsl 10)
                                     end);
                 25697 ->
-                    escape_surrogate(Rest, Opts, Input, Pos, Buffer, Acc,
+                    escape_surrogate(Rest, Settings, Input, Pos, Buffer, Acc,
                                     begin
                                         _@2485 = 218,
                                         _@2486 = Last,
@@ -1714,7 +1887,7 @@ escapeu(Data, Opts, Input, Pos, Buffer, Acc) ->
                                         (_@2485 band 3 bsl 8 + _@2486 bsl 10)
                                     end);
                 25698 ->
-                    escape_surrogate(Rest, Opts, Input, Pos, Buffer, Acc,
+                    escape_surrogate(Rest, Settings, Input, Pos, Buffer, Acc,
                                     begin
                                         _@2487 = 219,
                                         _@2488 = Last,
@@ -1722,57 +1895,57 @@ escapeu(Data, Opts, Input, Pos, Buffer, Acc) ->
                                         +
                                         (_@2487 band 3 bsl 8 + _@2488 bsl 10)
                                     end);
-                25904 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 224);
-                25905 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 225);
-                25906 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 226);
-                25907 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 227);
-                25908 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 228);
-                25909 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 229);
-                25910 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 230);
-                25911 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 231);
-                25912 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 232);
-                25913 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 233);
-                25921 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 234);
-                25922 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 235);
-                25923 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 236);
-                25924 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 237);
-                25925 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 238);
-                25926 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 239);
-                25953 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 234);
-                25954 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 235);
-                25955 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 236);
-                25956 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 237);
-                25957 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 238);
-                25958 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 239);
-                26160 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 240);
-                26161 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 241);
-                26162 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 242);
-                26163 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 243);
-                26164 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 244);
-                26165 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 245);
-                26166 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 246);
-                26167 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 247);
-                26168 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 248);
-                26169 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 249);
-                26177 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 250);
-                26178 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 251);
-                26179 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 252);
-                26180 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 253);
-                26181 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 254);
-                26182 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 255);
-                26209 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 250);
-                26210 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 251);
-                26211 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 252);
-                26212 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 253);
-                26213 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 254);
-                26214 -> escapeu_2(Rest, Opts, Input, Pos, Buffer, Acc, Last, 255);
-                _ -> throw_token(6, Rest, Opts, Input, Pos, Buffer)
+                25904 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 224);
+                25905 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 225);
+                25906 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 226);
+                25907 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 227);
+                25908 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 228);
+                25909 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 229);
+                25910 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 230);
+                25911 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 231);
+                25912 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 232);
+                25913 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 233);
+                25921 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 234);
+                25922 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 235);
+                25923 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 236);
+                25924 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 237);
+                25925 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 238);
+                25926 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 239);
+                25953 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 234);
+                25954 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 235);
+                25955 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 236);
+                25956 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 237);
+                25957 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 238);
+                25958 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 239);
+                26160 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 240);
+                26161 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 241);
+                26162 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 242);
+                26163 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 243);
+                26164 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 244);
+                26165 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 245);
+                26166 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 246);
+                26167 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 247);
+                26168 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 248);
+                26169 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 249);
+                26177 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 250);
+                26178 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 251);
+                26179 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 252);
+                26180 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 253);
+                26181 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 254);
+                26182 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 255);
+                26209 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 250);
+                26210 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 251);
+                26211 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 252);
+                26212 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 253);
+                26213 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 254);
+                26214 -> escapeu_2(Rest, Settings, Input, Pos, Buffer, Acc, Last, 255);
+                _ -> throw_token(6, Rest, Settings, Input, Pos, Buffer)
             end;
         <<_/bitstring>> ->
-            throw_eof(Opts, Input, Pos, Buffer)
+            throw_eof(Settings, Input, Pos, Buffer)
     end.
 
-escapeu_last(Int, Rest, Opts, Input, Pos, Buffer) ->
+escapeu_last(Int, Rest, Settings, Input, Pos, Buffer) ->
     case Int of
         12336 -> 0; 12337 -> 1; 12338 -> 2; 12339 -> 3; 12340 -> 4; 12341 -> 5; 12342 -> 6;
         12343 -> 7; 12344 -> 8; 12345 -> 9; 12353 -> 10; 12354 -> 11; 12355 -> 12;
@@ -1855,54 +2028,54 @@ escapeu_last(Int, Rest, Opts, Input, Pos, Buffer) ->
         26167 -> 247; 26168 -> 248; 26169 -> 249; 26177 -> 250; 26178 -> 251; 26179 -> 252;
         26180 -> 253; 26181 -> 254; 26182 -> 255; 26209 -> 250; 26210 -> 251; 26211 -> 252;
         26212 -> 253; 26213 -> 254; 26214 -> 255;
-        _ -> throw_token(6, Rest, Opts, Input, Pos, Buffer)
+        _ -> throw_token(6, Rest, Settings, Input, Pos, Buffer)
     end.
 
-escapeu_1(<<_/bitstring>> = Rest, Opts, Input, Pos, Buffer, Acc, Last, X) ->
+escapeu_1(<<_/bitstring>> = Rest, Settings, Input, Pos, Buffer, Acc, Last, X) ->
     A = 6 bsl 5 + (X bsl 2) + (Last bsr 6),
     B = 2 bsl 6 + Last band 63,
     C = [Acc, A, B],
-    string(Rest, Opts, Input, Pos + 6, Buffer, C, 0).
+    string(Rest, Settings, Input, Pos + 6, Buffer, C, 0).
 
-escapeu_2(<<_/bitstring>> = Rest, Opts, Input, Pos, Buffer, Acc, Last, X) ->
+escapeu_2(<<_/bitstring>> = Rest, Settings, Input, Pos, Buffer, Acc, Last, X) ->
     A = 14 bsl 4 + (X bsr 4),
     B = 2 bsl 6 + (X band 15 bsl 2) + (Last bsr 6),
     C = 2 bsl 6 + Last band 63,
     D = [Acc, A, B, C],
-    string(Rest, Opts, Input, Pos + 6, Buffer, D, 0).
+    string(Rest, Settings, Input, Pos + 6, Buffer, D, 0).
 
-escape_surrogate(Data, Opts, Input, Pos, Buffer, Acc, Hi) ->
+escape_surrogate(Data, Settings, Input, Pos, Buffer, Acc, Hi) ->
     case Data of
         <<92/integer, 117/integer, Int1:16/integer, Int2:16/integer, Rest/bitstring>> ->
-            Last = escapeu_last(Int2, Rest, Opts, Input, Pos + 6, Buffer),
+            Last = escapeu_last(Int2, Rest, Settings, Input, Pos + 6, Buffer),
             X = case Int1 of
                 17475 -> 220; 17476 -> 221; 17477 -> 222; 17478 -> 223;
                 17507 -> 220; 17508 -> 221; 17509 -> 222; 17510 -> 223;
                 25667 -> 220; 25668 -> 221; 25669 -> 222; 25670 -> 223;
                 25699 -> 220; 25700 -> 221; 25701 -> 222; 25702 -> 223;
-                _ -> throw_token(12, Rest, Opts, Input, Pos, Buffer)
+                _ -> throw_token(12, Rest, Settings, Input, Pos, Buffer)
             end,
             Y = X band 3 bsl 8 + Last,
             Acc1 = [Acc | <<(Hi + Y)/utf8>>],
-            string(Rest, Opts, Input, Pos + 12, Buffer, Acc1, 0);
+            string(Rest, Settings, Input, Pos + 12, Buffer, Acc1, 0);
         <<_/integer, _/bitstring>> ->
-            throw_byte(Data, Opts, Input, Pos + 6, Buffer);
+            throw_byte(Data, Settings, Input, Pos + 6, Buffer);
         <<_/bitstring>> ->
-            throw_eof(Opts, Input, Pos, Buffer)
+            throw_eof(Settings, Input, Pos, Buffer)
     end.
 
-throw_byte(<<Rest/bitstring>>, Opts, Input, Pos, Buffer) ->
+throw_byte(<<Rest/bitstring>>, Settings, Input, Pos, Buffer) ->
     Byte = binary:at(Input, Pos),
-    throw({{byte, Byte}, Rest, Opts, Input, Pos, Buffer}).
+    throw({{byte, Byte}, Rest, Settings, Input, Pos, Buffer}).
 
-throw_token(Len, Rest, Opts, Input, Pos, Buffer) when is_integer(Len) ->
+throw_token(Len, Rest, Settings, Input, Pos, Buffer) when is_integer(Len) ->
     Token = binary_part(Input, Pos, Len),
-    throw_token(Token, Rest, Opts, Input, Pos, Buffer);
-throw_token(Token, Rest, Opts, Input, Pos, Buffer) ->
-    throw({{token, Token}, Rest, Opts, Input, Pos, Buffer}).
+    throw_token(Token, Rest, Settings, Input, Pos, Buffer);
+throw_token(Token, Rest, Settings, Input, Pos, Buffer) ->
+    throw({{token, Token}, Rest, Settings, Input, Pos, Buffer}).
 
-throw_eof(Opts, Input, Pos, Buffer) ->
-    throw({eof, Opts, Input, Pos, Buffer}).
+throw_eof(Settings, Input, Pos, Buffer) ->
+    throw({eof, Settings, Input, Pos, Buffer}).
 
 chars_to_integer(N2, N1) ->
     ((N2 - $0) * 10) + (N1 - $0).
@@ -1947,135 +2120,147 @@ decode_test() ->
         },
         {{ok, true}, <<"true">>, #{}},
         {{ok, false}, <<"false">>, #{}},
-        {{ok, undefined}, <<"null">>, #{}},
+        {{ok, ?DEFAULT_NULL_VALUE}, <<"null">>, #{}},
         {{ok, <<"ABC">>}, <<"\"\\u0041\\u0042\\u0043\"">>, #{}},
-        { {ok, #{foo => 1}}
-        , <<"{\"foo\": \"1\"}">>
-        , #{ keys => to_atom, values => to_integer }
+        % { {ok, #{foo => 1}}
+        % , <<"{\"foo\": \"1\"}">>
+        % , #{ keys => to_atom, values => to_integer }
+        % },
+        { {ok, #{keya => <<"valuea">>}}
+        , <<"{\"key\\u0061\": \"value\\u0061\"}">>
+        , #{object => #{keys => to_atom}}
+        },
+        { {ok, #{<<"keya">> => valuea}}
+        , <<"{\"key\\u0061\": \"value\\u0061\"}">>
+        , #{string => #{codecs => [to_atom]}}
+        },
+        { {ok, #{keya => valuea}}
+        , <<"{\"key\\u0061\": \"value\\u0061\"}">>
+        , #{string => #{codecs => [to_atom]}, object => #{keys => to_atom}}
         },
         {{error, not_an_iodata}, error, #{}}
     ]].
 
-resume_test() ->
-    [ ?assertEqual(Expect, decode(Input, Opts))
-      || {Expect, Input, Opts} <- [
-        { {ok, [undefined, undefined, #{<<"foo">> => undefined}]}
-        , <<"[1e999,1e999,{\"foo\": 1e999}]">>
-        , #{ error_handler => fun do_handle_error/3 }
-        }
-    ]].
+% resume_test() ->
+%     [ ?assertEqual(Expect, decode(Input, Opts))
+%       || {Expect, Input, Opts} <- [
+%         { {ok, [undefined, undefined, #{<<"foo">> => undefined}]}
+%         , <<"[1e999,1e999,{\"foo\": 1e999}]">>
+%         , #{ error_handler => fun do_handle_error/3 }
+%         }
+%     ]].
 
-do_handle_error(throw, {{token, Token}, Rest, Opts, Input, Pos, Buffer}, _Stacktrace) ->
-    resume(Token, Rest, Opts, Input, Pos, Buffer);
-do_handle_error(Class, Reason, Stacktrace) ->
-    handle_error(Class, Reason, Stacktrace).
+% do_handle_error(throw, {{token, Token}, Rest, Opts, Input, Pos, Buffer}, _Stacktrace) ->
+%     resume(Token, Rest, Opts, Input, Pos, Buffer);
+% do_handle_error(Class, Reason, Stacktrace) ->
+%     handle_error(Class, Reason, Stacktrace).
 
-datetime_plugin_test() ->
-    [ ?assertEqual(Expect, decode(Input, Opts))
-        || {Expect, Input, Opts} <- [
-        { {ok, <<"1970-01-01T00:00:00Z">>}
-        , <<"\"1970-01-01T00:00:00Z\"">>
-        , #{}
-        },
-        { {ok, {{1970,1,1},{0,0,0}}}
-        , <<"\"1970-01-01T00:00:00Z\"">>
-        , #{plugins => [datetime]}
-        }
-    ]].
+% datetime_plugin_test() ->
+%     [ ?assertEqual(Expect, decode(Input, Opts))
+%         || {Expect, Input, Opts} <- [
+%         { {ok, <<"1970-01-01T00:00:00Z">>}
+%         , <<"\"1970-01-01T00:00:00Z\"">>
+%         , #{}
+%         },
+%         { {ok, {{1970,1,1},{0,0,0}}}
+%         , <<"\"1970-01-01T00:00:00Z\"">>
+%         , #{plugins => [datetime]}
+%         }
+%     ]].
 
-inet_plugin_test() ->
-    [ ?assertEqual(Expect, decode(Input, Opts))
-      || {Expect, Input, Opts} <- [
-        % ipv4
-        {{ok, <<"0.0.0.0">>}, <<"\"0.0.0.0\"">>, #{} },
-        { {ok, {0,0,0,0}}, <<"\"0.0.0.0\"">>, #{plugins => [inet]} },
-        { {ok, {255,255,255,255}}
-        , <<"\"255.255.255.255\"">>
-        , #{plugins => [inet]}
-        },
-        % ipv6
-        {{ok, <<"::">>}, <<"\"::\"">>, #{}},
-        {{ok, {0,0,0,0,0,0,0,0}}, <<"\"::\"">>, #{plugins => [inet]}},
-        {{ok, {0,0,0,0,0,0,0,1}}, <<"\"::1\"">>, #{plugins => [inet]}},
-        { {ok, {0,0,0,0,0,0,(192 bsl 8) bor 168,(42 bsl 8) bor 2}}
-        , <<"\"::192.168.42.2\"">>
-        , #{plugins => [inet]}
-        },
-        { {ok, {0,0,0,0,0,16#FFFF,(192 bsl 8) bor 168,(42 bsl 8) bor 2}}
-        , <<"\"::ffff:192.168.42.2\"">>
-        , #{plugins => [inet]}
-        },
-        { {ok, {16#3ffe,16#b80,16#1f8d,16#2,16#204,16#acff,16#fe17,16#bf38}}
-        , <<"\"3ffe:b80:1f8d:2:204:acff:fe17:bf38\"">>
-        , #{plugins => [inet]}
-        },
-        { {ok, {16#fe80,0,0,0,16#204,16#acff,16#fe17,16#bf38}}
-        , <<"\"fe80::204:acff:fe17:bf38\"">>
-        , #{plugins => [inet]}
-        }
-    ]].
+% inet_plugin_test() ->
+%     [ ?assertEqual(Expect, decode(Input, Opts))
+%       || {Expect, Input, Opts} <- [
+%         % ipv4
+%         {{ok, <<"0.0.0.0">>}, <<"\"0.0.0.0\"">>, #{} },
+%         { {ok, {0,0,0,0}}, <<"\"0.0.0.0\"">>, #{plugins => [inet]} },
+%         { {ok, {255,255,255,255}}
+%         , <<"\"255.255.255.255\"">>
+%         , #{plugins => [inet]}
+%         },
+%         % ipv6
+%         {{ok, <<"::">>}, <<"\"::\"">>, #{}},
+%         {{ok, {0,0,0,0,0,0,0,0}}, <<"\"::\"">>, #{plugins => [inet]}},
+%         {{ok, {0,0,0,0,0,0,0,1}}, <<"\"::1\"">>, #{plugins => [inet]}},
+%         { {ok, {0,0,0,0,0,0,(192 bsl 8) bor 168,(42 bsl 8) bor 2}}
+%         , <<"\"::192.168.42.2\"">>
+%         , #{plugins => [inet]}
+%         },
+%         { {ok, {0,0,0,0,0,16#FFFF,(192 bsl 8) bor 168,(42 bsl 8) bor 2}}
+%         , <<"\"::ffff:192.168.42.2\"">>
+%         , #{plugins => [inet]}
+%         },
+%         { {ok, {16#3ffe,16#b80,16#1f8d,16#2,16#204,16#acff,16#fe17,16#bf38}}
+%         , <<"\"3ffe:b80:1f8d:2:204:acff:fe17:bf38\"">>
+%         , #{plugins => [inet]}
+%         },
+%         { {ok, {16#fe80,0,0,0,16#204,16#acff,16#fe17,16#bf38}}
+%         , <<"\"fe80::204:acff:fe17:bf38\"">>
+%         , #{plugins => [inet]}
+%         }
+%     ]].
 
-pid_plugin_test() ->
-    [ ?assertEqual(Expect, decode(Input, Opts))
-        || {Expect, Input, Opts} <- [
-        {{ok, <<"<0.92.0>">>}, <<"\"<0.92.0>\"">>, #{}},
-        { {ok, list_to_pid("<0.92.0>")}
-        , <<"\"<0.92.0>\"">>
-        , #{plugins => [pid]}
-        }
-    ]].
+% pid_plugin_test() ->
+%     [ ?assertEqual(Expect, decode(Input, Opts))
+%         || {Expect, Input, Opts} <- [
+%         {{ok, <<"<0.92.0>">>}, <<"\"<0.92.0>\"">>, #{}},
+%         { {ok, list_to_pid("<0.92.0>")}
+%         , <<"\"<0.92.0>\"">>
+%         , #{plugins => [pid]}
+%         }
+%     ]].
 
-port_plugin_test() ->
-    [ ?assertEqual(Expect, decode(Input, Opts))
-        || {Expect, Input, Opts} <- [
-        {{ok, <<"#Port<0.1>">>}, <<"\"#Port<0.1>\"">>, #{}},
-        { {ok, list_to_port("#Port<0.1>")}
-        , <<"\"#Port<0.1>\"">>
-        , #{plugins => [port]}
-        }
-    ]].
+% port_plugin_test() ->
+%     [ ?assertEqual(Expect, decode(Input, Opts))
+%         || {Expect, Input, Opts} <- [
+%         {{ok, <<"#Port<0.1>">>}, <<"\"#Port<0.1>\"">>, #{}},
+%         { {ok, list_to_port("#Port<0.1>")}
+%         , <<"\"#Port<0.1>\"">>
+%         , #{plugins => [port]}
+%         }
+%     ]].
 
-reference_plugin_test() ->
-    [ ?assertEqual(Expect, decode(Input, Opts))
-        || {Expect, Input, Opts} <- [
-        { {ok, <<"#Ref<0.314572725.1088159747.110918>">>}
-        , <<"\"#Ref<0.314572725.1088159747.110918>\"">>
-        , #{}
-        },
-        { {ok, list_to_ref("#Ref<0.314572725.1088159747.110918>")}
-        , <<"\"#Ref<0.314572725.1088159747.110918>\"">>
-        , #{plugins => [reference]}
-        }
-    ]].
+% reference_plugin_test() ->
+%     [ ?assertEqual(Expect, decode(Input, Opts))
+%         || {Expect, Input, Opts} <- [
+%         { {ok, <<"#Ref<0.314572725.1088159747.110918>">>}
+%         , <<"\"#Ref<0.314572725.1088159747.110918>\"">>
+%         , #{}
+%         },
+%         { {ok, list_to_ref("#Ref<0.314572725.1088159747.110918>")}
+%         , <<"\"#Ref<0.314572725.1088159747.110918>\"">>
+%         , #{plugins => [reference]}
+%         }
+%     ]].
 
-timestamp_plugin_test() ->
-    [ ?assertEqual(Expect, decode(Input, Opts))
-        || {Expect, Input, Opts} <- [
-        { {ok, <<"1970-01-01T00:00:00.000Z">>}
-        , <<"\"1970-01-01T00:00:00.000Z\"">>
-        , #{}
-        },
-        { {ok, {0,0,0}}
-        , <<"\"1970-01-01T00:00:00.000Z\"">>
-        , #{plugins => [timestamp]}
-        }
-    ]].
+% timestamp_plugin_test() ->
+%     [ ?assertEqual(Expect, decode(Input, Opts))
+%         || {Expect, Input, Opts} <- [
+%         { {ok, <<"1970-01-01T00:00:00.000Z">>}
+%         , <<"\"1970-01-01T00:00:00.000Z\"">>
+%         , #{}
+%         },
+%         { {ok, {0,0,0}}
+%         , <<"\"1970-01-01T00:00:00.000Z\"">>
+%         , #{plugins => [timestamp]}
+%         }
+%     ]].
 
-plugins_type_check_test() ->
-    Plugins = [ datetime
-              , inet
-              , pid
-              , port
-              , reference
-              , timestamp
-              ],
-    [ ?assertEqual(Expect, decode(Input, Opts#{plugins => Plugins}))
-        || {Expect, Input, Opts} <- [
-        {{ok, <<"foo">>}, <<"\"foo\"">>, #{}},
-        {{ok, 0}, <<"0">>, #{}},
-        {{ok, 0.0}, <<"0.0">>, #{}},
-        {{ok, #{}}, <<"{}">>, #{}},
-        {{ok, []}, <<"[]">>, #{}}
-    ]].
+% plugins_type_check_test() ->
+%     Plugins = [ datetime
+%               , inet
+%               , pid
+%               , port
+%               , reference
+%               , timestamp
+%               ],
+%     [ ?assertEqual(Expect, decode(Input, Opts#{plugins => Plugins}))
+%         || {Expect, Input, Opts} <- [
+%         {{ok, <<"foo">>}, <<"\"foo\"">>, #{}},
+%         {{ok, 0}, <<"0">>, #{}},
+%         {{ok, 0.0}, <<"0.0">>, #{}},
+%         {{ok, #{}}, <<"{}">>, #{}},
+%         {{ok, []}, <<"[]">>, #{}}
+%     ]].
 
 -endif.

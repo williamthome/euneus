@@ -1,7 +1,7 @@
 %%%---------------------------------------------------------------------
 %%% @copyright 2023 William Fank Thomé
 %%% @author William Fank Thomé <willilamthome@hotmail.com>
-%%% @doc JSON formatter tests.
+%%% @doc Smart JSON generator tests.
 %%%
 %%% Copyright 2023 William Fank Thomé
 %%%
@@ -19,7 +19,7 @@
 %%%
 %%% @end
 %%%---------------------------------------------------------------------
--module(euneus_formatter_SUITE).
+-module(euneus_encoder_smart_SUITE).
 
 % -include_lib("common_test/include/ct.hrl").
 
@@ -33,7 +33,7 @@
         ]).
 
 %% Test cases
--export([ minify/1, prettify/1 ]).
+-export([ encode/1 ]).
 
 %%%=====================================================================
 %%% Callback functions
@@ -127,21 +127,18 @@ end_per_testcase(_TestCase, _Config) ->
     TestCase :: atom().
 
 all() ->
-    [ minify, prettify ].
+    [ encode ].
 
 %%%=====================================================================
 %%% Test cases
 %%%=====================================================================
 
-minify(Config) when is_list(Config) ->
+% TODO: Use a JSON with more types.
+encode(Config) when is_list(Config) ->
     {ok, JSON} = read_file("test.json", Config),
-    {ok, Min} = read_file("test.min.json", Config),
-    Min = iolist_to_binary(euneus_formatter:minify(JSON)).
-
-prettify(Config) when is_list(Config) ->
-    {ok, JSON} = read_file("test.min.json", Config),
-    {ok, PP} = read_file("test.json", Config),
-    PP = iolist_to_binary(euneus_formatter:prettify(JSON)).
+    {ok, Term} = euneus:decode(JSON),
+    Smart = euneus:encode_to_binary(Term),
+    Smart = euneus:encode_to_binary(Term, #{}).
 
 %%%=====================================================================
 %%% Support functions

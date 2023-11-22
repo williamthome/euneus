@@ -81,13 +81,18 @@ defmodule EuneusTest.EuneusDecoderTest do
   end
 
   test "copying strings on decode" do
-    assert decode!("{}", %{values: :copy}) == %{}
+    assert decode!("{}", %{string: %{codecs: [:copy]}}) == %{}
     as = :binary.copy("a", 101)
     bs = :binary.copy("b", 102)
 
     # Copy decode, copies the key
     assert [{key, value}] =
-             :maps.to_list(decode!(~s({"#{as}": "#{bs}"}), %{values: :copy, keys: :copy}))
+             :maps.to_list(
+               decode!(~s({"#{as}": "#{bs}"}), %{
+                 string: %{codecs: [:copy]},
+                 object: %{keys: :copy}
+               })
+             )
 
     assert key == as
     assert value == bs
