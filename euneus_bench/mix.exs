@@ -15,11 +15,13 @@ defmodule EuneusBench.MixProject do
   defp aliases() do
     [
       encode: ["run script/encode.exs"],
+      encode_v2: ["run script/encode_v2.exs"],
       encode_parsed: ["run script/encode_parsed.exs"],
-      encode_parsed_plugins: ["run script/encode_parsed_plugins.exs"],
+      encode_parsed_codecs: ["run script/encode_parsed_codecs.exs"],
       decode: ["run script/decode.exs"],
+      decode_v2: ["run script/decode_v2.exs"],
       decode_parsed: ["run script/decode_parsed.exs"],
-      decode_parsed_plugins: ["run script/decode_parsed_plugins.exs"]
+      decode_parsed_codecs: ["run script/decode_parsed_codecs.exs"]
     ]
   end
 

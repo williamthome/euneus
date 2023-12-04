@@ -2,7 +2,7 @@ defmodule EuneusTest.EuneusEncoderTest do
   use ExUnit.Case, async: true
 
   test "atom" do
-    assert encode!(:undefined) == "null"
+    assert encode!(:null) == "null"
     assert encode!(true) == "true"
     assert encode!(false) == "false"
     assert encode!(:poison) == ~s("poison")
@@ -25,17 +25,17 @@ defmodule EuneusTest.EuneusEncoderTest do
     assert encode!("\"") == ~s("\\"")
     assert encode!("\0") == ~s("\\u0000")
     assert encode!(<<31>>) == ~s("\\u001F")
-    assert encode!("☃a", %{escaper: :unicode}) == ~s("\\u2603a")
-    assert encode!("𝄞b", %{escaper: :unicode}) == ~s("\\uD834\\uDD1Eb")
-    assert encode!("\u2028\u2029abc", %{escaper: :javascript}) == ~s("\\u2028\\u2029abc")
-    assert encode!("</script>", %{escaper: :html}) == ~s("<\\/script>")
+    assert encode!("☃a", %{escape: :unicode}) == ~s("\\u2603a")
+    assert encode!("𝄞b", %{escape: :unicode}) == ~s("\\uD834\\uDD1Eb")
+    assert encode!("\u2028\u2029abc", %{escape: :javascript}) == ~s("\\u2028\\u2029abc")
+    assert encode!("</script>", %{escape: :html}) == ~s("<\\/script>")
 
-    assert encode!(~s(<script>var s = "\u2028\u2029";</script>), %{escaper: :html}) ==
+    assert encode!(~s(<script>var s = "\u2028\u2029";</script>), %{escape: :html}) ==
              ~s("<script>var s = \\\"\\u2028\\u2029\\\";<\\/script>")
 
     assert encode!("áéíóúàèìòùâêîôûãẽĩõũ") == ~s("áéíóúàèìòùâêîôûãẽĩõũ")
-    assert encode!("a\u2028a", %{escaper: :javascript}) == ~s("a\\u2028a")
-    assert encode!("a\u2028a", %{escaper: :html}) == ~s("a\\u2028a")
+    assert encode!("a\u2028a", %{escape: :javascript}) == ~s("a\\u2028a")
+    assert encode!("a\u2028a", %{escape: :html}) == ~s("a\\u2028a")
   end
 
   test "Map" do

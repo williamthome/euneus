@@ -34,17 +34,19 @@
 
 %% Test cases
 -export([ nulls/1
-        , binary_encoder/1
-        , atom_encoder/1
-        , integer_encoder/1
-        , float_encoder/1
-        , list_encoder/1
-        , map_encoder/1
-        , unhandled_encoder/1
-        , escaper/1
-        , error_handler/1
-        , plugins/1
+        , encode_binary/1
+        , encode_atom/1
+        , encode_integer/1
+        , encode_float/1
+        , encode_list/1
+        , encode_map/1
+        , encode_tuple/1
+        , escape/1
+        , handle_error/1
+        , codecs/1
         ]).
+
+-define(DEFAULT_NULL_VALUE, null).
 
 %%%=====================================================================
 %%% Callback functions
@@ -139,16 +141,16 @@ end_per_testcase(_TestCase, _Config) ->
 
 all() ->
     [ nulls
-    , binary_encoder
-    , atom_encoder
-    , integer_encoder
-    , float_encoder
-    , list_encoder
-    , map_encoder
-    , unhandled_encoder
-    , escaper
-    , error_handler
-    , plugins
+    , encode_binary
+    , encode_atom
+    , encode_integer
+    , encode_float
+    , encode_list
+    , encode_map
+    , encode_tuple
+    , escape
+    , handle_error
+    , codecs
     ].
 
 %%%=====================================================================
@@ -156,113 +158,132 @@ all() ->
 %%%=====================================================================
 
 nulls(Config) when is_list(Config) ->
-    {ok, <<"null">>} = encode(undefined, #{}),
-    {ok, <<"null">>} = encode(nil, #{nulls => [nil]}).
+    {ok, <<"null">>} = encode(?DEFAULT_NULL_VALUE, #{}),
+    {ok, <<"null">>} = encode(nil, #{null_values => [nil]}).
 
-binary_encoder(Config) when is_list(Config) ->
+encode_binary(Config) when is_list(Config) ->
     {ok, [$", <<"foo">>, $"]} = encode(<<"foo">>, #{}),
     {ok, <<"\"foo\"">>} = encode(<<"foo">>, #{
-        binary_encoder => fun(Bin, _Opts) ->
-            <<$", Bin/binary, $">>
-        end
+        binary => #{
+            encode => fun(Bin, _Opts) ->
+                <<$", Bin/binary, $">>
+            end
+        }
     }).
 
-atom_encoder(Config) when is_list(Config) ->
+encode_atom(Config) when is_list(Config) ->
     {ok, <<"true">>} = encode(true, #{}),
     {ok, <<"false">>} = encode(false, #{}),
     {ok, [$", <<"foo">>, $"]} = encode(foo, #{}),
     {ok, <<"\"foo\"">>} = encode(foo, #{
-        atom_encoder => fun(Atom, _Opts) ->
-            <<$", (atom_to_binary(Atom))/binary, $">>
-        end
+        atom => #{
+            encode => fun(Atom, _Opts) ->
+                <<$", (atom_to_binary(Atom))/binary, $">>
+            end
+        }
     }).
 
-integer_encoder(Config) when is_list(Config) ->
+encode_integer(Config) when is_list(Config) ->
     {ok, <<"0">>} = encode(0, #{}),
     {ok, <<"\"0\"">>} = encode(0, #{
-        integer_encoder => fun(Int, _Opts) ->
-            <<$", (integer_to_binary(Int))/binary, $">>
-        end
+        integer => #{
+            encode => fun(Int, _Opts) ->
+                <<$", (integer_to_binary(Int))/binary, $">>
+            end
+        }
     }).
 
-float_encoder(Config) when is_list(Config) ->
+encode_float(Config) when is_list(Config) ->
     {ok, <<"0.0">>} = encode(0.00, #{}),
     {ok, <<"\"1.000e-02\"">>} = encode(0.010, #{
-        float_encoder => fun(Float, _Opts) ->
-            <<$", (float_to_binary(Float, [{scientific, 3}]))/binary, $">>
-        end
+        float => #{
+            encode => fun(Float, _Opts) ->
+                <<$", (float_to_binary(Float, [{scientific, 3}]))/binary, $">>
+            end
+        }
     }).
 
-list_encoder(Config) when is_list(Config) ->
+encode_list(Config) when is_list(Config) ->
     {ok, <<"[]">>} = encode([], #{}),
     {ok, [${, [$", <<"foo">>, $"], $:, [$", <<"bar">>, $"], $}]} =
-        encode([{foo, bar}], #{list_encoder => fun
-            ([{K, _} | _] = Proplist, Opts)
-              when is_binary(K); is_atom(K); is_integer(K) ->
-                Map = proplists:to_map(Proplist),
-                euneus_encoder:encode_map(Map, Opts);
-            (List, Opts) ->
-                euneus_encoder:encode_list(List, Opts)
-        end
+        encode([{foo, bar}], #{
+            list => #{
+                encode => fun
+                    ([{K, _} | _] = Proplist, Opts)
+                      when is_binary(K); is_atom(K); is_integer(K) ->
+                        Map = proplists:to_map(Proplist),
+                        euneus_encoder:encode_map(Map, Opts);
+                    (List, Opts) ->
+                        euneus_encoder:encode_list(List, Opts)
+                end
+            }
     }).
 
-map_encoder(Config) when is_list(Config) ->
+encode_map(Config) when is_list(Config) ->
     {ok, <<"{}">>} = encode(#{}, #{}),
     {ok, [${, [$", <<"foo">>, $"], $:, [$", <<"bar">>, $"], $}]} =
-        encode(#{}, #{map_encoder => fun (_Map, Opts) ->
-            euneus_encoder:encode_map(#{foo => bar}, Opts)
-        end
+        encode(#{}, #{
+            map => #{
+                encode => fun (_Map, Opts) ->
+                    euneus_encoder:encode_map(#{foo => bar}, Opts)
+                end
+            }
     }).
 
-unhandled_encoder(Config) when is_list(Config) ->
-    {error, {unsupported_type, {foo}}} = encode({foo}, #{}),
-    {ok, [$[, [$", <<"myrecord">>, $"], [$,,
-        [${, [$", <<"key">>, $"], $:, [$", <<"val">>, $"], $}],
-    $]]]} = encode({myrecord, val}, #{
-        unhandled_encoder => fun({myrecord, Val}, Opts) ->
-            euneus_encoder:encode_list([myrecord, #{key => Val}], Opts)
-        end
+encode_tuple(Config) when is_list(Config) ->
+    {ok, <<"[\"foo\"]">>} = encode_to_bin({foo}, #{}),
+    {ok, <<"[\"myrecord\",{\"key\":\"val\"}]">>} =
+        encode_to_bin({myrecord, val}, #{
+            tuple => #{
+                encode => fun({myrecord, Val}, Opts) ->
+                    euneus_encoder:encode_list([myrecord, #{key => Val}], Opts)
+                end
+            }
     }).
 
-escaper(Config) when is_list(Config) ->
+escape(Config) when is_list(Config) ->
     {ok, <<"\"foo\"">>} = encode_to_bin(foo, #{
-        escaper => json
+        escape => json
     }),
     {ok, <<"\"<\\/script>\"">>} = encode_to_bin(<<"</script>">>, #{
-        escaper => html
+        escape => html
     }),
     {ok, <<"\"\\u2028\\u2029\"">>} = encode_to_bin(
         unicode:characters_to_binary([8232,8233]), #{
-        escaper => javascript
+        escape => javascript
     }),
     {ok, <<"\"\\u2603\"">>} = encode_to_bin(<<"☃"/utf8>>, #{
-        escaper => unicode
+        escape => unicode
     }),
     {ok, <<"bar">>} = encode(foo, #{
-        escaper => fun (<<"foo">>, _Opts) ->
+        escape => fun (<<"foo">>, _Opts) ->
             <<"bar">>
         end
     }).
 
-error_handler(Config) when is_list(Config) ->
+handle_error(Config) when is_list(Config) ->
     {error, bar} = encode(foo, #{
-        escaper => fun (<<"foo">>, _Opts) ->
+        escape => fun (<<"foo">>, _Opts) ->
             throw(foo)
         end,
-        error_handler => fun (throw, foo, _Stacktrace) ->
+        handle_error => fun (throw, foo, _Stacktrace) ->
             {error, bar}
         end
     }).
 
-plugins(Config) when is_list(Config) ->
+codecs(Config) when is_list(Config) ->
+    Opts = euneus_encoder:parse_options_to_settings(#{}),
     {halt, [$", <<"test::foo">>, $"]} =
-        euneus_test_plugin:encode({test, foo}, euneus_encoder:parse_opts(#{})),
+        euneus_test_codec:encode({test, foo}, foo, Opts),
     next =
-        euneus_test_plugin:encode({test, bar}, euneus_encoder:parse_opts(#{})),
-    {error, {unsupported_type, {test, foo}}} =
-        euneus_encoder:encode({test, foo}, #{}),
-    {ok, [$", <<"test::foo">>, $"]} =
-        euneus_encoder:encode({test, foo}, #{plugins => [euneus_test_plugin]}).
+        euneus_test_codec:encode({test, bar}, bar, Opts),
+    {ok, <<"[\"test\",\"foo\"]">>} = encode_to_bin({test, foo}, #{}),
+    {ok, <<"\"test::foo\"">>} =
+        encode_to_bin({test, foo}, #{
+            tuple => #{
+                codecs => [{euneus_test_codec, foo}]
+            }
+    }).
 
 %%%=====================================================================
 %%% Support functions

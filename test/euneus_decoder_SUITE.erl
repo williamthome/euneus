@@ -33,14 +33,18 @@
         ]).
 
 %% Test cases
--export([ null_term/1
-        , keys/1
-        , values/1
-        , arrays/1
-        , objects/1
-        , error_handler/1
-        , plugins/1
+-export([ null_value/1
+        , integer_base/1
+        , string/1
+        , array/1
+        , object/1
+        , object_return/1
+        , object_keys/1
+        , handle_error/1
+        , codecs/1
         ]).
+
+-define(DEFAULT_NULL_VALUE, null).
 
 %%%=====================================================================
 %%% Callback functions
@@ -134,97 +138,160 @@ end_per_testcase(_TestCase, _Config) ->
     TestCase :: atom().
 
 all() ->
-    [ null_term
-    , keys
-    , values
-    , arrays
-    , objects
-    , error_handler
-    , plugins
+    [ null_value
+    , string
+    , integer_base
+    , array
+    , object
+    , object_return
+    , object_keys
+    , handle_error
+    , codecs
     ].
 
 %%%=====================================================================
 %%% Test cases
 %%%=====================================================================
 
-null_term(Config) when is_list(Config) ->
-    {ok, undefined} = decode(<<"null">>, #{}),
-    {ok, nil} = decode(<<"null">>, #{null_term => nil}).
+null_value(Config) when is_list(Config) ->
+    {ok, ?DEFAULT_NULL_VALUE} = decode(<<"null">>, #{}),
+    {ok, nil} = decode(<<"null">>, #{null_value => nil}).
 
-keys(Config) when is_list(Config) ->
+integer_base(Config) when is_list(Config) ->
+    {ok, 10} = decode(<<"10">>, #{}),
+    {ok, 16} = decode(<<"10">>, #{integer_base => 16}).
+
+string(Config) when is_list(Config) ->
     {ok, #{<<"foo">> := <<"bar">>}} = decode(<<"{\"foo\":\"bar\"}">>, #{}),
     {ok, #{<<"foo">> := <<"bar">>}} = decode(<<"{\"foo\":\"bar\"}">>, #{
-        keys => copy
-    }),
-    {ok, #{foo := <<"bar">>}} = decode(<<"{\"foo\":\"bar\"}">>, #{
-        keys => to_atom
-    }),
-    {ok, #{foo := <<"bar">>}} = decode(<<"{\"foo\":\"bar\"}">>, #{
-        keys => to_existing_atom
-    }),
-    {ok, #{0 := <<"0">>}} = decode(<<"{\"0\":\"0\"}">>, #{
-        keys => to_integer
-    }),
-    {ok, #{foo := <<"bar">>}} = decode(<<"{\"foo\":\"bar\"}">>, #{
-        keys => fun(<<"foo">>, _Opts) ->
-            foo
-        end
-    }).
-
-values(Config) when is_list(Config) ->
-    {ok, #{<<"foo">> := <<"bar">>}} = decode(<<"{\"foo\":\"bar\"}">>, #{}),
-    {ok, #{<<"foo">> := <<"bar">>}} = decode(<<"{\"foo\":\"bar\"}">>, #{
-        values => copy
+        string => #{
+            codecs => [copy]
+        }
     }),
     {ok, #{<<"foo">> := bar}} = decode(<<"{\"foo\":\"bar\"}">>, #{
-        values => to_atom
+        string => #{
+            codecs => [to_atom]
+        }
     }),
     {ok, #{<<"foo">> := bar}} = decode(<<"{\"foo\":\"bar\"}">>, #{
-        values => to_existing_atom
+        string => #{
+            codecs => [to_existing_atom]
+        }
     }),
     {ok, #{<<"0">> := 0}} = decode(<<"{\"0\":\"0\"}">>, #{
-        values => to_integer
+        string => #{
+            codecs => [to_integer]
+        }
     }),
     {ok, #{<<"foo">> := bar}} = decode(<<"{\"foo\":\"bar\"}">>, #{
-        values => fun(<<"bar">>, _Opts) ->
-            bar
-        end
+        string => #{
+            codecs => [
+                fun(<<"bar">>, _Opts, _Settings) ->
+                    {halt, bar}
+                end
+            ]
+        }
     }).
 
-arrays(Config) when is_list(Config) ->
-    {ok, [<<"foo">>,true,0,undefined]} = decode(<<"[\"foo\",true,0,null]">>, #{}),
-    {ok, [foo]} = decode(<<"[]">>, #{
-        arrays => fun([], _Opts) ->
-            [foo]
-        end
+array(Config) when is_list(Config) ->
+    {ok, [<<"foo">>,true,0,?DEFAULT_NULL_VALUE]} = decode(<<"[\"foo\",true,0,null]">>, #{}),
+    {ok, [1]} = decode(<<"[0]">>, #{
+        array => #{
+            codecs => [
+                fun([0], _Opts, _Settings) ->
+                    {halt, [1]}
+                end
+            ]
+        }
     }).
 
-objects(Config) when is_list(Config) ->
-    {ok, #{<<"foo">> := <<"bar">>, <<"0">> := undefined}} =
-        decode(<<"{\"foo\":\"bar\",\"0\":null}">>, #{}),
-    {ok, #{}} = decode(<<"{\"foo\":\"bar\",\"0\":null}">>, #{
-        objects => fun(#{<<"foo">> := <<"bar">>, <<"0">> := undefined}, _Opts) ->
-            #{}
-        end
+object(Config) when is_list(Config) ->
+    {ok, #{<<"foo">> := <<"bar">>, <<"0">> := 0}} =
+        decode(<<"{\"foo\":\"bar\",\"0\":0}">>, #{}),
+    {ok, #{}} = decode(<<"{\"foo\":\"bar\",\"0\":0}">>, #{
+        object => #{
+            codecs => [
+                fun(#{<<"foo">> := <<"bar">>, <<"0">> := 0}, _Opts, _Settings) ->
+                    {halt, #{}}
+                end
+            ]
+        }
     }).
 
-error_handler(Config) when is_list(Config) ->
-    {error, bar} = decode(<<"[]">>, #{
-        arrays => fun([], _Opts) ->
-            throw(foo)
-        end,
-        error_handler => fun (throw, foo, _Stacktrace) ->
+object_return(Config) when is_list(Config) ->
+    {ok, #{<<"foo">> := <<"bar">>, <<"0">> := 0}} =
+        decode(<<"{\"foo\":\"bar\",\"0\":0}">>, #{
+            object => #{
+                return => map
+            }
+        }),
+    {ok, [{<<"0">>, 0}, {<<"foo">>, <<"bar">>}]} =
+        decode(<<"{\"foo\":\"bar\",\"0\":0}">>, #{
+            object => #{
+                return => proplist
+            }
+        }),
+    {ok, [{<<"foo">>, <<"bar">>}, {<<"0">>, 0}]} =
+        decode(<<"{\"foo\":\"bar\",\"0\":0}">>, #{
+            object => #{
+                return => ordered_proplist
+            }
+        }).
+
+object_keys(Config) when is_list(Config) ->
+    {ok, #{<<"foo">> := <<"bar">>}} = decode(<<"{\"foo\":\"bar\"}">>, #{}),
+    {ok, #{<<"foo">> := <<"bar">>}} = decode(<<"{\"foo\":\"bar\"}">>, #{
+        object => #{
+            keys => copy
+        }
+    }),
+    {ok, #{foo := <<"bar">>}} = decode(<<"{\"foo\":\"bar\"}">>, #{
+        object => #{
+            keys => to_atom
+        }
+    }),
+    {ok, #{foo := <<"bar">>}} = decode(<<"{\"foo\":\"bar\"}">>, #{
+        object => #{
+            keys => to_existing_atom
+        }
+    }),
+    {ok, #{0 := <<"0">>}} = decode(<<"{\"0\":\"0\"}">>, #{
+        object => #{
+            keys => to_integer
+        }
+    }),
+    {ok, [{foo, <<"bar">>}]} = decode(<<"{\"foo\":\"bar\"}">>, #{
+        object => #{
+            return => proplist,
+            keys => to_atom
+        }
+    }).
+
+handle_error(Config) when is_list(Config) ->
+    {error, bar} = decode(<<"[0]">>, #{
+        array => #{
+            codecs => [fun([0], _Opts, _Settings) ->
+                throw(foo)
+            end]
+        },
+        handle_error => fun (throw, foo, _Stacktrace) ->
             {error, bar}
         end
     }).
 
-plugins(Config) when is_list(Config) ->
+codecs(Config) when is_list(Config) ->
+    Opts = euneus_decoder:parse_options_to_settings(#{}),
     {halt, {test, foo}} =
-        euneus_test_plugin:decode(<<"test::foo">>, euneus_decoder:parse_opts(#{})),
+        euneus_test_codec:decode(<<"test::foo">>, foo, Opts),
     next =
-        euneus_test_plugin:decode(<<"test::bar">>, euneus_decoder:parse_opts(#{})),
+        euneus_test_codec:decode(<<"test::bar">>, bar, Opts),
+    {ok, <<"test::foo">>} = decode(<<"\"test::foo\"">>, #{}),
     {ok, {test, foo}} =
-        euneus_decoder:decode(<<"\"test::foo\"">>, #{plugins => [euneus_test_plugin]}).
+        decode(<<"\"test::foo\"">>, #{
+            string => #{
+                codecs => [{euneus_test_codec, foo}]
+            }
+        }).
 
 %%%=====================================================================
 %%% Support functions

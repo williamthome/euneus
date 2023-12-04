@@ -1,7 +1,7 @@
 %%%---------------------------------------------------------------------
 %%% @copyright 2023 William Fank Thomé
 %%% @author William Fank Thomé <willilamthome@hotmail.com>
-%%% @doc Test plugin.
+%%% @doc Test codec.
 %%%
 %%% Copyright 2023 William Fank Thomé
 %%%
@@ -19,24 +19,27 @@
 %%%
 %%% @end
 %%%---------------------------------------------------------------------
--module(euneus_test_plugin).
+-module(euneus_test_codec).
 
--behaviour(euneus_plugin).
+-behaviour(euneus_codec).
 
-%% euneus_plugin callbacks
+%% euneus_codec callbacks
 
--export([ encode/2, decode/2 ]).
+-export([ init/1, encode/3, decode/3 ]).
 
 %%%=====================================================================
-%%% euneus_plugin callbacks
+%%% euneus_codec callbacks
 %%%=====================================================================
 
-encode({test, foo}, Opts) ->
-    {halt, euneus_encoder:encode_binary(<<"test::foo">>, Opts)};
-encode(_Term, _Opts) ->
+init(Opts) ->
+    {ok, Opts}.
+
+encode({test, foo}, foo, Settings) ->
+    {halt, euneus_encoder:encode_binary(<<"test::foo">>, Settings)};
+encode(_Term, _Opts, _Settings) ->
     next.
 
-decode(<<"test::foo">>, _Opts) ->
+decode(<<"test::foo">>, foo, _Settings) ->
     {halt, {test, foo}};
-decode(_Bin, _Opts) ->
+decode(_Bin, _Opts, _Settings) ->
     next.

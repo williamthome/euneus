@@ -67,19 +67,19 @@
 
 -type encode_input() :: euneus_encoder:input().
 -type encode_opts() :: euneus_encoder:options().
--type encode_parsed_opts() :: euneus_encoder:parsed_options().
+-type encode_parsed_opts() :: euneus_encoder:settings().
 -type encode_result() :: euneus_encoder:result().
 -type encode_to_bin_result() :: {ok, binary()}
                               | {error, euneus_encoder:error_reason()}.
 
 -type decode_input() :: euneus_decoder:input().
 -type decode_opts() :: euneus_decoder:options().
--type decode_parsed_opts() :: euneus_decoder:parsed_options().
+-type decode_parsed_opts() :: euneus_decoder:settings().
 -type decode_result() :: euneus_decoder:result().
 
 -type format_input() :: euneus_formatter:input().
 -type format_opts() :: euneus_formatter:options().
--type format_parsed_opts() :: euneus_formatter:parsed_options().
+-type format_parsed_opts() :: euneus_formatter:settings().
 -type format_result() :: euneus_formatter:result().
 
 %%%=====================================================================
@@ -139,7 +139,7 @@ encode_to_binary(Input, Opts) ->
     Result :: encode_parsed_opts().
 
 parse_encode_opts(Opts) ->
-    euneus_encoder:parse_opts(Opts).
+    euneus_encoder:parse_options_to_settings(Opts).
 
 %%----------------------------------------------------------------------
 %% @doc Generates a JSON from Erlang term.
@@ -387,7 +387,7 @@ decode(Input, Opts) ->
     Result :: decode_parsed_opts().
 
 parse_decode_opts(Opts) ->
-    euneus_decoder:parse_opts(Opts).
+    euneus_decoder:parse_options_to_settings(Opts).
 
 %%----------------------------------------------------------------------
 %% @doc Parses JSON to Erlang term.

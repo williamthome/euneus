@@ -2,7 +2,7 @@ defmodule EuneusTest.EuneusSmartEncoderTest do
   use ExUnit.Case, async: true
 
   test "atom" do
-    assert encode!(:undefined) == "null"
+    assert encode!(:null) == "null"
     assert encode!(true) == "true"
     assert encode!(false) == "false"
     assert encode!(:poison) == ~s("poison")

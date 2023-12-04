@@ -2,15 +2,19 @@ Code.eval_file("helper.exs", "./script")
 
 opts =
   :euneus.parse_encode_opts(%{
-    plugins: [
-      :datetime,
-      :timestamp,
-      :pid,
-      :port,
-      :proplist,
-      :reference,
-      :inet
-    ]
+    list: %{
+      codecs: [
+        :proplist
+      ]
+    },
+    tuple: %{
+      codecs: [
+        :datetime,
+        :timestamp,
+        :ipv4,
+        :ipv6
+      ]
+    }
   })
 
 jobs = %{
@@ -42,11 +46,11 @@ inputs =
   end
 
 EuneusBench.Helper.run(
-  "encode_parsed_plugins",
+  "encode_parsed_codecs",
   jobs,
   inputs,
   %{
-    # markdown: true,
+    markdown: true
     # graph: true,
     # save: true,
     # parallel: 1,
