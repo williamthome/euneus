@@ -24,6 +24,7 @@
 -compile({ inline, plugins/3 }).
 -compile({ inline, string/6 }).
 -compile({ inline, string/7 }).
+-compile({ inline, normalize_string/3 }).
 -compile({ inline, number/6 }).
 -compile({ inline, number_exp_cont/7 }).
 -compile({ inline, number_exp_sign/6 }).
@@ -478,35 +479,9 @@ value(Data, Opts, Input, Pos, Buffer) ->
 string(Data, Opts, Input, Pos, Buffer, Len) ->
     case Data of
         <<$"/integer, Rest/bitstring>> ->
-            Last = binary_part(Input, Pos, Len),
-            Value =
-                case Buffer of
-                    [?key | _] ->
-                        case plugins(Opts#opts.plugins, Last, Opts) of
-                            next ->
-                                case Opts of
-                                    #opts{keys = undefined} ->
-                                        Last;
-                                    #opts{keys = Normalize} ->
-                                        Normalize(Last, Opts)
-                                end;
-                            {halt, Term} ->
-                                Term
-                        end;
-                    [_|_] ->
-                        case plugins(Opts#opts.plugins, Last, Opts) of
-                            next ->
-                                case Opts of
-                                    #opts{values = undefined} ->
-                                        Last;
-                                    #opts{values = Normalize} ->
-                                        Normalize(Last, Opts)
-                                end;
-                            {halt, Term} ->
-                                Term
-                        end
-                end,
-            continue(Rest, Opts, Input, Pos + Len + 1, Buffer, Value);
+            String0 = binary_part(Input, Pos, Len),
+            String = normalize_string(String0, Opts, Buffer),
+            continue(Rest, Opts, Input, Pos + Len + 1, Buffer, String);
         <<$\\/integer, Rest/bitstring>> ->
             Part = binary_part(Input, Pos, Len),
             escape(Rest, Opts, Input, Pos + Len, Buffer, Part);
@@ -530,7 +505,8 @@ string(Data, Opts, Input, Pos, Buffer, Acc, Len) ->
     case Data of
         <<$"/integer, Rest/bitstring>> ->
             Last = binary_part(Input, Pos, Len),
-            String = iolist_to_binary([Acc | Last]),
+            String0 = iolist_to_binary([Acc | Last]),
+            String = normalize_string(String0, Opts, Buffer),
             continue(Rest, Opts, Input, Pos + Len + 1, Buffer, String);
         <<$\\/integer, Rest/bitstring>> ->
             Part = binary_part(Input, Pos, Len),
@@ -549,6 +525,29 @@ string(Data, Opts, Input, Pos, Buffer, Acc, Len) ->
             throw_byte(Data, Opts, Input, Pos, Buffer);
         <<_/bitstring>> ->
             throw_eof(Opts, Input, Pos, Buffer)
+    end.
+
+normalize_string(String, Opts, Buffer) ->
+    case plugins(Opts#opts.plugins, String, Opts) of
+        next ->
+            case Buffer of
+                [?key | _] ->
+                    case Opts of
+                        #opts{keys = undefined} ->
+                            String;
+                        #opts{keys = Normalize} ->
+                            Normalize(String, Opts)
+                    end;
+                [_|_] ->
+                    case Opts of
+                        #opts{values = undefined} ->
+                            String;
+                        #opts{values = Normalize} ->
+                            Normalize(String, Opts)
+                    end
+            end;
+        {halt, Term} ->
+            Term
     end.
 
 number(Data, Opts, Input, Pos, Buffer, Len) ->
@@ -1952,6 +1951,18 @@ decode_test() ->
         { {ok, #{foo => 1}}
         , <<"{\"foo\": \"1\"}">>
         , #{ keys => to_atom, values => to_integer }
+        },
+        { {ok, #{keya => <<"valuea">>}}
+        , <<"{\"key\\u0061\": \"value\\u0061\"}">>
+        , #{keys => to_atom}
+        },
+        { {ok, #{<<"keya">> => valuea}}
+        , <<"{\"key\\u0061\": \"value\\u0061\"}">>
+        , #{values => to_atom}
+        },
+        { {ok, #{keya => valuea}}
+        , <<"{\"key\\u0061\": \"value\\u0061\"}">>
+        , #{values => to_atom, keys => to_atom}
         },
         {{error, not_an_iodata}, error, #{}}
     ]].
