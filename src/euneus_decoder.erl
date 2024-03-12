@@ -1001,7 +1001,7 @@ plugins([inet | T], Term, Opts) ->
     case Term of
         <<A/integer, B/integer, C/integer, $., _/bitstring>>
           when ?range(A, 0, 255); ?range(B, 0, 255); ?range(C, 0, 255) ->
-            case inet_parse:ipv4_address(binary_to_list(Term)) of
+            case inet_parse:ipv4strict_address(binary_to_list(Term)) of
                 {ok, Ip} ->
                     {halt, Ip};
                 {error, einval} ->
@@ -1009,7 +1009,7 @@ plugins([inet | T], Term, Opts) ->
             end;
         <<A/integer, B/integer, $., _/bitstring>>
           when ?range(A, 0, 255); ?range(B, 0, 255) ->
-            case inet_parse:ipv4_address(binary_to_list(Term)) of
+            case inet_parse:ipv4strict_address(binary_to_list(Term)) of
                 {ok, Ip} ->
                     {halt, Ip};
                 {error, einval} ->
@@ -1017,7 +1017,7 @@ plugins([inet | T], Term, Opts) ->
             end;
         <<A/integer, $., _/bitstring>>
           when ?range(A, 0, 255) ->
-            case inet_parse:ipv4_address(binary_to_list(Term)) of
+            case inet_parse:ipv4strict_address(binary_to_list(Term)) of
                 {ok, Ip} ->
                     {halt, Ip};
                 {error, einval} ->
@@ -1998,6 +1998,10 @@ inet_plugin_test() ->
     [ ?assertEqual(Expect, decode(Input, Opts))
       || {Expect, Input, Opts} <- [
         % ipv4
+        { {ok, #{<<"ip">> => {10,12,13,14}, <<"test">> => <<"0.000">>}}
+        , <<"{\"test\":\"0.000\",\"ip\":\"10.12.13.14\"}">>
+        , #{plugins => [inet]}
+        },
         {{ok, <<"0.0.0.0">>}, <<"\"0.0.0.0\"">>, #{} },
         { {ok, {0,0,0,0}}, <<"\"0.0.0.0\"">>, #{plugins => [inet]} },
         { {ok, {255,255,255,255}}
