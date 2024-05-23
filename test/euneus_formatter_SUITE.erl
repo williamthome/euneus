@@ -1,9 +1,9 @@
 %%%---------------------------------------------------------------------
-%%% @copyright 2023 William Fank Thomé
+%%% @copyright 2023-2024 William Fank Thomé
 %%% @author William Fank Thomé <willilamthome@hotmail.com>
 %%% @doc JSON formatter tests.
 %%%
-%%% Copyright 2023 William Fank Thomé
+%%% Copyright 2023-2024 William Fank Thomé
 %%%
 %%% Licensed under the Apache License, Version 2.0 (the "License");
 %%% you may not use this file except in compliance with the License.

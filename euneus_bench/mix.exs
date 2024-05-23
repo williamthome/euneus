@@ -27,6 +27,7 @@ defmodule EuneusBench.MixProject do
   defp deps do
     [
       {:euneus, path: "../"},
+      {:json_polyfill, "~> 0.1"},
       {:thoas, "~> 1.2"},
       {:jason, "~> 1.4"},
       {:jsone, "~> 1.6"},

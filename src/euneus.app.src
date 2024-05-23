@@ -1,10 +1,10 @@
 {application, euneus, [
     {description, "An incredibly flexible and performant JSON parser, generator and formatter in pure Erlang"},
-    {vsn, "1.2.2"},
+    {vsn, "2.0.0"},
     {registered, []},
-    {applications, [
-        kernel,
-        stdlib
+    {applications, [kernel, stdlib]},
+    {optional_applications, [
+        json_polyfill % required if OTP < 27
     ]},
     {env, []},
     {modules, []},

@@ -10,14 +10,14 @@ jobs = %{
 }
 
 data = [
-  "Blockchain",
-  "Giphy",
-  "GitHub",
-  "GovTrack",
-  "Issue 90",
-  "JSON Generator",
-  "Pokedex",
-  "UTF-8 unescaped"
+  "Blockchain"
+  # "Giphy",
+  # "GitHub",
+  # "GovTrack",
+  # "Issue 90",
+  # "JSON Generator",
+  # "Pokedex",
+  # "UTF-8 unescaped"
 ]
 
 inputs =

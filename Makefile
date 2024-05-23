@@ -1,39 +1,28 @@
 all:
 
-bench.encode:
-	cd euneus_bench && mix encode
+.PHONY: check
 
-bench.encode_parsed:
-	cd euneus_bench && mix encode_parsed
+check: dialyzer test.erlang test.elixir
 
-bench.encode_parsed_plugins:
-	cd euneus_bench && mix encode_parsed_plugins
+.PHONY: dialyzer
 
-bench.decode:
-	cd euneus_bench && mix decode
-
-bench.decode_parsed:
-	cd euneus_bench && mix decode_parsed
-
-bench.decode_parsed_plugins:
-	cd euneus_bench && mix decode_parsed_plugins
+dialyzer:
+	rebar3 dialyzer
 
 .PHONY: test
 
-test.rebar3:
-	rebar3 as test do ct, eunit
+test.erlang:
+	rebar3 do ct, eunit
 
-test.mix:
+test.elixir:
 	cd euneus_test && mix test
 
-test: test.rebar3 test.mix
+test: test.erlang test.elixir
 
-.PHONY: check
+.PHONY: bench
 
-check: test
-	rebar3 dialyzer
+bench.encode:
+	cd euneus_bench && mix encode
 
-.PHONY: publish
-
-publish: check
-	rebar3 hex publish
+bench.decode:
+	cd euneus_bench && mix decode

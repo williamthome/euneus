@@ -1,9 +1,9 @@
 %%%---------------------------------------------------------------------
-%%% @copyright 2023 William Fank Thomé
+%%% @copyright 2023-2024 William Fank Thomé
 %%% @author William Fank Thomé <willilamthome@hotmail.com>
 %%% @doc JSON generator.
 %%%
-%%% Copyright 2023 William Fank Thomé
+%%% Copyright 2023-2024 William Fank Thomé
 %%%
 %%% Licensed under the Apache License, Version 2.0 (the "License");
 %%% you may not use this file except in compliance with the License.
@@ -21,994 +21,697 @@
 %%%---------------------------------------------------------------------
 -module(euneus_encoder).
 
--compile({ inline, plugins/3 }).
--compile({ inline, drop_nulls/2 }).
--compile({ inline, encode_binary/2 }).
--compile({ inline, encode_atom/2 }).
--compile({ inline, encode_integer/2 }).
--compile({ inline, encode_float/2 }).
--compile({ inline, encode_list/2 }).
--compile({ inline, encode_map/2 }).
--compile({ inline, encode_unhandled/2 }).
--compile({ inline, escape_json/4 }).
--compile({ inline, escape_json_chunk/5 }).
--compile({ inline, escape_html/4 }).
--compile({ inline, escape_html_chunk/5 }).
--compile({ inline, escape_js/4 }).
--compile({ inline, escape_js_chunk/5 }).
--compile({ inline, escape_unicode/4 }).
--compile({ inline, escape_unicode_chunk/5 }).
--compile({ inline, handle_error/3 }).
--compile({ inline, maps_get/3 }).
--compile({ inline, maps_to_list/1 }).
+-dialyzer({no_return, [parse_opts/1]}).
 
-% By default, encode_unhandled/2 will raise unsupported_type exception,
-% so it is a function without a local return. Note that parse_opts/1
-% is included because unhandled_encoder option has no local return.
--dialyzer({ no_return, parse_opts/1 }).
--dialyzer({ no_return, encode_unhandled/2 }).
--dialyzer( no_improper_lists ).
+-export([encode/1, encode/2, parse_opts/1]).
 
-%% API functions
+-ifdef(TEST).
+-include_lib("eunit/include/eunit.hrl").
+-endif.
 
--export([ encode/2 ]).
--export([ parse_opts/1 ]).
--export([ get_nulls_option/1 ]).
--export([ get_binary_encoder_option/1 ]).
--export([ get_atom_encoder_option/1 ]).
--export([ get_integer_encoder_option/1 ]).
--export([ get_float_encoder_option/1 ]).
--export([ get_list_encoder_option/1 ]).
--export([ get_map_encoder_option/1 ]).
--export([ get_unhandled_encoder_option/1 ]).
--export([ get_escaper_option/1 ]).
--export([ get_error_handler_option/1 ]).
--export([ get_plugins_option/1 ]).
--export([ encode_parsed/2 ]).
--export([ encode_binary/2 ]).
--export([ encode_atom/2 ]).
--export([ encode_integer/2 ]).
--export([ encode_float/2 ]).
--export([ encode_list/2 ]).
--export([ encode_map/2 ]).
--export([ encode_unhandled/2 ]).
--export([ escape/2 ]).
--export([ escape_byte/1 ]).
--export([ escape_json/1 ]).
--export([ escape_html/1 ]).
--export([ escape_js/1 ]).
--export([ escape_unicode/1 ]).
--export([ throw_unsupported_type_error/1 ]).
--export([ handle_error/3 ]).
+-define(NULLS, [null]).
 
-%% Types
+-define(min(X, Min), (
+    is_integer(X) andalso X >= Min
+)).
 
--export_type([ input/0 ]).
--export_type([ options/0 ]).
--export_type([ parsed_options/0 ]).
--export_type([ result/0 ]).
--export_type([ encoder/1 ]).
--export_type([ escaper/1 ]).
--export_type([ error_handler/0 ]).
--export_type([ error_reason/0 ]).
+-define(in_range(X, Min, Max), (
+    is_integer(X) andalso X >= Min andalso X =< Max)
+).
 
--record(opts, { nulls :: list()
-              , binary_encoder :: encoder(binary())
-              , atom_encoder :: encoder(atom())
-              , integer_encoder :: encoder(integer())
-              , float_encoder :: encoder(float())
-              , list_encoder :: encoder(list())
-              , map_encoder :: encoder(map())
-              , unhandled_encoder :: encoder(term())
-              , escaper :: json
-                         | html
-                         | javascript
-                         | unicode
-                         | escaper(binary())
-              , error_handler :: error_handler()
-              , plugins :: [plugin()]
-              }).
+-record(state, { escape
+               , encode_atom
+               , encode_binary
+               , encode_integer
+               , encode_float
+               , encode_list
+               , encode_map
+               , encode_tuple
+               , encode_pid
+               , encode_port
+               , encode_ref
+               , integer_to_binary
+               , float_to_binary
+               }).
 
--type input() :: term().
--type options() :: map().
--type parsed_options() :: #opts{}.
--type result() :: {ok, iolist()} | {error, error_reason()}.
--type encoder(Input) :: fun((Input, parsed_options()) -> iolist()).
--type escaper(Input) :: fun((Input, parsed_options()) -> iolist()).
--type error_class() :: error | exit | throw.
--type unsupported_type_error() :: {unsupported_type, Unsupported :: term()}.
--type invalid_byte_error() :: {invalid_byte, Byte :: byte(), Input :: binary()}.
--type error_reason() :: unsupported_type_error() | invalid_byte_error().
--type error_stacktrace() :: erlang:stacktrace().
--type error_handler() :: fun(( error_class()
-                             , error_reason()
-                             , error_stacktrace() ) -> error_stacktrace()).
--type plugin() :: datetime
-                | inet
-                | pid
-                | port
-                | proplist
-                | reference
-                | timestamp
-                | drop_nulls
-                | module()
-                .
-
-%% Macros
-
--define(min(X, Min), is_integer(X) andalso X >= Min).
--define(range(X, Min, Max), is_integer(X) andalso X >= Min andalso X =< Max).
--define(is_proplist_key(X), is_binary(X) orelse is_atom(X) orelse is_integer(X)).
-
--define(NON_PRINTABLE_LAST, 31).
--define(ONE_BYTE_LAST, 127).
--define(TWO_BYTE_LAST, 2_047).
--define(THREE_BYTE_LAST, 65_535).
+-type encode() :: fun((term()) -> iodata()).
+-type encode_callback(Type) :: fun((Type, encode(), #state{}) -> iodata()).
+-type codec(Type) :: fun((Type) -> iodata()).
+-type atom_codec() :: codec(atom()).
+-type binary_codec() :: codec(binary()).
+-type integer_codec() :: codec(integer()).
+-type float_codec() :: codec(float()).
+-type list_codec() :: proplist
+                    | {proplist, IsProplist :: fun((list()) -> boolean())}
+                    | codec(list()).
+-type map_codec() :: drop_nulls | codec(map()) | [codec(map())].
+-type tuple_codec() :: datetime
+                     | timestamp
+                     | ipv4
+                     | ipv6
+                     | {records, [{Name :: atom(), Fields :: [atom()]}]}
+                     | codec(tuple()).
+-type pid_codec() :: codec(pid()).
+-type port_codec() :: codec(port()).
+-type reference_codec() :: codec(reference()).
+-type options() :: #{ escape => fun((binary()) -> iodata())
+                    , nulls => [term()]
+                    , sort_keys => boolean()
+                    , atom => atom_codec() | [atom_codec()]
+                    , binary => binary_codec() | [binary_codec()]
+                    , integer => integer_codec() | [integer_codec()]
+                    , float => float_codec() | [float_codec()]
+                    , list => list_codec() | [list_codec()]
+                    , map => map_codec() | [map_codec()]
+                    , tuple => tuple_codec() | [tuple_codec()]
+                    , pid => pid_codec() | [pid_codec()]
+                    , port => port_codec() | [port_codec()]
+                    , reference => reference_codec() | [reference_codec()]
+                    , encode_atom => encode_callback(atom())
+                    , encode_binary => encode_callback(binary())
+                    , encode_integer => encode_callback(integer())
+                    , encode_float => encode_callback(float())
+                    , encode_list => encode_callback(list())
+                    , encode_map => encode_callback(map())
+                    , encode_tuple => encode_callback(tuple())
+                    , encode_pid => encode_callback(pid())
+                    , encode_port => encode_callback(port())
+                    , encode_reference => encode_callback(reference())
+                    , integer_to_binary => fun((integer()) -> binary())
+                    , float_to_binary => fun((float()) -> binary())
+                    }.
 
 %%%=====================================================================
 %%% API functions
 %%%=====================================================================
 
-%%----------------------------------------------------------------------
-%% @doc Generates a JSON from Erlang term.
-%%
-%% @param Term :: {@link euneus_encoder:input()}.
-%% @param Opts :: {@link euneus_encoder:options()}.
-%%
-%% @returns {@link euneus_encoder:result()}.
-%%
-%% @end
-%%----------------------------------------------------------------------
--spec encode(input(), options()) -> result().
+-spec encode(term()) -> iodata().
 
+encode(Term) ->
+    json:encode(Term).
+
+-spec encode(term(), #state{} | options()) -> iodata().
+
+encode(Term, #state{} = State) ->
+    do_encode(Term, State);
 encode(Term, Opts) ->
-    encode_parsed(Term, parse_opts(Opts)).
+    do_encode(Term, parse_opts(Opts)).
 
-%%----------------------------------------------------------------------
-%% @doc Parses {@link euneus_encoder:options()} to {@link euneus_encoder:parsed_options()}.
-%%
-%% The parsed map can be expanded in compile time or stored to be
-%% reused, avoiding parsing the options in every encoding.
-%%
-%% @end
-%%
-%% NOTE: The explicit call of functions wrapped in another function is
-%% required for the inline optimization.
-%%
-%% @param Opts :: {@link euneus_encoder:options()}.
-%%
-%% @returns {@link euneus_encoder:parsed_options()}.
-%%
-%% @end
-%%----------------------------------------------------------------------
--spec parse_opts(options()) -> parsed_options().
+-spec parse_opts(options()) -> #state{}.
 
-parse_opts(Opts) ->
-    #opts{
-        nulls = maps_get(nulls, Opts, [undefined]),
-        binary_encoder = maps_get(binary_encoder, Opts, fun (X, O) ->
-            escape(X, O)
-        end),
-        atom_encoder = maps_get(atom_encoder, Opts, fun (X, O) ->
-            encode_atom(X, O)
-        end),
-        integer_encoder = maps_get(integer_encoder, Opts, fun (X, O) ->
-            encode_integer(X, O)
-        end),
-        float_encoder = maps_get(float_encoder, Opts, fun (X, O) ->
-            encode_float(X, O)
-        end),
-        list_encoder = maps_get(list_encoder, Opts, fun (X, O) ->
-            encode_list(X, O)
-        end),
-        map_encoder = maps_get(map_encoder, Opts, fun (X, O) ->
-            encode_map(X, O)
-        end),
-        unhandled_encoder = maps_get(unhandled_encoder, Opts, fun (X, O) ->
-            encode_unhandled(X, O)
-        end),
-        escaper =
-            case maps_get(escaper, Opts, json) of
-                json ->
-                    fun(X, _O) -> [$", escape_json(X, [], X, 0), $"] end;
-                html ->
-                    fun(X, _O) -> [$", escape_html(X, [], X, 0), $"] end;
-                javascript ->
-                    fun(X, _O) -> [$", escape_js(X, [], X, 0), $"] end;
-                unicode ->
-                    fun(X, _O) -> [$", escape_unicode(X, [], X, 0), $"] end;
-                Fun when is_function(Fun, 2) ->
-                    Fun
-            end,
-        error_handler = maps_get(error_handler, Opts, fun(C, R, S) ->
-            handle_error(C, R, S)
-        end),
-        plugins = maps_get(plugins, Opts, [])
+parse_opts(Opts) when is_map(Opts) ->
+    % TODO: Escape html, javascript, and unicode.
+    Escape = maps:get(escape, Opts, fun json:encode_binary/1),
+    NullValues = maps:get(nulls, Opts, ?NULLS),
+    Nulls = maps:from_keys(NullValues, null),
+    IntToBin = maps:get(integer_to_binary, Opts, fun erlang:integer_to_binary/1),
+    FloatToBin = maps:get(float_to_binary, Opts, fun(Float) ->
+        erlang:float_to_binary(Float, [short])
+    end),
+    #state{
+        escape = Escape,
+        encode_atom = encode_callback(
+            normalize_atom_codecs(get_codecs(atom, Opts)),
+            maps:get(encode_atom, Opts, fun(Atom, _Encode, _State) ->
+                encode_atom(Atom, Nulls, Escape)
+            end)
+        ),
+        encode_binary = encode_callback(
+            normalize_binary_codecs(get_codecs(binary, Opts)),
+            maps:get(encode_binary, Opts, fun(Bin, _Encode, _State) ->
+                Escape(Bin)
+            end)
+        ),
+        encode_integer = encode_callback(
+            normalize_integer_codecs(get_codecs(integer, Opts)),
+            maps:get(encode_integer, Opts, fun(Int, _Encode, _State) ->
+                IntToBin(Int)
+            end)
+        ),
+        encode_float = encode_callback(
+            normalize_float_codecs(get_codecs(float, Opts)),
+            maps:get(encode_float, Opts, fun(Float, _Encode, _State) ->
+                FloatToBin(Float)
+            end)
+        ),
+        encode_list = encode_callback(
+            normalize_list_codecs(get_codecs(list, Opts)),
+            maps:get(encode_list, Opts, fun(List, Encode, _State) ->
+                json:encode_list(List, Encode)
+            end)
+        ),
+        encode_map = encode_callback(
+            normalize_map_codecs(get_codecs(map, Opts), Nulls),
+            maps:get(encode_map, Opts,
+                case maps:get(sort_keys, Opts, false) of
+                    true ->
+                        fun(Map, Encode, State) ->
+                            encode_sorted_map(Map, Encode, State)
+                        end;
+                    false ->
+                        fun(Map, Encode, State) ->
+                            encode_map(Map, Encode, State)
+                        end
+                end
+            )
+        ),
+        encode_tuple = encode_callback(
+            normalize_tuple_codecs(get_codecs(tuple, Opts)),
+            maps:get(encode_tuple, Opts, fun(Unsupported, _Encode, _State) ->
+                unsupported_type_error(Unsupported)
+            end)
+        ),
+        encode_pid = encode_callback(
+            normalize_pid_codecs(get_codecs(pid, Opts)),
+            maps:get(encode_pid, Opts, fun(Unsupported, _Encode, _State) ->
+                unsupported_type_error(Unsupported)
+            end)
+        ),
+        encode_port = encode_callback(
+            normalize_port_codecs(get_codecs(port, Opts)),
+            maps:get(encode_port, Opts, fun(Unsupported, _Encode, _State) ->
+                unsupported_type_error(Unsupported)
+            end)
+        ),
+        encode_ref = encode_callback(
+            normalize_reference_codecs(get_codecs(reference, Opts)),
+            maps:get(encode_ref, Opts, fun(Unsupported, _Encode, _State) ->
+                unsupported_type_error(Unsupported)
+            end)
+        ),
+        integer_to_binary = IntToBin,
+        float_to_binary = FloatToBin
     }.
-
-%%%---------------------------------------------------------------------
-%%% Options
-%%%---------------------------------------------------------------------
-
-get_nulls_option(#opts{nulls = Nulls}) ->
-    Nulls.
-
-get_binary_encoder_option(#opts{binary_encoder = BinaryEncoder}) ->
-    BinaryEncoder.
-
-get_atom_encoder_option(#opts{atom_encoder = AtomEncoder}) ->
-    AtomEncoder.
-
-get_integer_encoder_option(#opts{integer_encoder = IntegerEncoder}) ->
-    IntegerEncoder.
-
-get_float_encoder_option(#opts{float_encoder = FloatEncoder}) ->
-    FloatEncoder.
-
-get_list_encoder_option(#opts{list_encoder = ListEncoder}) ->
-    ListEncoder.
-
-get_map_encoder_option(#opts{map_encoder = MapEncoder}) ->
-    MapEncoder.
-
-get_unhandled_encoder_option(#opts{unhandled_encoder = UnhandledEncoder}) ->
-    UnhandledEncoder.
-
-get_escaper_option(#opts{escaper = Escaper}) ->
-    Escaper.
-
-get_error_handler_option(#opts{error_handler = Handler}) ->
-    Handler.
-
-get_plugins_option(#opts{plugins = Plugins}) ->
-    Plugins.
-
-%%----------------------------------------------------------------------
-%% @doc Generates a JSON from Erlang term.
-%%
-%% @param Term :: {@link euneus_encoder:input()}.
-%% @param Opts :: {@link euneus_encoder:parsed_options()}.
-%%
-%% @returns {@link euneus_encoder:result()}.
-%%
-%% @see euneus_encoder:parse_opts/1
-%%
-%% @end
-%%----------------------------------------------------------------------
--spec encode_parsed(input(), parsed_options()) -> result().
-
-encode_parsed(Term, Opts) ->
-    try
-        {ok, value(Term, Opts)}
-    catch
-        Class:Reason:Stacktrace ->
-            Handle = Opts#opts.error_handler,
-            Handle(Class, Reason, Stacktrace)
-    end.
-
-encode_binary(Bin, Opts) ->
-    escape(Bin, Opts).
-
-encode_atom(true, _Opts) ->
-    <<"true">>;
-encode_atom(false, _Opts) ->
-    <<"false">>;
-encode_atom(Atom, #opts{nulls = Nulls} = Opts) ->
-    case lists:member(Atom, Nulls) of
-        true ->
-            <<"null">>;
-        false ->
-            escape(atom_to_binary(Atom, utf8), Opts)
-    end.
-
-encode_integer(Int, _Opts) ->
-    integer_to_binary(Int).
-
-encode_float(Float, _Opts) ->
-    float_to_binary(Float, [short]).
-
-encode_list([H | T], Opts) ->
-    [$[, value(H, Opts), do_encode_list_loop(T, Opts)];
-encode_list([], _Opts) ->
-    <<"[]">>.
-
-do_encode_list_loop([], _Opts) ->
-    [$]];
-do_encode_list_loop([H | T], Opts) ->
-    [$,, value(H, Opts) | do_encode_list_loop(T, Opts)].
-
-encode_map(Map, Opts) ->
-    do_encode_map(maps_to_list(Map), Opts).
-
-do_encode_map([{K, V} | T], Opts) ->
-    [${, key(K, Opts), $:, value(V, Opts) | do_encode_map_loop(T, Opts)];
-do_encode_map([], _) ->
-    <<"{}">>.
-
-do_encode_map_loop([], _Opts) ->
-    [$}];
-do_encode_map_loop([{K, V} | T], Opts) ->
-    [$,, key(K, Opts), $:, value(V, Opts) | do_encode_map_loop(T, Opts)].
-
-encode_unhandled(Term, _Opts) ->
-    throw_unsupported_type_error(Term).
-
-escape(Bin, #opts{escaper = Escape} = Opts) ->
-    Escape(Bin, Opts).
-
-escape_json(Bin) ->
-    escape_json(Bin, [], Bin, 0).
-
-escape_json(Data, Acc, Input, Pos) ->
-    case Data of
-        <<$"/integer, Rest/bitstring>> ->
-            Acc1 = [Acc | <<"\\\"">>],
-            escape_json(Rest, Acc1, Input, Pos+1);
-        <<$\\/integer, Rest/bitstring>> ->
-            Acc1 = [Acc | <<"\\\\">>],
-            escape_json(Rest, Acc1, Input, Pos+1);
-        <<Byte/integer, Rest/bitstring>> when Byte =< ?NON_PRINTABLE_LAST ->
-            Acc1 = [Acc | escape_byte(Byte)],
-            escape_json(Rest, Acc1, Input, Pos+1);
-        <<Byte/integer, Rest/bitstring>> when Byte =< ?ONE_BYTE_LAST ->
-            escape_json_chunk(Rest, Acc, Input, Pos, 1);
-        <<Char/utf8, Rest/bitstring>> when Char =< ?TWO_BYTE_LAST ->
-            escape_json_chunk(Rest, Acc, Input, Pos, 2);
-        <<Char/utf8, Rest/bitstring>> when Char =< ?THREE_BYTE_LAST ->
-            escape_json_chunk(Rest, Acc, Input, Pos, 3);
-        <<_Char/utf8, Rest/bitstring>> ->
-            escape_json_chunk(Rest, Acc, Input, Pos, 4);
-        <<>> ->
-            Acc;
-        <<Byte/integer, _Rest/bitstring>> ->
-            throw_invalid_byte_error(Byte, Input)
-    end.
-
-escape_json_chunk(Data, Acc, Input, Pos, Len) ->
-    case Data of
-        <<$"/integer, Rest/bitstring>> ->
-            Part = binary_part(Input, Pos, Len),
-            Acc1 = [Acc | [Part, <<"\\\"">>]],
-            escape_json(Rest, Acc1, Input, Pos+Len+1);
-        <<$\\/integer, Rest/bitstring>> ->
-            Part = binary_part(Input, Pos, Len),
-            Acc1 = [Acc | [Part, <<"\\\\">>]],
-            escape_json(Rest, Acc1, Input, Pos+Len+1);
-        <<Byte/integer, Rest/bitstring>> when Byte =< ?NON_PRINTABLE_LAST ->
-            Part = binary_part(Input, Pos, Len),
-            Acc1 = [Acc | [Part, escape_byte(Byte)]],
-            escape_json(Rest, Acc1, Input, Pos+Len+1);
-        <<Byte/integer, Rest/bitstring>> when Byte =< ?ONE_BYTE_LAST ->
-            escape_json_chunk(Rest, Acc, Input, Pos, Len+1);
-        <<>> ->
-            case Acc =:= [] of
-                true ->
-                    binary_part(Input, Pos, Len);
-                false ->
-                    [Acc, binary_part(Input, Pos, Len)]
-            end;
-        <<Char/utf8, Rest/bitstring>> when Char =< ?TWO_BYTE_LAST ->
-            escape_json_chunk(Rest, Acc, Input, Pos, Len+2);
-        <<Char/utf8, Rest/bitstring>> when Char =< ?THREE_BYTE_LAST ->
-            escape_json_chunk(Rest, Acc, Input, Pos, Len+3);
-        <<_Char/utf8, Rest/bitstring>> ->
-            escape_json_chunk(Rest, Acc, Input, Pos, Len+4);
-        <<Byte/integer, _Rest/bitstring>> ->
-            throw_invalid_byte_error(Byte, Input)
-    end.
-
-escape_html(Bin) ->
-    escape_html(Bin, [], Bin, 0).
-
-escape_html(Data, Acc, Input, Pos) ->
-    case Data of
-        <<$"/integer, Rest/bitstring>> ->
-          Acc1 = [Acc, <<"\\\"">>],
-          escape_html(Rest, Acc1, Input, Pos+1);
-        <<$\\/integer, Rest/bitstring>> ->
-            Acc1 = [Acc | <<"\\\\">>],
-            escape_html(Rest, Acc1, Input, Pos+1);
-        <<$//integer, Rest/bitstring>> ->
-          Acc1 = [Acc | <<"\\/">>],
-          escape_html(Rest, Acc1, Input, Pos+1);
-        <<Byte/integer, Rest/bitstring>> when Byte < 33 ->
-            Acc1 = [Acc, escape_byte(Byte)],
-            escape_html(Rest, Acc1, Input, Pos+1);
-        <<Byte/integer, Rest/bitstring>> when Byte =< ?ONE_BYTE_LAST ->
-            escape_html_chunk(Rest, Acc, Input, Pos, 1);
-        <<Char/utf8, Rest/bitstring>> when Char =< ?TWO_BYTE_LAST ->
-            escape_html_chunk(Rest, Acc, Input, Pos, 2);
-        <<8232/utf8, Rest/bitstring>> ->
-            Acc1 = [Acc | <<"\\u2028">>],
-            escape_html(Rest, Acc1, Input, Pos+3);
-        <<8233/utf8, Rest/bitstring>> ->
-            Acc1 = [Acc | <<"\\u2029">>],
-            escape_html(Rest, Acc1, Input, Pos+3);
-        <<Char/utf8, Rest/bitstring>> when Char =< ?THREE_BYTE_LAST ->
-            escape_html_chunk(Rest, Acc, Input, Pos, 3);
-        <<_Char/utf8, Rest/bitstring>> ->
-            escape_html_chunk(Rest, Acc, Input, Pos, 4);
-        <<>> ->
-            Acc;
-        <<Byte/integer, _Rest/bitstring>> ->
-            throw_invalid_byte_error(Byte, Input)
-    end.
-
-escape_html_chunk(Data, Acc, Input, Pos, Len) ->
-    case Data of
-        <<$"/integer, Rest/bitstring>> ->
-            Part = binary_part(Input, Pos, Len),
-            Acc2 = [Acc | [Part, <<"\\\"">>]],
-            escape_html(Rest, Acc2, Input, Pos+Len+1);
-        <<$\\/integer, Rest/bitstring>> ->
-            Part = binary_part(Input, Pos, Len),
-            Acc2 = [Acc | [Part, <<"\\\\">>]],
-            escape_html(Rest, Acc2, Input, Pos+Len+1);
-        <<$//integer, Rest/bitstring>> ->
-            Part = binary_part(Input, Pos, Len),
-            Acc2 = [Acc | [Part, <<"\\/">>]],
-            escape_html(Rest, Acc2, Input, Pos+Len+1);
-        <<Byte/integer, Rest/bitstring>> when Byte =< ?NON_PRINTABLE_LAST ->
-            Part = binary_part(Input, Pos, Len),
-            Acc2 = [Acc, Part, escape_byte(Byte)],
-            escape_html(Rest, Acc2, Input, Pos+Len+1);
-        <<Byte/integer, Rest/bitstring>> when Byte =< ?ONE_BYTE_LAST ->
-            escape_html_chunk(Rest, Acc, Input, Pos, Len+1);
-        <<>> ->
-            case Acc =:= [] of
-                true ->
-                    binary_part(Input, Pos, Len);
-                false ->
-                    [Acc, binary_part(Input, Pos, Len)]
-            end;
-        <<Char/utf8, Rest/bitstring>> when Char =< ?TWO_BYTE_LAST ->
-            escape_html_chunk(Rest, Acc, Input, Pos, Len+2);
-        <<8232/utf8, Rest/bitstring>> ->
-            Part = binary_part(Input, Pos, Len),
-            Acc2 = [Acc | [Part, <<"\\u2028">>]],
-            escape_html(Rest, Acc2, Input, Pos+Len+3);
-        <<8233/utf8, Rest/bitstring>> ->
-            Part = binary_part(Input, Pos, Len),
-            Acc2 = [Acc | [Part, <<"\\u2029">>]],
-            escape_html(Rest, Acc2, Input, Pos+Len+3);
-        <<Char/utf8, Rest/bitstring>> when Char =< ?THREE_BYTE_LAST ->
-            escape_html_chunk(Rest, Acc, Input, Pos, Len+3);
-        <<_Char/utf8, Rest/bitstring>> ->
-            escape_html_chunk(Rest, Acc, Input, Pos, Len+4);
-        <<Byte/integer, _Rest/bitstring>> ->
-            throw_invalid_byte_error(Byte, Input)
-    end.
-
-escape_js(Bin) ->
-    escape_js(Bin, [], Bin, 0).
-
-escape_js(Data, Acc, Input, Pos) ->
-    case Data of
-        <<$"/integer, Rest/bitstring>> ->
-            Acc1 = [Acc | <<"\\\"">>],
-            escape_js(Rest, Acc1, Input, Pos+1);
-        <<$\\/integer, Rest/bitstring>> ->
-            Acc1 = [Acc | <<"\\\\">>],
-            escape_js(Rest, Acc1, Input, Pos+1);
-        <<Byte/integer, Rest/bitstring>> when Byte =< ?NON_PRINTABLE_LAST ->
-            Acc1 = [Acc | escape_byte(Byte)],
-            escape_js(Rest, Acc1, Input, Pos+1);
-        <<Byte/integer, Rest/bitstring>> when Byte =< ?ONE_BYTE_LAST ->
-            escape_js_chunk(Rest, Acc, Input, Pos, 1);
-        <<Char/utf8, Rest/bitstring>> when Char =< ?TWO_BYTE_LAST ->
-            escape_js_chunk(Rest, Acc, Input, Pos, 2);
-        <<8232/utf8, Rest/bitstring>> ->
-            Acc1 = [Acc | <<"\\u2028">>],
-            escape_js(Rest, Acc1, Input, Pos+3);
-        <<8233/utf8, Rest/bitstring>> ->
-            Acc1 = [Acc | <<"\\u2029">>],
-            escape_js(Rest, Acc1, Input, Pos+3);
-        <<Char/utf8, Rest/bitstring>> when Char =< ?THREE_BYTE_LAST ->
-            escape_js_chunk(Rest, Acc, Input, Pos, 3);
-        <<_Char/utf8, Rest/bitstring>> ->
-            escape_js_chunk(Rest, Acc, Input, Pos, 4);
-        <<>> ->
-            Acc;
-        <<Byte/integer, _Rest/bitstring>> ->
-            throw_invalid_byte_error(Byte, Input)
-    end.
-
-escape_js_chunk(Data, Acc, Input, Pos, Len) ->
-    case Data of
-        <<$"/integer, Rest/bitstring>> ->
-            Part = binary_part(Input, Pos, Len),
-            Acc1 = [Acc | [Part, <<"\\\"">>]],
-            escape_js(Rest, Acc1, Input, Pos+Len+1);
-        <<$\\/integer, Rest/bitstring>> ->
-            Part = binary_part(Input, Pos, Len),
-            Acc1 = [Acc | [Part, <<"\\\\">>]],
-            escape_js(Rest, Acc1, Input, Pos+Len+1);
-        <<Byte/integer, Rest/bitstring>> when Byte =< ?NON_PRINTABLE_LAST ->
-            Part = binary_part(Input, Pos, Len),
-            Acc1 = [Acc | [Part, escape_byte(Byte)]],
-            escape_js(Rest, Acc1, Input, Pos+Len+1);
-        <<Byte/integer, Rest/bitstring>> when Byte =< ?ONE_BYTE_LAST ->
-            escape_js_chunk(Rest, Acc, Input, Pos, Len+1);
-        <<>> ->
-            case Acc =:= [] of
-                true ->
-                    binary_part(Input, Pos, Len);
-                false ->
-                    [Acc, binary_part(Input, Pos, Len)]
-            end;
-        <<Char/utf8, Rest/bitstring>> when Char =< ?TWO_BYTE_LAST ->
-            escape_js_chunk(Rest, Acc, Input, Pos, Len+2);
-        <<8232/utf8, Rest/bitstring>> ->
-            Part = binary_part(Input, Pos, Len),
-            Acc1 = [Acc | [Part, <<"\\u2028">>]],
-            escape_js(Rest, Acc1, Input, Pos+Len+3);
-        <<8233/utf8, Rest/bitstring>> ->
-            Part = binary_part(Input, Pos, Len),
-            Acc1 = [Acc | [Part, <<"\\u2029">>]],
-            escape_js(Rest, Acc1, Input, Pos+Len+3);
-        <<Char/utf8, Rest/bitstring>> when Char =< ?THREE_BYTE_LAST ->
-            escape_js_chunk(Rest, Acc, Input, Pos, Len+3);
-        <<_Char/utf8, Rest/bitstring>> ->
-            escape_js_chunk(Rest, Acc, Input, Pos, Len+4);
-        <<Byte/integer, _Rest/bitstring>> ->
-            throw_invalid_byte_error(Byte, Input)
-    end.
-
-escape_unicode(Bin) ->
-    escape_unicode(Bin, [], Bin, 0).
-
-escape_unicode(Data, Acc, Input, Pos) ->
-    case Data of
-        <<$"/integer, Rest/bitstring>> ->
-            Acc1 = [Acc | <<"\\\"">>],
-            escape_unicode(Rest, Acc1, Input, Pos+1);
-        <<$\\/integer, Rest/bitstring>> ->
-            Acc1 = [Acc | <<"\\\\">>],
-            escape_unicode(Rest, Acc1, Input, Pos+1);
-        <<Byte/integer, Rest/bitstring>> when Byte =< ?NON_PRINTABLE_LAST ->
-            Acc1 = [Acc | escape_byte(Byte)],
-            escape_unicode(Rest, Acc1, Input, Pos+1);
-        <<Byte/integer, Rest/bitstring>> when Byte =< ?ONE_BYTE_LAST ->
-            escape_unicode_chunk(Rest, Acc, Input, Pos, 1);
-        <<Char/utf8, Rest/bitstring>> when Char < 256 ->
-            Acc1 = [Acc | [<<"\\u00">>, integer_to_binary(Char, 16)]],
-            escape_unicode(Rest, Acc1, Input, Pos+2);
-        <<Char/utf8, Rest/bitstring>> when Char =< ?TWO_BYTE_LAST ->
-            Acc1 = [Acc | [<<"\\u0">>, integer_to_binary(Char, 16)]],
-            escape_unicode(Rest, Acc1, Input, Pos+2);
-        <<Char/utf8, Rest/bitstring>> when Char < 4096 ->
-            Acc1 = [Acc | [<<"\\u0">>, integer_to_binary(Char, 16)]],
-            escape_unicode(Rest, Acc1, Input, Pos+3);
-        <<Char/utf8, Rest/bitstring>> when Char =< ?THREE_BYTE_LAST ->
-            Acc1 = [Acc | [<<"\\u">>, integer_to_binary(Char, 16)]],
-            escape_unicode(Rest, Acc1, Input, Pos+3);
-        <<Char0/utf8, Rest/bitstring>> ->
-            Char = Char0 - 65536,
-            Acc1 = [ Acc
-                   | [ <<"\\uD">>
-                     , integer_to_binary(2048 bor (Char bsr 10), 16)
-                     , <<"\\uD">>
-                     , integer_to_binary(3072 bor Char band 1023, 16) ]
-                   ],
-            escape_unicode(Rest, Acc1, Input, Pos+4);
-        <<>> ->
-            Acc;
-        <<Byte/integer, _Rest/bitstring>> ->
-            throw_invalid_byte_error(Byte, Input)
-    end.
-
-escape_unicode_chunk(Data, Acc, Input, Pos, Len) ->
-    case Data of
-        <<$"/integer, Rest/bitstring>> ->
-            Part = binary_part(Input, Pos, Len),
-            Acc1 = [Acc | [Part, <<"\\\"">>]],
-            escape_unicode(Rest, Acc1, Input, Pos+Len+1);
-        <<$\\/integer, Rest/bitstring>> ->
-            Part = binary_part(Input, Pos, Len),
-            Acc1 = [Acc | [Part, <<"\\\\">>]],
-            escape_unicode(Rest, Acc1, Input, Pos+Len+1);
-        <<Byte/integer, Rest/bitstring>> when Byte =< ?NON_PRINTABLE_LAST ->
-            Part = binary_part(Input, Pos, Len),
-            Acc1 = [Acc | [Part, escape_byte(Byte)]],
-            escape_unicode(Rest, Acc1, Input, Pos+Len+1);
-        <<Byte/integer, Rest/bitstring>> when Byte =< ?ONE_BYTE_LAST ->
-            escape_unicode_chunk(Rest, Acc, Input, Pos, Len+1);
-        <<>> ->
-            case Acc =:= [] of
-                true ->
-                    binary_part(Input, Pos, Len);
-                false ->
-                    [Acc | binary_part(Input, Pos, Len)]
-            end;
-        <<Char/utf8, Rest/bitstring>> when Char < 256 ->
-            Part = binary_part(Input, Pos, Len),
-            Acc1 = [Acc | [Part, <<"\\u00">>, integer_to_binary(Char, 16)]],
-            escape_unicode(Rest, Acc1, Input, Pos+Len+2);
-        <<Char/utf8, Rest/bitstring>> when Char =< ?TWO_BYTE_LAST ->
-            Part = binary_part(Input, Pos, Len),
-            Acc1 = [Acc | [Part, <<"\\u0">>, integer_to_binary(Char, 16)]],
-            escape_unicode(Rest, Acc1, Input, Pos+Len+2);
-        <<Char/utf8, Rest/bitstring>> when Char < 4096 ->
-            Part = binary_part(Input, Pos, Len),
-            Acc1 = [Acc | [Part, <<"\\u0">>, integer_to_binary(Char, 16)]],
-            escape_unicode(Rest, Acc1, Input, Pos+Len+3);
-        <<Char/utf8, Rest/bitstring>> when Char =< ?THREE_BYTE_LAST ->
-            Part = binary_part(Input, Pos, Len),
-            Acc1 = [Acc | [Part, <<"\\u">>, integer_to_binary(Char, 16)]],
-            escape_unicode(Rest, Acc1, Input, Pos+Len+3);
-        <<Char0/utf8, Rest/bitstring>> ->
-            Char = Char0 - 65536,
-            Part = binary_part(Input, Pos, Len),
-            Acc1 = [ Acc
-                   | [ Part
-                     , <<"\\uD">>
-                     , integer_to_binary(2048 bor (Char bsr 10), 16)
-                     , <<"\\uD">>
-                     , integer_to_binary(3072 bor Char band 1023, 16) ]
-                   ],
-            escape_unicode(Rest, Acc1, Input, Pos+Len+4);
-        <<Byte/integer, _Rest/bitstring>> ->
-            throw_invalid_byte_error(Byte, Input)
-    end.
-
-escape_byte(0) -> <<"\\u0000">>;
-escape_byte(1) -> <<"\\u0001">>;
-escape_byte(2) -> <<"\\u0002">>;
-escape_byte(3) -> <<"\\u0003">>;
-escape_byte(4) -> <<"\\u0004">>;
-escape_byte(5) -> <<"\\u0005">>;
-escape_byte(6) -> <<"\\u0006">>;
-escape_byte(7) -> <<"\\u0007">>;
-escape_byte($\b) -> <<"\\b">>;
-escape_byte($\t) -> <<"\\t">>;
-escape_byte($\n) -> <<"\\n">>;
-escape_byte($\v) -> <<"\\u000B">>;
-escape_byte($\f) -> <<"\\f">>;
-escape_byte($\r) -> <<"\\r">>;
-escape_byte(14) -> <<"\\u000E">>;
-escape_byte(15) -> <<"\\u000F">>;
-escape_byte(16) -> <<"\\u0010">>;
-escape_byte(17) -> <<"\\u0011">>;
-escape_byte(18) -> <<"\\u0012">>;
-escape_byte(19) -> <<"\\u0013">>;
-escape_byte(20) -> <<"\\u0014">>;
-escape_byte(21) -> <<"\\u0015">>;
-escape_byte(22) -> <<"\\u0016">>;
-escape_byte(23) -> <<"\\u0017">>;
-escape_byte(24) -> <<"\\u0018">>;
-escape_byte(25) -> <<"\\u0019">>;
-escape_byte(26) -> <<"\\u001A">>;
-escape_byte($\e) -> <<"\\u001B">>;
-escape_byte(28) -> <<"\\u001C">>;
-escape_byte(29) -> <<"\\u001D">>;
-escape_byte(30) -> <<"\\u001E">>;
-escape_byte(31) -> <<"\\u001F">>;
-escape_byte($\") -> <<"\\\"">>;
-escape_byte($/) -> <<"\\/">>;
-escape_byte($\\) -> <<"\\\\">>;
-escape_byte(Byte) -> throw_invalid_byte_error(Byte, Byte).
-
-throw_unsupported_type_error(Term) ->
-    throw({unsupported_type, Term}).
-
-throw_invalid_byte_error(Byte, Input) ->
-    throw({invalid_byte, Byte, Input}).
-
-handle_error(throw, Reason, _Stacktrace) ->
-    case Reason of
-        {unsupported_type, Unsupported} ->
-            {error, {unsupported_type, Unsupported}};
-        {invalid_byte, Byte0, Input} ->
-            Byte = <<"0x"/utf8, (integer_to_binary(Byte0, 16))/binary>>,
-            {error, {invalid_byte, Byte, Input}};
-        _ ->
-            {error, Reason}
-    end;
-handle_error(Class, Reason, Stacktrace) ->
-    erlang:raise(Class, Reason, Stacktrace).
 
 %%%=====================================================================
 %%% Internal functions
 %%%=====================================================================
 
-key(Atom, #opts{binary_encoder = Encode} = Opts) when is_atom(Atom) ->
-    Encode(atom_to_binary(Atom, utf8), Opts);
-key(Bin, #opts{binary_encoder = Encode} = Opts) when is_binary(Bin) ->
-    Encode(Bin, Opts);
-key(Int, #opts{binary_encoder = Encode} = Opts) when is_integer(Int) ->
-    Encode(integer_to_binary(Int), Opts);
-key(String, #opts{binary_encoder = Encode} = Opts) when is_list(String) ->
-    Encode(list_to_binary(String), Opts).
+%%
+%% Encode
+%%
 
-value(Term, #opts{plugins = Plugins} = Opts) ->
-    case plugins(Plugins, Term, Opts) of
-        next ->
-            encode_term(Term, Opts);
-        {halt, IOData} ->
-            IOData
+encode_callback([], Next) when is_function(Next, 3) ->
+    Next;
+encode_callback(Codecs, Next) when is_list(Codecs) ->
+    fun(Term, Encode, State) ->
+        traverse_codecs(Codecs, Next, Term, Encode, State)
     end.
 
-plugins([], _Term, _Opts) ->
-    next;
-plugins([datetime | T], Term, Opts) ->
-    case Term of
-        {{YYYY,MM,DD},{H,M,S}}
-          when ?min(YYYY, 0), ?range(MM, 1, 12), ?range(DD, 1, 31)
-             , ?range(H, 0, 23), ?range(M, 0, 59), ?range(S, 0, 59) ->
-            DateTime = iolist_to_binary(io_lib:format(
-                "~4.10.0B-~2.10.0B-~2.10.0BT~2.10.0B:~2.10.0B:~2.10.0BZ",
-                [YYYY,MM,DD,H,M,S])
-            ),
-            {halt, escape(DateTime, Opts)};
-        _ ->
-            plugins(T, Term, Opts)
+do_encode(InitialTerm, State) ->
+    json:encode(InitialTerm, fun(Term, Encode) ->
+        value(Term, Encode, State)
+    end).
+
+key(Key, Encode, State = #state{encode_binary = EncodeBinary})
+    when is_binary(Key) ->
+    EncodeBinary(Key, Encode, State);
+key(Key, Encode, State = #state{encode_binary = EncodeBinary})
+    when is_atom(Key) ->
+    EncodeBinary(atom_to_binary(Key, utf8), Encode, State);
+key(Key, Encode, State = #state{encode_binary = EncodeBinary})
+    when is_list(Key) ->
+    EncodeBinary(iolist_to_binary(Key), Encode, State);
+key(Key, Encode, State = #state{encode_binary = EncodeBinary})
+    when is_integer(Key) ->
+    IntToBin = State#state.integer_to_binary,
+    EncodeBinary(IntToBin(Key), Encode, State);
+key(Key, Encode, State = #state{encode_binary = EncodeBinary})
+    when is_float(Key) ->
+    FloatToBin = State#state.float_to_binary,
+    EncodeBinary(FloatToBin(Key), Encode, State).
+
+value(Atom, Encode, State = #state{encode_atom = EncodeAtom})
+    when is_atom(Atom) ->
+    EncodeAtom(Atom, Encode, State);
+value(Bin, Encode, State = #state{encode_binary = EncodeBinary})
+    when is_binary(Bin) ->
+    EncodeBinary(Bin, Encode, State);
+value(Int, Encode, State = #state{encode_integer = EncodeInt})
+    when is_integer(Int) ->
+    EncodeInt(Int, Encode, State);
+value(Float, Encode, State = #state{encode_float = EncodeFloat})
+    when is_float(Float) ->
+    EncodeFloat(Float, Encode, State);
+value(List, Encode, State = #state{encode_list = EncodeList})
+    when is_list(List) ->
+    EncodeList(List, Encode, State);
+value(Map, Encode, State = #state{encode_map = EncodeMap})
+    when is_map(Map) ->
+    EncodeMap(Map, Encode, State);
+value(Tuple, Encode, State = #state{encode_tuple = EncodeTuple})
+    when is_tuple(Tuple) ->
+    EncodeTuple(Tuple, Encode, State);
+value(PID, Encode, State = #state{encode_pid = EncodePID})
+    when is_pid(PID) ->
+    EncodePID(PID, Encode, State);
+value(Port, Encode, State = #state{encode_port = EncodePort})
+    when is_port(Port) ->
+    EncodePort(Port, Encode, State);
+value(Ref, Encode, State = #state{encode_ref = EncodeRef})
+    when is_reference(Ref) ->
+    EncodeRef(Ref, Encode, State);
+value(Unsupported, _Encode, _State) ->
+    unsupported_type_error(Unsupported).
+
+%%
+%% Errors
+%%
+
+unsupported_type_error(Unsupported) ->
+    error({unsupported_type, Unsupported}).
+
+%%
+%% Custom encoders
+%%
+
+encode_atom(true, _Nulls, _Escape) ->
+    <<"true">>;
+encode_atom(false, _Nulls, _Escape) ->
+    <<"false">>;
+encode_atom(Atom, Nulls, _Escape) when is_map_key(Atom, Nulls) ->
+    <<"null">>;
+encode_atom(Atom, _Nulls, Escape) ->
+    Escape(atom_to_binary(Atom, utf8)).
+
+encode_map(Map, Encode, State) ->
+    encode_object([
+        [$,, key(Key, Encode, State), $: | value(Value, Encode, State)]
+        || Key := Value <- Map
+    ]).
+
+encode_sorted_map(Map, Encode, State) ->
+    encode_object([
+        [$,, key(Key, Encode, State), $: | value(Value, Encode, State)]
+        || {Key, Value} <- lists:keysort(1, maps:to_list(Map))
+    ]).
+
+encode_object([]) -> <<"{}">>;
+encode_object([[_Comma | Entry] | Rest]) -> ["{", Entry, Rest, "}"].
+
+%%
+%% Codecs
+%%
+
+get_codecs(Name, Opts) ->
+    case maps:get(Name, Opts, []) of
+        Codecs when is_list(Codecs) ->
+            Codecs;
+        Codec ->
+            [Codec]
+    end.
+
+traverse_codecs([Codec | Codecs], Next, Term, Encode, State) ->
+    case codec(Codec, Term, Encode, State) of
+        next ->
+            traverse_codecs(Codecs, Next, Term, Encode, State);
+        {next, NewTerm} ->
+            traverse_codecs(Codecs, Next, NewTerm, Encode, State);
+        {halt, NewTerm} ->
+            NewTerm
     end;
-plugins([inet | T], Term, Opts) ->
-    case Term of
-        {_A,_B,_C,_D} ->
-            case inet_parse:ntoa(Term) of
-                {error, einval} ->
-                    plugins(T, Term, Opts);
-                Ipv4 ->
-                    {halt, escape(list_to_binary(Ipv4), Opts)}
-            end;
-        {_A,_B,_C,_D,_E,_F,_G,_H} ->
-            case inet_parse:ntoa(Term) of
-                {error, einval} ->
-                    plugins(T, Term, Opts);
-                Ipv6 ->
-                    {halt, escape(list_to_binary(Ipv6), Opts)}
-            end;
-        _ ->
-            plugins(T, Term, Opts)
-    end;
-plugins([pid | T], Term, Opts) ->
-    case is_pid(Term) of
+traverse_codecs([], Next, Term, Encode, State) ->
+    Next(Term, Encode, State).
+
+codec({Codec, Opts}, Term, Encode, State) ->
+    Codec(Term, Opts, Encode, State);
+codec(Codec, Term, Encode, State) ->
+    Codec(Term, Encode, State).
+
+%%
+%% Atom codecs
+%%
+
+normalize_atom_codecs(Codecs) ->
+    lists:map(fun
+        (Fun) when is_function(Fun, 3) ->
+            Fun;
+        ({Fun, Opts}) when is_function(Fun, 4) ->
+            {Fun, Opts}
+    end, Codecs).
+
+%%
+%% Binary codecs
+%%
+
+normalize_binary_codecs(Codecs) ->
+    lists:map(fun
+        (Fun) when is_function(Fun, 3) ->
+            Fun;
+        ({Fun, Opts}) when is_function(Fun, 4) ->
+            {Fun, Opts}
+    end, Codecs).
+
+%%
+%% Integer codecs
+%%
+
+normalize_integer_codecs(Codecs) ->
+    lists:map(fun
+        (Fun) when is_function(Fun, 3) ->
+            Fun;
+        ({Fun, Opts}) when is_function(Fun, 4) ->
+            {Fun, Opts}
+    end, Codecs).
+
+%%
+%% Float codecs
+%%
+
+normalize_float_codecs(Codecs) ->
+    lists:map(fun
+        (Fun) when is_function(Fun, 3) ->
+            Fun;
+        ({Fun, Opts}) when is_function(Fun, 4) ->
+            {Fun, Opts}
+    end, Codecs).
+
+%%
+%% List codecs
+%%
+
+% NOTE: To drop null, this works:
+% 1> euneus_encoder:encode([{a,a},b,{c,null}], #{list => [proplist], map => [drop_nulls]}).
+% <<"{\"a\":\"a\",\"b\":true}">>
+normalize_list_codecs(Codecs) ->
+    lists:map(fun
+        (proplist) ->
+            {fun proplist_list_codec/4, fun is_proplist/1};
+        ({proplist, IsProplist}) when is_function(IsProplist, 1) ->
+            {fun proplist_list_codec/4, IsProplist};
+        (Fun) when is_function(Fun, 3) ->
+            Fun;
+        ({Fun, Opts}) when is_function(Fun, 4) ->
+            {Fun, Opts}
+    end, Codecs).
+
+is_proplist(List) ->
+    lists:all(fun is_proplist_prop/1, List).
+
+is_proplist_prop({Key, _}) ->
+    is_binary(Key) orelse is_atom(Key) orelse is_integer(Key);
+is_proplist_prop(Key) ->
+    is_binary(Key) orelse is_atom(Key).
+
+proplist_list_codec(List, IsProplist, Encode, _State) ->
+    case IsProplist(List) of
         true ->
-            Pid = iolist_to_binary(pid_to_list(Term)),
-            {halt, escape(Pid, Opts)};
+            {halt, Encode(proplists:to_map(List), Encode)};
         false ->
-            plugins(T, Term, Opts)
+            next
+    end.
+
+%%
+%% Map codecs
+%%
+
+normalize_map_codecs(Codecs, Nulls) ->
+    lists:map(fun
+        (drop_nulls) ->
+            {fun map_drop_nulls_codec/4, Nulls};
+        (Fun) when is_function(Fun, 3) ->
+            Fun;
+        ({Fun, Opts}) when is_function(Fun, 4) ->
+            {Fun, Opts}
+    end, Codecs).
+
+map_drop_nulls_codec(Map, Nulls, _Encode, _State) ->
+    {next, maps:filter(fun(_Key, Value) ->
+        not is_map_key(Value, Nulls)
+    end, Map)}.
+
+%%
+%% Tuple codecs
+%%
+
+normalize_tuple_codecs(Codecs) ->
+    lists:map(fun
+        (datetime) ->
+            fun datetime_tuple_codec/3;
+        (timestamp) ->
+            fun timestamp_tuple_codec/3;
+        (ipv4) ->
+            fun ipv4_tuple_codec/3;
+        (ipv6) ->
+            fun ipv6_tuple_codec/3;
+        ({records, RecordsList}) when is_list(RecordsList) ->
+            Records = maps:from_list([
+                {Name, {length(Fields)+1, Fields}}
+                || {Name, Fields} <- RecordsList
+            ]),
+            {fun records_tuple_codec/4, Records};
+        (Fun) when is_function(Fun, 3) ->
+            Fun;
+        ({Fun, Opts}) when is_function(Fun, 4) ->
+            {Fun, Opts}
+    end, Codecs).
+
+datetime_tuple_codec({{YYYY, MM, DD}, {H, M, S}}, _Encode, #state{escape = Escape})
+  when ?min(YYYY, 0), ?in_range(MM, 1, 12), ?in_range(DD, 1, 31)
+     , ?in_range(H, 0, 23), ?in_range(M, 0, 59), ?in_range(S, 0, 59) ->
+    Datetime = iolist_to_binary(io_lib:format(
+        "~4.10.0B-~2.10.0B-~2.10.0BT~2.10.0B:~2.10.0B:~2.10.0BZ",
+        [YYYY,MM,DD,H,M,S])
+    ),
+    {halt, Escape(Datetime)};
+datetime_tuple_codec(_, _, _) ->
+    next.
+
+timestamp_tuple_codec({MegaSecs, Secs, MicroSecs} = Timestamp, _Encode, #state{escape = Escape})
+  when ?min(MegaSecs, 0), ?min(Secs, 0), ?min(MicroSecs, 0) ->
+    MilliSecs = MicroSecs div 1000,
+    {{YYYY,MM,DD},{H,M,S}} = calendar:now_to_datetime(Timestamp),
+    DateTime = iolist_to_binary(io_lib:format(
+        "~4.10.0B-~2.10.0B-~2.10.0BT~2.10.0B:~2.10.0B:~2.10.0B.~3.10.0BZ",
+        [YYYY,MM,DD,H,M,S,MilliSecs])
+    ),
+    {halt, Escape(DateTime)};
+timestamp_tuple_codec(_, _, _) ->
+    next.
+
+ipv4_tuple_codec({_A,_B,_C,_D} = Tuple, _Encode, #state{escape = Escape}) ->
+    case inet_parse:ntoa(Tuple) of
+        {error, einval} ->
+            next;
+        Ipv4 ->
+            {halt, Escape(list_to_binary(Ipv4))}
     end;
-plugins([port | T], Term, Opts) ->
-    case is_port(Term) of
-        true ->
-            Pid = iolist_to_binary(port_to_list(Term)),
-            {halt, escape(Pid, Opts)};
-        false ->
-            plugins(T, Term, Opts)
+ipv4_tuple_codec(_, _, _) ->
+    next.
+
+ipv6_tuple_codec({_A,_B,_C,_D,_E,_F,_G,_H} = Tuple, _Encode, #state{escape = Escape}) ->
+    case inet_parse:ntoa(Tuple) of
+        {error, einval} ->
+            next;
+        Ipv6 ->
+            {halt, Escape(list_to_binary(Ipv6))}
     end;
-plugins([proplist | T], Term, Opts) ->
-    case Term of
-        [{X, _} | _] = Proplist when ?is_proplist_key(X) ->
-            Map = case lists:member(drop_nulls, Opts#opts.plugins) of
+ipv6_tuple_codec(_, _, _) ->
+    next.
+
+records_tuple_codec(Tuple, Records, Encode, _State) when tuple_size(Tuple) > 1 ->
+    Name = element(1, Tuple),
+    case Records of
+        #{Name := {Size, Keys}} ->
+            case tuple_size(Tuple) =:= Size of
                 true ->
-                    drop_nulls(proplists:to_map(Proplist), Opts);
+                    [Name | Values] = tuple_to_list(Tuple),
+                    Proplist = lists:zip(Keys, Values),
+                    {halt, Encode(proplists:to_map(Proplist), Encode)};
                 false ->
-                    proplists:to_map(Proplist)
-            end,
-            Encode = Opts#opts.map_encoder,
-            {halt, Encode(Map, Opts)};
-        _ ->
-            plugins(T, Term, Opts)
+                    next
+            end;
+        #{} ->
+            next
     end;
-plugins([reference | T], Term, Opts) ->
-    case is_reference(Term) of
-        true ->
-            Ref = iolist_to_binary(ref_to_list(Term)),
-            {halt, escape(Ref, Opts)};
-        false ->
-            plugins(T, Term, Opts)
-    end;
-plugins([timestamp | T], Term, Opts) ->
-    case Term of
-        {MegaSecs, Secs, MicroSecs} = Timestamp
-          when ?min(MegaSecs, 0), ?min(Secs, 0), ?min(MicroSecs, 0) ->
-            MilliSecs = MicroSecs div 1000,
-            {{YYYY,MM,DD},{H,M,S}} = calendar:now_to_datetime(Timestamp),
-            DateTime = iolist_to_binary(io_lib:format(
-                "~4.10.0B-~2.10.0B-~2.10.0BT~2.10.0B:~2.10.0B:~2.10.0B.~3.10.0BZ",
-                [YYYY,MM,DD,H,M,S,MilliSecs])
-            ),
-            {halt, escape(DateTime, Opts)};
-        _ ->
-            plugins(T, Term, Opts)
-    end;
-plugins([drop_nulls | T], Term, Opts) ->
-    case is_map(Term) of
-        true ->
-            Map = drop_nulls(Term, Opts),
-            Encode = Opts#opts.map_encoder,
-            {halt, Encode(Map, Opts)};
-        false ->
-            plugins(T, Term, Opts)
-    end;
-plugins([Plugin | T], Term, Opts) when is_atom(Plugin) ->
-    case Plugin:encode(Term, Opts) of
-        next ->
-            plugins(T, Term, Opts);
-        {halt, IOData} when is_binary(IOData); is_list(IOData) ->
-            {halt, IOData}
-    end.
+records_tuple_codec(_, _, _, _) ->
+    next.
 
-drop_nulls(Map0, Opts) ->
-    Nulls = euneus_encoder:get_nulls_option(Opts),
-    maps:filter(fun(_, V) -> not lists:member(V, Nulls) end, Map0).
+%%
+%% PID codecs
+%%
 
-encode_term(Bin, #opts{binary_encoder = Encode} = Opts) when is_binary(Bin) ->
-    Encode(Bin, Opts);
-encode_term(Atom, #opts{atom_encoder = Encode} = Opts) when is_atom(Atom) ->
-    Encode(Atom, Opts);
-encode_term(Int, #opts{integer_encoder = Encode} = Opts) when is_integer(Int) ->
-    Encode(Int, Opts);
-encode_term(Float, #opts{float_encoder = Encode} = Opts) when is_float(Float) ->
-    Encode(Float, Opts);
-encode_term(List, #opts{list_encoder = Encode} = Opts) when is_list(List) ->
-    Encode(List, Opts);
-encode_term(Map, #opts{map_encoder = Encode} = Opts) when is_map(Map) ->
-    Encode(Map, Opts);
-encode_term(Term, #opts{unhandled_encoder = Encode} = Opts) ->
-    Encode(Term, Opts).
+normalize_pid_codecs(Codecs) ->
+    lists:map(fun
+        (to_binary) ->
+            fun to_binary_pid_codec/3;
+        (Fun) when is_function(Fun, 3) ->
+            Fun;
+        ({Fun, Opts}) when is_function(Fun, 4) ->
+            {Fun, Opts}
+    end, Codecs).
+
+to_binary_pid_codec(PID, _Encode, #state{escape = Escape}) ->
+    {halt, Escape(iolist_to_binary(pid_to_list(PID)))}.
+
+%%
+%% Port codecs
+%%
+
+normalize_port_codecs(Codecs) ->
+    lists:map(fun
+        (to_binary) ->
+            fun to_binary_port_codec/3;
+        (Fun) when is_function(Fun, 3) ->
+            Fun;
+        ({Fun, Opts}) when is_function(Fun, 4) ->
+            {Fun, Opts}
+    end, Codecs).
+
+to_binary_port_codec(Port, _Encode, #state{escape = Escape}) ->
+    {halt, Escape(iolist_to_binary(port_to_list(Port)))}.
+
+%%
+%% Reference codecs
+%%
+
+normalize_reference_codecs(Codecs) ->
+    lists:map(fun
+        (to_binary) ->
+            fun to_binary_ref_codec/3;
+        (Fun) when is_function(Fun, 3) ->
+            Fun;
+        ({Fun, Opts}) when is_function(Fun, 4) ->
+            {Fun, Opts}
+    end, Codecs).
+
+to_binary_ref_codec(Ref, _Encode, #state{escape = Escape}) ->
+    {halt, Escape(iolist_to_binary(ref_to_list(Ref)))}.
 
 %%%=====================================================================
-%%% Support functions
-%%%=====================================================================
-
-maps_get(Key, Map, Default) ->
-    case Map of
-        #{Key := Value} -> Value;
-        #{} -> Default
-    end.
-
-maps_to_list(Map) ->
-    do_maps_to_list(erts_internal:map_next(0, Map, [])).
-
-do_maps_to_list([Iter, Map | Acc]) when is_integer(Iter) ->
-    do_maps_to_list(erts_internal:map_next(Iter, Map, Acc));
-do_maps_to_list(Acc) ->
-    Acc.
-
-%%%=====================================================================
-%%% Eunit tests
+%%% Tests
 %%%=====================================================================
 
 -ifdef(TEST).
 
--include_lib("eunit/include/eunit.hrl").
+nulls_test() ->
+    ?assertEqual(
+        <<"[\"foo\",null,null,\"bar\"]">>,
+        iolist_to_binary(encode(
+            [foo, null, undefined, bar],
+            #{nulls => [null, undefined]}
+        ))
+    ).
 
-encode_to_bin(Input, Opts) ->
-    case encode(Input, Opts) of
-        {ok, IOList} ->
-            {ok, iolist_to_binary(IOList)};
-        {error, Reason} ->
-            {error, Reason}
-    end.
+sort_keys_test() ->
+    Map = #{c => c, d => d, a => a, e => e, b => b},
+    [
+        ?assertEqual(
+            <<"{\"a\":\"a\",\"b\":\"b\",\"c\":\"c\",\"d\":\"d\",\"e\":\"e\"}">>,
+            iolist_to_binary(encode(Map, #{sort_keys => true}))
+        )
+    ].
 
-encode_test() ->
-    [ ?assertEqual(Expect, encode_to_bin(Input, Opts))
-      || {Expect, Input, Opts} <- [
-        {{ok, <<"true">>}, true, #{}},
-        {{ok, <<"\"foo\"">>}, foo, #{}},
-        {{ok, <<"\"foo\"">>}, <<"foo">>, #{}},
-        {{ok, <<"0">>}, 0, #{}},
-        {{ok, <<"123.456789">>}, 123.45678900, #{}},
-        {{ok, <<"[true,0,null]">>}, [true,0,undefined], #{}},
-        {{ok, <<"{\"foo\":\"bar\"}">>}, #{foo => bar}, #{}},
-        {{ok, <<"{\"0\":0}">>}, #{0 => 0}, #{}}
-    ]].
+% Not implemented yet because there are no built-in codecs:
+% - atom_test
+% - binary_test
+% - integer_test
+% - float_test
 
-datetime_plugin_test() ->
-    [ ?assertEqual(Expect, encode_to_bin(Input, Opts))
-        || {Expect, Input, Opts} <- [
-        { {error, {unsupported_type, {{1970,1,1},{0,0,0}}}}
-        , {{1970,1,1},{0,0,0}}
-        , #{}
-        },
-        { {ok, <<"\"1970-01-01T00:00:00Z\"">>}
-        , {{1970,1,1},{0,0,0}}
-        , #{plugins => [datetime]}
-        }
-    ]].
+list_test() ->
+    [ { "proplist"
+      , ?assertEqual(
+            <<"{\"foo\":\"foo\",\"bar\":true}">>,
+            iolist_to_binary(encode(
+                [{foo, foo}, bar],
+                #{list => proplist}
+            ))
+        )}
+    ].
 
-inet_plugin_test() ->
-    [ ?assertEqual(Expect, encode_to_bin(Input, Opts))
-      || {Expect, Input, Opts} <- [
-        % ipv4
-        {{error, {unsupported_type, {0,0,0,0}}}, {0,0,0,0}, #{} },
-        {{ok, <<"\"0.0.0.0\"">>}, {0,0,0,0}, #{plugins => [inet]}},
-        % ipv6
-        {{error, {unsupported_type, {0,0,0,0,0,0,0,0}}}, {0,0,0,0,0,0,0,0}, #{} },
-        {{ok, <<"\"::\"">>}, {0,0,0,0,0,0,0,0}, #{plugins => [inet]} },
-        {{ok, <<"\"::1\"">>}, {0,0,0,0,0,0,0,1}, #{plugins => [inet]}},
-        { {ok, <<"\"::192.168.42.2\"">>}
-        , {0,0,0,0,0,0,(192 bsl 8) bor 168,(42 bsl 8) bor 2}
-        , #{plugins => [inet]}
-        },
-        { {ok, <<"\"::ffff:192.168.42.2\"">>}
-        , {0,0,0,0,0,16#FFFF,(192 bsl 8) bor 168,(42 bsl 8) bor 2}
-        , #{plugins => [inet]}
-        },
-        { {ok, <<"\"3ffe:b80:1f8d:2:204:acff:fe17:bf38\"">>}
-        , {16#3ffe,16#b80,16#1f8d,16#2,16#204,16#acff,16#fe17,16#bf38}
-        , #{plugins => [inet]}
-        },
-        { {ok, <<"\"fe80::204:acff:fe17:bf38\"">>}
-        , {16#fe80,0,0,0,16#204,16#acff,16#fe17,16#bf38}
-        , #{plugins => [inet]}
-        }
-    ]].
+map_test() ->
+    [ { "drop_nulls"
+      , ?assertEqual(
+            <<"{\"foo\":\"foo\"}">>,
+            iolist_to_binary(encode(
+                #{foo => foo, bar => null},
+                #{map => drop_nulls}
+            ))
+        )}
+    ].
 
-pid_plugin_test() ->
-    [ ?assertEqual(Expect, encode_to_bin(Input, Opts))
-        || {Expect, Input, Opts} <- [
-        { {error, {unsupported_type, list_to_pid("<0.92.0>")}}
-        , list_to_pid("<0.92.0>")
-        , #{}
-        },
-        { {ok, <<"\"<0.92.0>\"">>}
-        , list_to_pid("<0.92.0>")
-        , #{plugins => [pid]}
-        }
-    ]].
+-record(foo, {foo, bar}).
+-record(bar, {bar, baz}).
+tuple_test() ->
+    [ { "datetime"
+      , ?assertEqual(
+            <<"{\"foo\":\"2024-04-29T22:34:35Z\"}">>,
+            iolist_to_binary(encode(
+                #{foo => {{2024,04,29},{22,34,35}}},
+                #{tuple => datetime}
+            ))
+        )}
+    , { "timestamp"
+      , ?assertEqual(
+            <<"\"1970-01-01T00:00:00.000Z\"">>,
+            iolist_to_binary(encode(
+                {0,0,0},
+                #{tuple => timestamp}
+            ))
+        )}
+    , { "ipv4"
+      , ?assertEqual(
+            <<"\"0.0.0.0\"">>,
+            iolist_to_binary(encode(
+                {0,0,0,0},
+                #{tuple => ipv4}
+            ))
+        )}
+    , { "ipv6"
+      , ?assertEqual(
+            <<"\"fe80::204:acff:fe17:bf38\"">>,
+            iolist_to_binary(encode(
+                {16#fe80,0,0,0,16#204,16#acff,16#fe17,16#bf38},
+                #{tuple => ipv6}
+            ))
+        )}
+    , { "record"
+      , ?assertEqual(
+            <<"[{\"foo\":\"foo\",\"bar\":\"bar\"},{\"bar\":\"bar\",\"baz\":\"baz\"}]">>,
+            iolist_to_binary(encode(
+                [
+                    #foo{foo = foo, bar = bar},
+                    #bar{bar = bar, baz = baz}
+                ],
+                #{tuple => {records, [
+                    {foo, record_info(fields, foo)},
+                    {bar, record_info(fields, bar)}
+                ]}}
+            ))
+        )}
+    ].
 
-port_plugin_test() ->
-    [ ?assertEqual(Expect, encode_to_bin(Input, Opts))
-        || {Expect, Input, Opts} <- [
-        { {error, {unsupported_type, list_to_port("#Port<0.1>")}}
-        , list_to_port("#Port<0.1>")
-        , #{}
-        },
-        { {ok, <<"\"#Port<0.1>\"">>}
-        , list_to_port("#Port<0.1>")
-        , #{plugins => [port]}
-        }
-    ]].
+pid_test() ->
+    [ { "to_binary"
+      , ?assertEqual(
+            <<"\"<0.92.0>\"">>,
+            iolist_to_binary(encode(
+                list_to_pid("<0.92.0>"),
+                #{pid => to_binary}
+            ))
+        )}
+    ].
 
-proplist_plugin_test() ->
-    [ ?assertEqual(Expect, encode_to_bin(Input, Opts))
-        || {Expect, Input, Opts} <- [
-        { {error, {unsupported_type, {foo, bar}}}, [{foo, bar}], #{}},
-        { {ok, <<"{\"foo\":\"bar\"}">>}, [{foo, bar}], #{plugins => [proplist]}}
-    ]].
+port_test() ->
+    [ { "to_binary"
+      , ?assertEqual(
+            <<"\"#Port<0.1>\"">>,
+            iolist_to_binary(encode(
+                list_to_port("#Port<0.1>"),
+                #{port => to_binary}
+            ))
+        )}
+    ].
 
-reference_plugin_test() ->
-    [ ?assertEqual(Expect, encode_to_bin(Input, Opts))
-        || {Expect, Input, Opts} <- [
-        { {error, {unsupported_type, list_to_ref("#Ref<0.314572725.1088159747.110918>")}}
-        , list_to_ref("#Ref<0.314572725.1088159747.110918>")
-        , #{}
-        },
-        { {ok, <<"\"#Ref<0.314572725.1088159747.110918>\"">>}
-        , list_to_ref("#Ref<0.314572725.1088159747.110918>")
-        , #{plugins => [reference]}
-        }
-    ]].
-
-timestamp_plugin_test() ->
-    [ ?assertEqual(Expect, encode_to_bin(Input, Opts))
-        || {Expect, Input, Opts} <- [
-        {{error, {unsupported_type, {0,0,0}}}, {0,0,0}, #{}},
-        { {ok, <<"\"1970-01-01T00:00:00.000Z\"">>}
-        , {0,0,0}
-        , #{plugins => [timestamp]}
-        }
-    ]].
-
-drop_nulls_plugin_test() ->
-    [ ?assertEqual(Expect, encode_to_bin(Input, Opts))
-        || {Expect, Input, Opts} <- [
-        { {ok, <<"{\"a\":1}">>}
-        , #{a => 1, b => undefined}
-        , #{plugins => [drop_nulls]}
-        },
-        { {ok, <<"{\"a\":1}">>}
-        , #{a => 1, b => undefined, c => foo}
-        , #{nulls => [undefined, foo], plugins => [drop_nulls]}
-        },
-        { {ok, <<"{\"a\":1}">>}
-        , [{a, 1}, {b, undefined}, {c, foo}]
-        , #{nulls => [undefined, foo], plugins => [proplist, drop_nulls]}
-        }
-    ]].
+reference_test() ->
+    [ { "to_binary"
+      , ?assertEqual(
+            <<"\"#Ref<0.314572725.1088159747.110918>\"">>,
+            iolist_to_binary(encode(
+                list_to_ref("#Ref<0.314572725.1088159747.110918>"),
+                #{reference => to_binary}
+            ))
+        )}
+    ].
 
 -endif.

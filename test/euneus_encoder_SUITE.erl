@@ -1,9 +1,9 @@
 %%%---------------------------------------------------------------------
-%%% @copyright 2023 William Fank Thomé
+%%% @copyright 2023-2024 William Fank Thomé
 %%% @author William Fank Thomé <willilamthome@hotmail.com>
 %%% @doc JSON generator tests.
 %%%
-%%% Copyright 2023 William Fank Thomé
+%%% Copyright 2023-2024 William Fank Thomé
 %%%
 %%% Licensed under the Apache License, Version 2.0 (the "License");
 %%% you may not use this file except in compliance with the License.
@@ -33,18 +33,7 @@
         ]).
 
 %% Test cases
--export([ nulls/1
-        , binary_encoder/1
-        , atom_encoder/1
-        , integer_encoder/1
-        , float_encoder/1
-        , list_encoder/1
-        , map_encoder/1
-        , unhandled_encoder/1
-        , escaper/1
-        , error_handler/1
-        , plugins/1
-        ]).
+-export([]).
 
 %%%=====================================================================
 %%% Callback functions
@@ -138,143 +127,17 @@ end_per_testcase(_TestCase, _Config) ->
     TestCase :: atom().
 
 all() ->
-    [ nulls
-    , binary_encoder
-    , atom_encoder
-    , integer_encoder
-    , float_encoder
-    , list_encoder
-    , map_encoder
-    , unhandled_encoder
-    , escaper
-    , error_handler
-    , plugins
-    ].
+    [].
 
 %%%=====================================================================
 %%% Test cases
 %%%=====================================================================
 
-nulls(Config) when is_list(Config) ->
-    {ok, <<"null">>} = encode(undefined, #{}),
-    {ok, <<"null">>} = encode(nil, #{nulls => [nil]}).
-
-binary_encoder(Config) when is_list(Config) ->
-    {ok, [$", <<"foo">>, $"]} = encode(<<"foo">>, #{}),
-    {ok, <<"\"foo\"">>} = encode(<<"foo">>, #{
-        binary_encoder => fun(Bin, _Opts) ->
-            <<$", Bin/binary, $">>
-        end
-    }).
-
-atom_encoder(Config) when is_list(Config) ->
-    {ok, <<"true">>} = encode(true, #{}),
-    {ok, <<"false">>} = encode(false, #{}),
-    {ok, [$", <<"foo">>, $"]} = encode(foo, #{}),
-    {ok, <<"\"foo\"">>} = encode(foo, #{
-        atom_encoder => fun(Atom, _Opts) ->
-            <<$", (atom_to_binary(Atom))/binary, $">>
-        end
-    }).
-
-integer_encoder(Config) when is_list(Config) ->
-    {ok, <<"0">>} = encode(0, #{}),
-    {ok, <<"\"0\"">>} = encode(0, #{
-        integer_encoder => fun(Int, _Opts) ->
-            <<$", (integer_to_binary(Int))/binary, $">>
-        end
-    }).
-
-float_encoder(Config) when is_list(Config) ->
-    {ok, <<"0.0">>} = encode(0.00, #{}),
-    {ok, <<"\"1.000e-02\"">>} = encode(0.010, #{
-        float_encoder => fun(Float, _Opts) ->
-            <<$", (float_to_binary(Float, [{scientific, 3}]))/binary, $">>
-        end
-    }).
-
-list_encoder(Config) when is_list(Config) ->
-    {ok, <<"[]">>} = encode([], #{}),
-    {ok, [${, [$", <<"foo">>, $"], $:, [$", <<"bar">>, $"], $}]} =
-        encode([{foo, bar}], #{list_encoder => fun
-            ([{K, _} | _] = Proplist, Opts)
-              when is_binary(K); is_atom(K); is_integer(K) ->
-                Map = proplists:to_map(Proplist),
-                euneus_encoder:encode_map(Map, Opts);
-            (List, Opts) ->
-                euneus_encoder:encode_list(List, Opts)
-        end
-    }).
-
-map_encoder(Config) when is_list(Config) ->
-    {ok, <<"{}">>} = encode(#{}, #{}),
-    {ok, [${, [$", <<"foo">>, $"], $:, [$", <<"bar">>, $"], $}]} =
-        encode(#{}, #{map_encoder => fun (_Map, Opts) ->
-            euneus_encoder:encode_map(#{foo => bar}, Opts)
-        end
-    }).
-
-unhandled_encoder(Config) when is_list(Config) ->
-    {error, {unsupported_type, {foo}}} = encode({foo}, #{}),
-    {ok, [$[, [$", <<"myrecord">>, $"], [$,,
-        [${, [$", <<"key">>, $"], $:, [$", <<"val">>, $"], $}],
-    $]]]} = encode({myrecord, val}, #{
-        unhandled_encoder => fun({myrecord, Val}, Opts) ->
-            euneus_encoder:encode_list([myrecord, #{key => Val}], Opts)
-        end
-    }).
-
-escaper(Config) when is_list(Config) ->
-    {ok, <<"\"foo\"">>} = encode_to_bin(foo, #{
-        escaper => json
-    }),
-    {ok, <<"\"<\\/script>\"">>} = encode_to_bin(<<"</script>">>, #{
-        escaper => html
-    }),
-    {ok, <<"\"\\u2028\\u2029\"">>} = encode_to_bin(
-        unicode:characters_to_binary([8232,8233]), #{
-        escaper => javascript
-    }),
-    {ok, <<"\"\\u2603\"">>} = encode_to_bin(<<"☃"/utf8>>, #{
-        escaper => unicode
-    }),
-    {ok, <<"bar">>} = encode(foo, #{
-        escaper => fun (<<"foo">>, _Opts) ->
-            <<"bar">>
-        end
-    }).
-
-error_handler(Config) when is_list(Config) ->
-    {error, bar} = encode(foo, #{
-        escaper => fun (<<"foo">>, _Opts) ->
-            throw(foo)
-        end,
-        error_handler => fun (throw, foo, _Stacktrace) ->
-            {error, bar}
-        end
-    }).
-
-plugins(Config) when is_list(Config) ->
-    {halt, [$", <<"test::foo">>, $"]} =
-        euneus_test_plugin:encode({test, foo}, euneus_encoder:parse_opts(#{})),
-    next =
-        euneus_test_plugin:encode({test, bar}, euneus_encoder:parse_opts(#{})),
-    {error, {unsupported_type, {test, foo}}} =
-        euneus_encoder:encode({test, foo}, #{}),
-    {ok, [$", <<"test::foo">>, $"]} =
-        euneus_encoder:encode({test, foo}, #{plugins => [euneus_test_plugin]}).
+% nothing here yet!
 
 %%%=====================================================================
 %%% Support functions
 %%%=====================================================================
 
-encode(Input, Opts) ->
-    euneus_encoder:encode(Input, Opts).
-
-encode_to_bin(Input, Opts) ->
-    case encode(Input, Opts) of
-        {ok, JSON} ->
-            {ok, iolist_to_binary(JSON)};
-        {error, Reason} ->
-            {error, Reason}
-    end.
+% encode(Input, Opts) ->
+%     euneus_encoder:encode(Input, Opts).

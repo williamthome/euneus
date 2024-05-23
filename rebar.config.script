@@ -1,0 +1,43 @@
+Config = [
+    {erl_opts, [debug_info, warnings_as_errors]},
+
+    {project_plugins, [rebar3_hex, rebar3_ex_doc]},
+
+    {hex, [{doc, #{provider => ex_doc}}]},
+
+    {ex_doc, [
+        {extras, [
+            {'README.md', #{title => <<"Overview">>}},
+            {'LICENSE.md', #{title => <<"License">>}}
+        ]},
+        {main, <<"README.md">>},
+        {homepage_url, <<"https://github.com/williamthome/euneus">>},
+        {source_url, <<"https://github.com/williamthome/euneus">>},
+        {api_reference, false}
+    ]}
+],
+
+% TODO: Better OTP release check.
+% -ifdef(OTP_RELEASE).
+%   -if(?OTP_RELEASE < 27).
+%     Config ++ [
+%         {deps, [{json_polyfill, "0.1.0"}]},
+%         {dialyzer, [{plt_extra_apps, [json_polyfill]}]}
+%     ].
+%   -endif.
+% -else.
+%     Config ++ [
+%         {deps, [{json_polyfill, "0.1.0"}]},
+%         {dialyzer, [{plt_extra_apps, [json_polyfill]}]}
+%     ].
+% -endif.
+
+case erlang:system_info(otp_release) of
+    Rel when Rel >= "27" ->
+        Config;
+    _ ->
+        Config ++ [
+            {deps, [{json_polyfill, "0.1.0"}]},
+            {dialyzer, [{plt_extra_apps, [json_polyfill]}]}
+        ]
+end.

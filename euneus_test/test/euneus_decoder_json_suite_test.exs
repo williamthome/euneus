@@ -47,24 +47,24 @@ defmodule EuneusTest.EuneusDecoderJsonSuiteTest do
     case Path.basename(path) do
       "y_" <> name ->
         test name do
-          {:ok, _} = :euneus.decode(File.read!(unquote(path)), %{})
+          :euneus.decode(File.read!(unquote(path)))
         end
 
       "n_" <> name ->
         test name do
-          {:error, _} = :euneus.decode(File.read!(unquote(path)), %{})
+          catch_error(:euneus.decode(File.read!(unquote(path))))
         end
 
       "i_" <> name ->
         cond do
           name in i_fails ->
             test name do
-              {:error, _} = :euneus.decode(File.read!(unquote(path)), %{})
+              catch_error(:euneus.decode(File.read!(unquote(path))))
             end
 
           name in i_succeeds ->
             test name do
-              {:ok, _} = :euneus.decode(File.read!(unquote(path)), %{})
+              :euneus.decode(File.read!(unquote(path)))
             end
         end
     end

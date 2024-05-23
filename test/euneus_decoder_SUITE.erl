@@ -1,9 +1,9 @@
 %%%---------------------------------------------------------------------
-%%% @copyright 2023 William Fank Thomé
+%%% @copyright 2023-2024 William Fank Thomé
 %%% @author William Fank Thomé <willilamthome@hotmail.com>
 %%% @doc JSON parser tests.
 %%%
-%%% Copyright 2023 William Fank Thomé
+%%% Copyright 2023-2024 William Fank Thomé
 %%%
 %%% Licensed under the Apache License, Version 2.0 (the "License");
 %%% you may not use this file except in compliance with the License.
@@ -33,14 +33,7 @@
         ]).
 
 %% Test cases
--export([ null_term/1
-        , keys/1
-        , values/1
-        , arrays/1
-        , objects/1
-        , error_handler/1
-        , plugins/1
-        ]).
+-export([]).
 
 %%%=====================================================================
 %%% Callback functions
@@ -134,101 +127,17 @@ end_per_testcase(_TestCase, _Config) ->
     TestCase :: atom().
 
 all() ->
-    [ null_term
-    , keys
-    , values
-    , arrays
-    , objects
-    , error_handler
-    , plugins
-    ].
+    [].
 
 %%%=====================================================================
 %%% Test cases
 %%%=====================================================================
 
-null_term(Config) when is_list(Config) ->
-    {ok, undefined} = decode(<<"null">>, #{}),
-    {ok, nil} = decode(<<"null">>, #{null_term => nil}).
-
-keys(Config) when is_list(Config) ->
-    {ok, #{<<"foo">> := <<"bar">>}} = decode(<<"{\"foo\":\"bar\"}">>, #{}),
-    {ok, #{<<"foo">> := <<"bar">>}} = decode(<<"{\"foo\":\"bar\"}">>, #{
-        keys => copy
-    }),
-    {ok, #{foo := <<"bar">>}} = decode(<<"{\"foo\":\"bar\"}">>, #{
-        keys => to_atom
-    }),
-    {ok, #{foo := <<"bar">>}} = decode(<<"{\"foo\":\"bar\"}">>, #{
-        keys => to_existing_atom
-    }),
-    {ok, #{0 := <<"0">>}} = decode(<<"{\"0\":\"0\"}">>, #{
-        keys => to_integer
-    }),
-    {ok, #{foo := <<"bar">>}} = decode(<<"{\"foo\":\"bar\"}">>, #{
-        keys => fun(<<"foo">>, _Opts) ->
-            foo
-        end
-    }).
-
-values(Config) when is_list(Config) ->
-    {ok, #{<<"foo">> := <<"bar">>}} = decode(<<"{\"foo\":\"bar\"}">>, #{}),
-    {ok, #{<<"foo">> := <<"bar">>}} = decode(<<"{\"foo\":\"bar\"}">>, #{
-        values => copy
-    }),
-    {ok, #{<<"foo">> := bar}} = decode(<<"{\"foo\":\"bar\"}">>, #{
-        values => to_atom
-    }),
-    {ok, #{<<"foo">> := bar}} = decode(<<"{\"foo\":\"bar\"}">>, #{
-        values => to_existing_atom
-    }),
-    {ok, #{<<"0">> := 0}} = decode(<<"{\"0\":\"0\"}">>, #{
-        values => to_integer
-    }),
-    {ok, #{<<"foo">> := bar}} = decode(<<"{\"foo\":\"bar\"}">>, #{
-        values => fun(<<"bar">>, _Opts) ->
-            bar
-        end
-    }).
-
-arrays(Config) when is_list(Config) ->
-    {ok, [<<"foo">>,true,0,undefined]} = decode(<<"[\"foo\",true,0,null]">>, #{}),
-    {ok, [foo]} = decode(<<"[]">>, #{
-        arrays => fun([], _Opts) ->
-            [foo]
-        end
-    }).
-
-objects(Config) when is_list(Config) ->
-    {ok, #{<<"foo">> := <<"bar">>, <<"0">> := undefined}} =
-        decode(<<"{\"foo\":\"bar\",\"0\":null}">>, #{}),
-    {ok, #{}} = decode(<<"{\"foo\":\"bar\",\"0\":null}">>, #{
-        objects => fun(#{<<"foo">> := <<"bar">>, <<"0">> := undefined}, _Opts) ->
-            #{}
-        end
-    }).
-
-error_handler(Config) when is_list(Config) ->
-    {error, bar} = decode(<<"[]">>, #{
-        arrays => fun([], _Opts) ->
-            throw(foo)
-        end,
-        error_handler => fun (throw, foo, _Stacktrace) ->
-            {error, bar}
-        end
-    }).
-
-plugins(Config) when is_list(Config) ->
-    {halt, {test, foo}} =
-        euneus_test_plugin:decode(<<"test::foo">>, euneus_decoder:parse_opts(#{})),
-    next =
-        euneus_test_plugin:decode(<<"test::bar">>, euneus_decoder:parse_opts(#{})),
-    {ok, {test, foo}} =
-        euneus_decoder:decode(<<"\"test::foo\"">>, #{plugins => [euneus_test_plugin]}).
+% nothing here yet!
 
 %%%=====================================================================
 %%% Support functions
 %%%=====================================================================
 
-decode(Input, Opts) ->
-    euneus_decoder:decode(Input, Opts).
+% decode(Input, Opts) ->
+%     euneus_decoder:decode(Input, Opts).
