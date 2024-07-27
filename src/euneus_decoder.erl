@@ -263,11 +263,15 @@ object_push_decoder(push, binary, Codecs) ->
     fun(Key, Value, Acc) ->
         [{Key, traverse_codecs(Codecs, Value)} | Acc]
     end;
-object_push_decoder(push, binary_to_atom, Codecs) ->
+object_push_decoder(push, copy, Codecs) ->
+    fun(Key, Value, Acc) ->
+        [{binary:copy(Key), traverse_codecs(Codecs, Value)} | Acc]
+    end;
+object_push_decoder(push, atom, Codecs) ->
     fun(Key, Value, Acc) ->
         [{binary_to_atom(Key, utf8), traverse_codecs(Codecs, Value)} | Acc]
     end;
-object_push_decoder(push, binary_to_existing_atom, Codecs) ->
+object_push_decoder(push, existing_atom, Codecs) ->
     fun(Key, Value, Acc) ->
         [{binary_to_existing_atom(Key, utf8), traverse_codecs(Codecs, Value)} | Acc]
     end;

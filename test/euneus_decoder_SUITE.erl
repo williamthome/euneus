@@ -30,6 +30,16 @@ test_decode(Config) when is_list(Config) ->
         {[null, <<"foo">>, 1, 1.0, #{<<"foo">> => <<"bar">>, <<"bar">> => 1}],
          <<"[null, \"foo\", 1, 1.0, {\"foo\": \"bar\", \"bar\": 1}]">>,
          #{}},
+        % Object keys: binary
+        {#{<<"foo">> => <<"bar">>}, <<"{\"foo\": \"bar\"}">>, #{object_keys => binary}},
+        % Object keys: copy
+        {#{<<"foo">> => <<"bar">>}, <<"{\"foo\": \"bar\"}">>, #{object_keys => copy}},
+        % Object keys: atom
+        {#{foo => <<"bar">>}, <<"{\"foo\": \"bar\"}">>, #{object_keys => atom}},
+        % Object keys: existing_atom
+        {#{foo => <<"bar">>}, <<"{\"foo\": \"bar\"}">>, #{object_keys => existing_atom}},
+        % Object keys: fun/1
+        {#{<<"foo">> => <<"bar">>}, <<"{\"foo\": \"bar\"}">>, #{object_keys => fun(K) -> K end}},
         % Codec: copy
         {<<"foo">>, <<"\"foo\"">>, #{codecs => [copy]}},
         % Codec: timestamp
