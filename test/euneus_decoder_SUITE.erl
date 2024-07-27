@@ -22,13 +22,44 @@ end_per_suite(Config) ->
 %% --------------------------------------------------------------------
 
 test_decode(Config) when is_list(Config) ->
-    [
-        ?assertEqual(null,
-                     euneus_decoder:decode(<<"null">>)),
-        ?assertEqual([null, 1],
-                     euneus_decoder:decode(<<"[null, 1]">>)),
-        ?assertEqual(#{<<"foo">> => null, <<"bar">> => 1},
-                     euneus_decoder:decode(<<"{\"foo\": null, \"bar\": 1}">>))
-
-    ].
+    [?assertEqual(Expect, euneus_decoder:decode(JSON, Opts))
+     || {Expect, JSON, Opts} <- [
+        % Null
+        {null, <<"null">>, #{}},
+        % Simple values
+        {[null, <<"foo">>, 1, 1.0, #{<<"foo">> => <<"bar">>, <<"bar">> => 1}],
+         <<"[null, \"foo\", 1, 1.0, {\"foo\": \"bar\", \"bar\": 1}]">>,
+         #{}},
+        % Codec: copy
+        {<<"foo">>, <<"\"foo\"">>, #{codecs => [copy]}},
+        % Codec: timestamp
+        {{0,0,0}, <<"\"1970-01-01T00:00:00.000Z\"">>, #{codecs => [timestamp]}},
+        % Codec: datetime
+        {{{1970,1,1},{0,0,0}}, <<"\"1970-01-01T00:00:00Z\"">>, #{codecs => [datetime]}},
+        % Code: ipv4
+        {{0,0,0,0}, <<"\"0.0.0.0\"">>, #{codecs => [ipv4]}},
+        % Codec: ipv6
+        {{0,0,0,0,0,0,0,0}, <<"\"::\"">>, #{codecs => [ipv6]}},
+        {{0,0,0,0,0,0,0,1}, <<"\"::1\"">>, #{codecs => [ipv6]}},
+        {{0,0,0,0,0,0,(192 bsl 8) bor 168,(42 bsl 8) bor 2},
+         <<"\"::192.168.42.2\"">>,
+         #{codecs => [ipv6]}},
+        {{0,0,0,0,0,16#FFFF,(192 bsl 8) bor 168,(42 bsl 8) bor 2},
+         <<"\"::ffff:192.168.42.2\"">>,
+         #{codecs => [ipv6]}},
+        {{16#3ffe,16#b80,16#1f8d,16#2,16#204,16#acff,16#fe17,16#bf38},
+         <<"\"3ffe:b80:1f8d:2:204:acff:fe17:bf38\"">>,
+         #{codecs => [ipv6]}},
+        {{16#fe80,0,0,0,16#204,16#acff,16#fe17,16#bf38},
+         <<"\"fe80::204:acff:fe17:bf38\"">>,
+         #{codecs => [ipv6]}},
+        % Codec: pid
+        {list_to_pid("<0.92.0>"), <<"\"<0.92.0>\"">>, #{codecs => [pid]}},
+        % Codec: port
+        {list_to_port("#Port<0.1>"), <<"\"#Port<0.1>\"">>, #{codecs => [port]}},
+        % Codec: reference
+        {list_to_ref("#Ref<0.314572725.1088159747.110918>"),
+         <<"\"#Ref<0.314572725.1088159747.110918>\"">>,
+         #{codecs => [reference]}}
+    ]].
 
