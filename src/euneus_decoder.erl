@@ -7,6 +7,14 @@
 -export([decode/1]).
 -export([decode/2]).
 
+%
+
+% Suppress the error:
+% > The call json:decode_continue(JSON::binary(), State::json:continuation_state())
+% > contains an opaque term as 2nd argument when terms of different types
+% > are expected in these positions
+-dialyzer({no_opaque, [do_decode_continue/2]}).
+
 %% --------------------------------------------------------------------
 %% Macros
 %% --------------------------------------------------------------------
@@ -22,9 +30,36 @@
 %% API functions
 %% --------------------------------------------------------------------
 
+-spec decode(binary()) -> term().
 decode(JSON) ->
     decode(JSON, #{}).
 
+-spec decode(binary(), Opts) -> term()
+    when Opts :: #{
+             codecs => [ copy
+                       | timestamp
+                       | datetime
+                       | ipv4
+                       | ipv6
+                       | pid
+                       | port
+                       | reference
+                       | fun((binary()) -> next | {halt, term()})],
+             array_start => json:array_start_fun(),
+             array_push => json:array_push_fun(),
+             array_finish => json:array_finish_fun(),
+             object_start => json:object_start_fun(),
+             object_keys => binary
+                          | copy
+                          | atom
+                          | existing_atom
+                          | json:from_binary_fun(),
+             object_push => json:object_push_fun(),
+             object_finish => json:object_finish_fun(),
+             float => json:from_binary_fun(),
+             integer => json:from_binary_fun(),
+             null => term()
+         }.
 decode(JSON, Opts) when is_binary(JSON), is_map(Opts) ->
     Codecs = norm_codecs(maps:get(codecs, Opts, [])),
     Decoders = decoders(Codecs, Opts),
