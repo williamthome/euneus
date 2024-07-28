@@ -65,7 +65,8 @@
              | timestamp
              | ipv4
              | ipv6
-             | {record, Name :: atom(), Fields :: [atom()]}
+             | {record, #{Name :: atom() => {Fields :: [atom()], Size :: pos_integer()}}
+                      | [{Name :: atom(), Fields :: [atom()]}]}
              | fun((tuple()) -> next | {halt, term()})],
     pid => default | encode(pid()),
     port => default | encode(port()),
