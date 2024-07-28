@@ -1,14 +1,27 @@
 -module(euneus_encoder).
 -compile({no_auto_import, [float/1]}).
 
+%% --------------------------------------------------------------------
+%% API function exports
+%% --------------------------------------------------------------------
+
 -export([encode/2]).
+
+%% --------------------------------------------------------------------
+%% Macros
+%% --------------------------------------------------------------------
 
 -define(min(X, Min), (
     is_integer(X) andalso X >= Min
 )).
+
 -define(in_range(X, Min, Max), (
-    is_integer(X) andalso X >= Min andalso X =< Max)
-).
+    is_integer(X) andalso X >= Min andalso X =< Max
+)).
+
+%% --------------------------------------------------------------------
+%% Types (and their exports)
+%% --------------------------------------------------------------------
 
 -record(state, {
     nulls :: #{term() := null},
@@ -26,9 +39,15 @@
     port :: encode(port()),
     reference :: encode(reference())
 }).
+-opaque state() :: #state{}.
+-export_type([state/0]).
 
 -type encode(Type) :: fun((Type, json:encoder(), #state{}) -> iodata()).
+-export_type([encode/1]).
+
 -type is_proplist() :: fun((list()) -> boolean()).
+-export_type([is_proplist/0]).
+
 -type options() :: #{
     nulls := [term()],
     drop_nulls := boolean(),
@@ -52,6 +71,11 @@
     port := default | encode(port()),
     reference := default | encode(reference())
 }.
+-export_type([options/0]).
+
+%% --------------------------------------------------------------------
+%% API functions
+%% --------------------------------------------------------------------
 
 -spec encode(term(), options()) -> iodata().
 encode(Input, Opts) ->
@@ -59,6 +83,10 @@ encode(Input, Opts) ->
     json:encode(Input, fun(Term, Encode) ->
         value(Term, Encode, State)
     end).
+
+%% --------------------------------------------------------------------
+%% Internal functions
+%% --------------------------------------------------------------------
 
 % State
 
@@ -147,6 +175,43 @@ tuple(Codecs) when is_list(Codecs) ->
 tuple(Encode) when is_function(Encode, 3) ->
     Encode.
 
+pid(default) ->
+    fun encode_pid/3;
+pid(Encode) when is_function(Encode, 3) ->
+    Encode.
+
+port(default) ->
+    fun encode_port/3;
+port(Encode) when is_function(Encode, 3) ->
+    Encode.
+
+reference(default) ->
+    fun encode_reference/3;
+reference(Encode) when is_function(Encode, 3) ->
+    Encode.
+
+% Codecs
+
+codecs(Codecs) ->
+    fun(Tuple, Encode, State) ->
+        case traverse_codecs(Codecs, Tuple) of
+            Tuple ->
+                error(unsuported_tuple, [Tuple, Encode, State]);
+            Term ->
+                value(Term, Encode, State)
+        end
+    end.
+
+traverse_codecs([Codec | Codecs], Tuple) ->
+    case Codec(Tuple) of
+        next ->
+            traverse_codecs(Codecs, Tuple);
+        {halt, NewTerm} ->
+            NewTerm
+    end;
+traverse_codecs([], Tuple) ->
+    Tuple.
+
 norm_codec(datetime) ->
     fun datetime_codec/1;
 norm_codec(timestamp) ->
@@ -223,41 +288,6 @@ records_codec(Records) ->
         (_Tuple) ->
             next
     end.
-
-codecs(Codecs) ->
-    fun(Tuple, Encode, State) ->
-        case traverse_codecs(Codecs, Tuple) of
-            Tuple ->
-                error(unsuported_tuple, [Tuple, Encode, State]);
-            Term ->
-                value(Term, Encode, State)
-        end
-    end.
-
-traverse_codecs([Codec | Codecs], Tuple) ->
-    case Codec(Tuple) of
-        next ->
-            traverse_codecs(Codecs, Tuple);
-        {halt, NewTerm} ->
-            NewTerm
-    end;
-traverse_codecs([], Tuple) ->
-    Tuple.
-
-pid(default) ->
-    fun encode_pid/3;
-pid(Encode) when is_function(Encode, 3) ->
-    Encode.
-
-port(default) ->
-    fun encode_port/3;
-port(Encode) when is_function(Encode, 3) ->
-    Encode.
-
-reference(default) ->
-    fun encode_reference/3;
-reference(Encode) when is_function(Encode, 3) ->
-    Encode.
 
 % Encoders
 
