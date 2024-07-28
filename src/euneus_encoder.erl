@@ -49,17 +49,17 @@
 -export_type([is_proplist/0]).
 
 -type options() :: #{
-    nulls := [term()],
-    drop_nulls := boolean(),
-    escape := default | fun((binary()) -> iodata()),
-    integer := default | encode(integer()),
-    float := default | encode(float()),
-    atom := default | encode(atom()),
-    list := default | encode(list()),
-    proplist := boolean() | {true, is_proplist()},
-    map := default | encode(map()),
-    sort_keys := boolean(),
-    tuple := default
+    nulls => [term()],
+    drop_nulls => boolean(),
+    escape => default | fun((binary()) -> iodata()),
+    integer => default | encode(integer()),
+    float => default | encode(float()),
+    atom => default | encode(atom()),
+    list => default | encode(list()),
+    proplist => boolean() | {true, is_proplist()},
+    map => default | encode(map()),
+    sort_keys => boolean(),
+    tuple => default
            | encode(tuple())
            | [ datetime
              | timestamp
@@ -67,9 +67,9 @@
              | ipv6
              | {record, Name :: atom(), Fields :: [atom()]}
              | fun((tuple()) -> next | {halt, term()})],
-    pid := default | encode(pid()),
-    port := default | encode(port()),
-    reference := default | encode(reference())
+    pid => default | encode(pid()),
+    port => default | encode(port()),
+    reference => default | encode(reference())
 }.
 -export_type([options/0]).
 
