@@ -1,0 +1,250 @@
+-module(euneus_encoder).
+-compile({no_auto_import, [float/1]}).
+
+-export([encode/2]).
+
+-record(state, {
+    nulls,
+    drop_nulls,
+    escape,
+    integer,
+    float,
+    atom,
+    list,
+    proplist,
+    map,
+    sort_keys,
+    tuple,
+    pid,
+    port,
+    reference
+}).
+
+encode(Input, Opts) ->
+    State = new_state(Opts),
+    json:encode(Input, fun(Term, Encode) ->
+        value(Term, Encode, State)
+    end).
+
+% State
+
+new_state(Opts) ->
+    #state{
+       nulls = nulls(maps:get(nulls, Opts, [null])),
+       drop_nulls = drop_nulls(maps:get(drop_nulls, Opts, false)),
+       escape = escape(maps:get(escape, Opts, default)),
+       integer = integer(maps:get(integer, Opts, default)),
+       float = float(maps:get(float, Opts, default)),
+       atom = atom(maps:get(atom, Opts, default)),
+       list = list(maps:get(list, Opts, default)),
+       proplist = proplist(maps:get(proplist, Opts, false)),
+       map = map(maps:get(map, Opts, default)),
+       sort_keys = sort_keys(maps:get(sort_keys, Opts, false)),
+       tuple = tuple(maps:get(tuple, Opts, default)),
+       pid = pid(maps:get(pid, Opts, default)),
+       port = port(maps:get(port, Opts, default)),
+       reference = reference(maps:get(reference, Opts, default))
+    }.
+
+nulls(Nulls) when is_list(Nulls) ->
+    maps:from_keys(Nulls, null).
+
+drop_nulls(Drop) when is_boolean(Drop) ->
+    Drop.
+
+escape(default) ->
+    fun json:encode_binary/1;
+escape(Escape) when is_function(Escape, 1) ->
+    Escape.
+
+integer(default) ->
+    fun encode_integer/3;
+integer(Encode) when is_function(Encode, 3) ->
+    Encode.
+
+float(default) ->
+    fun encode_float/3;
+float(Encode) when is_function(Encode, 3) ->
+    Encode.
+
+atom(default) ->
+    fun encode_atom/3;
+atom(Encode) when is_function(Encode, 3) ->
+    Encode.
+
+list(default) ->
+    fun encode_list/3;
+list(Encode) when is_function(Encode, 3) ->
+    Encode.
+
+proplist(false) ->
+    false;
+proplist(true) ->
+    {true, fun is_proplist/1};
+proplist({true, IsProplist}) when is_function(IsProplist, 1) ->
+    {true, IsProplist}.
+
+is_proplist([]) ->
+    false;
+is_proplist(List) ->
+    lists:all(fun is_proplist_prop/1, List).
+
+% Must be the same types handled by key/2.
+is_proplist_prop({Key, _}) ->
+    is_binary(Key) orelse
+    is_list(Key) orelse
+    is_atom(Key) orelse
+    is_integer(Key);
+is_proplist_prop(Key) ->
+    is_atom(Key).
+
+map(default) ->
+    fun encode_map/3;
+map(Encode) when is_function(Encode, 3) ->
+    Encode.
+
+sort_keys(Sort) when is_boolean(Sort) ->
+    Sort.
+
+tuple(default) ->
+    fun encode_tuple/3;
+tuple(Codecs) when is_list(Codecs) ->
+    codecs([norm_codec(Codec) || Codec <- Codecs]);
+tuple(Encode) when is_function(Encode, 3) ->
+    Encode.
+
+codecs(Codecs) ->
+    fun(Tuple, Encode, State) ->
+        case traverse_codecs(Codecs, Tuple) of
+            Tuple ->
+                error(unsuported_tuple, [Tuple, Encode, State]);
+            Term ->
+                value(Term, Encode, State)
+        end
+    end.
+
+norm_codec(Codec) when is_function(Codec, 1) ->
+    Codec.
+
+traverse_codecs([Codec | Codecs], Tuple) ->
+    case Codec(Tuple) of
+        next ->
+            traverse_codecs(Codecs, Tuple);
+        {halt, NewTerm} ->
+            NewTerm
+    end;
+traverse_codecs([], Tuple) ->
+    Tuple.
+
+pid(default) ->
+    fun encode_pid/3;
+pid(Encode) when is_function(Encode, 3) ->
+    Encode.
+
+port(default) ->
+    fun encode_port/3;
+port(Encode) when is_function(Encode, 3) ->
+    Encode.
+
+reference(default) ->
+    fun encode_reference/3;
+reference(Encode) when is_function(Encode, 3) ->
+    Encode.
+
+% Encoders
+
+value(Bin, _Encode, State) when is_binary(Bin) ->
+    (State#state.escape)(Bin);
+value(Int, Encode, State) when is_integer(Int) ->
+    (State#state.integer)(Int, Encode, State);
+value(Float, Encode, State) when is_float(Float) ->
+    (State#state.float)(Float, Encode, State);
+value(Atom, Encode, State) when is_atom(Atom) ->
+    (State#state.atom)(Atom, Encode, State);
+value(List, Encode, State) when is_list(List) ->
+    (State#state.list)(List, Encode, State);
+value(Map, Encode, State) when is_map(Map) ->
+    (State#state.map)(Map, Encode, State);
+value(Tuple, Encode, State) when is_tuple(Tuple) ->
+    (State#state.tuple)(Tuple, Encode, State);
+value(Pid, Encode, State) when is_pid(Pid) ->
+    (State#state.pid)(Pid, Encode, State);
+value(Port, Encode, State) when is_port(Port) ->
+    (State#state.port)(Port, Encode, State);
+value(Ref, Encode, State) when is_reference(Ref) ->
+    (State#state.reference)(Ref, Encode, State);
+value(Term, Encode, State) ->
+    error(unsuported_term, [Term, Encode, State]).
+
+encode_integer(Int, _Encode, _State) ->
+    erlang:integer_to_binary(Int, 10).
+
+encode_float(Float, _Encode, _State) ->
+    erlang:float_to_binary(Float, [short]).
+
+encode_atom(true, _Encode, _State) ->
+    <<"true">>;
+encode_atom(false, _Encode, _State) ->
+    <<"false">>;
+encode_atom(Atom, _Encode, #state{nulls = Nulls}) when is_map_key(Atom, Nulls) ->
+    <<"null">>;
+encode_atom(Atom, _Encode, #state{escape = Escape}) ->
+    Escape(atom_to_binary(Atom, utf8)).
+
+encode_list(List, Encode, #state{proplist = false}) ->
+    json:encode_list(List, Encode);
+encode_list(List, Encode, #state{proplist = {true, IsProplist}} = State) ->
+    case IsProplist(List) of
+        true ->
+            value(proplists:to_map(List), Encode, State);
+        false ->
+            json:encode_list(List, Encode)
+    end.
+
+encode_map(Map, Encode, #state{sort_keys = false, drop_nulls = false} = State) ->
+    do_encode_map([
+        [$,, key(Key, State#state.escape), $: | value(Value, Encode, State)]
+        || Key := Value <- Map
+    ]);
+encode_map(Map, Encode, #state{sort_keys = false, drop_nulls = true} = State) ->
+    do_encode_map([
+        [$,, key(Key, State#state.escape), $: | value(Value, Encode, State)]
+        || Key := Value <- Map,
+           not is_map_key(Value, State#state.nulls)
+    ]);
+encode_map(Map, Encode, #state{sort_keys = true, drop_nulls = false} = State) ->
+    do_encode_map([
+        [$,, key(Key, State#state.escape), $: | value(Value, Encode, State)]
+        || {Key, Value} <- lists:keysort(1, maps:to_list(Map))
+    ]);
+encode_map(Map, Encode, #state{sort_keys = true, drop_nulls = true} = State) ->
+    do_encode_map([
+        [$,, key(Key, State#state.escape), $: | value(Value, Encode, State)]
+        || {Key, Value} <- lists:keysort(1, maps:to_list(Map)),
+           not is_map_key(Value, State#state.nulls)
+    ]).
+
+key(Bin, Escape) when is_binary(Bin) ->
+    Escape(Bin);
+key(Str, Escape) when is_list(Str) ->
+    Escape(iolist_to_binary(Str));
+key(Atom, Escape) when is_atom(Atom) ->
+    Escape(atom_to_binary(Atom, utf8));
+key(Int, Escape) when is_integer(Int) ->
+    Escape(integer_to_binary(Int, 10)).
+
+do_encode_map([]) -> <<"{}">>;
+do_encode_map([[_Comma | Entry] | Rest]) -> ["{", Entry, Rest, "}"].
+
+encode_tuple(Tuple, Encode, State) ->
+    error(unsuported_tuple, [Tuple, Encode, State]).
+
+encode_pid(Pid, Encode, State) ->
+    error(unsuported_pid, [Pid, Encode, State]).
+
+encode_port(Port, Encode, State) ->
+    error(unsuported_port, [Port, Encode, State]).
+
+encode_reference(Ref, Encode, State) ->
+    error(unsuported_reference, [Ref, Encode, State]).
+
