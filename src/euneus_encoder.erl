@@ -3,6 +3,13 @@
 
 -export([encode/2]).
 
+-define(min(X, Min), (
+    is_integer(X) andalso X >= Min
+)).
+-define(in_range(X, Min, Max), (
+    is_integer(X) andalso X >= Min andalso X =< Max)
+).
+
 -record(state, {
     nulls :: #{term() := null},
     drop_nulls :: boolean(),
@@ -35,7 +42,12 @@
     sort_keys := boolean(),
     tuple := default
            | encode(tuple())
-           | [fun((tuple()) -> next | {halt, term()})],
+           | [ datetime
+             | timestamp
+             | ipv4
+             | ipv6
+             | {record, Name :: atom(), Fields :: [atom()]}
+             | fun((tuple()) -> next | {halt, term()})],
     pid := default | encode(pid()),
     port := default | encode(port()),
     reference := default | encode(reference())
@@ -135,6 +147,83 @@ tuple(Codecs) when is_list(Codecs) ->
 tuple(Encode) when is_function(Encode, 3) ->
     Encode.
 
+norm_codec(datetime) ->
+    fun datetime_codec/1;
+norm_codec(timestamp) ->
+    fun timestamp_codec/1;
+norm_codec(ipv4) ->
+    fun ipv4_codec/1;
+norm_codec(ipv6) ->
+    fun ipv6_codec/1;
+norm_codec({record, Records}) when is_map(Records) ->
+    records_codec(Records);
+norm_codec({record, Records}) when is_list(Records) ->
+    records_codec(norm_records_list(Records));
+norm_codec(Codec) when is_function(Codec, 1) ->
+    Codec.
+
+norm_records_list(List) ->
+    maps:from_list([{Name, {Fields, length(Fields) + 1}} || {Name, Fields} <- List]).
+
+datetime_codec({{YYYY, MM, DD}, {H, M, S}})
+    when ?min(YYYY, 0), ?in_range(MM, 1, 12), ?in_range(DD, 1, 31),
+         ?in_range(H, 0, 23), ?in_range(M, 0, 59), ?in_range(S, 0, 59) ->
+    Datetime = iolist_to_binary(io_lib:format(
+        "~4.10.0B-~2.10.0B-~2.10.0BT~2.10.0B:~2.10.0B:~2.10.0BZ",
+        [YYYY, MM, DD, H, M, S])
+    ),
+    {halt, Datetime};
+datetime_codec(_Tuple) ->
+    next.
+
+timestamp_codec({MegaSecs, Secs, MicroSecs} = Timestamp)
+    when ?min(MegaSecs, 0), ?min(Secs, 0), ?min(MicroSecs, 0) ->
+    MilliSecs = MicroSecs div 1000,
+    {{YYYY, MM, DD}, {H, M, S}} = calendar:now_to_datetime(Timestamp),
+    DateTime = iolist_to_binary(io_lib:format(
+        "~4.10.0B-~2.10.0B-~2.10.0BT~2.10.0B:~2.10.0B:~2.10.0B.~3.10.0BZ",
+        [YYYY, MM, DD, H, M, S, MilliSecs])
+    ),
+    {halt, DateTime};
+timestamp_codec(_Tuple) ->
+    next.
+
+ipv4_codec({_A, _B, _C, _D} = Tuple) ->
+    case inet_parse:ntoa(Tuple) of
+        {error, einval} ->
+            next;
+        Ipv4 ->
+            {halt, list_to_binary(Ipv4)}
+    end;
+ipv4_codec(_Tuple) ->
+    next.
+
+ipv6_codec({_A, _B, _C, _D, _E, _F, _G, _H} = Tuple) ->
+    case inet_parse:ntoa(Tuple) of
+        {error, einval} ->
+            next;
+        Ipv6 ->
+            {halt, list_to_binary(Ipv6)}
+    end;
+ipv6_codec(_Tuple) ->
+    next.
+
+records_codec(Records) ->
+    fun
+        (Tuple) when tuple_size(Tuple) > 1 ->
+            Name = element(1, Tuple),
+            case Records of
+                #{Name := {Fields, Size}} when tuple_size(Tuple) =:= Size ->
+                    [Name | Values] = tuple_to_list(Tuple),
+                    Map = proplists:to_map(lists:zip(Fields, Values)),
+                    {halt, Map};
+                #{} ->
+                    next
+            end;
+        (_Tuple) ->
+            next
+    end.
+
 codecs(Codecs) ->
     fun(Tuple, Encode, State) ->
         case traverse_codecs(Codecs, Tuple) of
@@ -144,9 +233,6 @@ codecs(Codecs) ->
                 value(Term, Encode, State)
         end
     end.
-
-norm_codec(Codec) when is_function(Codec, 1) ->
-    Codec.
 
 traverse_codecs([Codec | Codecs], Tuple) ->
     case Codec(Tuple) of
