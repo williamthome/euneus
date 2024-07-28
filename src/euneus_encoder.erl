@@ -4,22 +4,44 @@
 -export([encode/2]).
 
 -record(state, {
-    nulls,
-    drop_nulls,
-    escape,
-    integer,
-    float,
-    atom,
-    list,
-    proplist,
-    map,
-    sort_keys,
-    tuple,
-    pid,
-    port,
-    reference
+    nulls :: #{term() := null},
+    drop_nulls :: boolean(),
+    escape :: fun((binary()) -> iodata()),
+    integer :: encode(integer()),
+    float :: encode(float()),
+    atom :: encode(atom()),
+    list :: encode(list()),
+    proplist :: false | {true, is_proplist()},
+    map :: encode(map()),
+    sort_keys :: boolean(),
+    tuple :: encode(tuple()),
+    pid :: encode(pid()),
+    port :: encode(port()),
+    reference :: encode(reference())
 }).
 
+-type encode(Type) :: fun((Type, json:encoder(), #state{}) -> iodata()).
+-type is_proplist() :: fun((list()) -> boolean()).
+-type options() :: #{
+    nulls := [term()],
+    drop_nulls := boolean(),
+    escape := default | fun((binary()) -> iodata()),
+    integer := default | encode(integer()),
+    float := default | encode(float()),
+    atom := default | encode(atom()),
+    list := default | encode(list()),
+    proplist := boolean() | {true, is_proplist()},
+    map := default | encode(map()),
+    sort_keys := boolean(),
+    tuple := default
+           | encode(tuple())
+           | [fun((tuple()) -> next | {halt, term()})],
+    pid := default | encode(pid()),
+    port := default | encode(port()),
+    reference := default | encode(reference())
+}.
+
+-spec encode(term(), options()) -> iodata().
 encode(Input, Opts) ->
     State = new_state(Opts),
     json:encode(Input, fun(Term, Encode) ->
