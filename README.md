@@ -36,32 +36,37 @@ The second argument of `euneus:encode/2` are options, and this is the spec:
 
 ```erlang
 -type options() :: #{
+    codecs => [codec()],
     nulls => [term()],
     skip_values => [term()],
-    escape => fun((binary()) -> iodata()),
-    integer => encode(integer()),
-    float => encode(float()),
-    atom => encode(atom()),
-    list => encode(list()),
-    proplist => boolean() | {true, is_proplist()},
-    map => encode(map()),
     sort_keys => boolean(),
-    tuple =>
-        encode(tuple())
-        | [
-            datetime
-            | timestamp
-            | ipv4
-            | ipv6
-            | {record,
-                #{Name :: atom() => {Fields :: [atom()], Size :: pos_integer()}}
-                | [{Name :: atom(), Fields :: [atom()]}]}
-            | fun((tuple()) -> next | {halt, term()})
-        ],
-    pid => encode(pid()),
-    port => encode(port()),
-    reference => encode(reference())
+    proplists => boolean() | {true, is_proplist()},
+    escape => fun((binary()) -> iodata()),
+    encode_integer => encode(integer()),
+    encode_float => encode(float()),
+    encode_atom => encode(atom()),
+    encode_list => encode(list()),
+    encode_map => encode(map()),
+    encode_tuple => encode(tuple()),
+    encode_pid => encode(pid()),
+    encode_port => encode(port()),
+    encode_reference => encode(reference())
 }.
+
+-type codec() ::
+    datetime
+    | timestamp
+    | ipv4
+    | ipv6
+    % {records, #{foo => {record_info(fields, foo), record_info(size, foo)}}}
+    | {records, #{Name :: atom() := {Fields :: [atom()], Size :: pos_integer()}}}
+    | codec_callback().
+
+-type codec_callback() :: fun((tuple()) -> next | {halt, term()}).
+
+-type is_proplist() :: fun((list()) -> boolean()).
+
+-type encode(Type) :: fun((Type, json:encoder(), state()) -> iodata()).
 ```
 
 ### Encode example
