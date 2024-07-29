@@ -38,26 +38,29 @@ The second argument of `euneus:encode/2` are options, and this is the spec:
 -type options() :: #{
     nulls => [term()],
     skip_values => [term()],
-    escape => default | fun((binary()) -> iodata()),
-    integer => default | encode(integer()),
-    float => default | encode(float()),
-    atom => default | encode(atom()),
-    list => default | encode(list()),
+    escape => fun((binary()) -> iodata()),
+    integer => encode(integer()),
+    float => encode(float()),
+    atom => encode(atom()),
+    list => encode(list()),
     proplist => boolean() | {true, is_proplist()},
-    map => default | encode(map()),
+    map => encode(map()),
     sort_keys => boolean(),
-    tuple => default
-           | encode(tuple())
-           | [ datetime
-             | timestamp
-             | ipv4
-             | ipv6
-             | {record, #{Name :: atom() => {Fields :: [atom()], Size :: pos_integer()}}
-                      | [{Name :: atom(), Fields :: [atom()]}]}
-             | fun((tuple()) -> next | {halt, term()})],
-    pid => default | encode(pid()),
-    port => default | encode(port()),
-    reference => default | encode(reference())
+    tuple =>
+        encode(tuple())
+        | [
+            datetime
+            | timestamp
+            | ipv4
+            | ipv6
+            | {record,
+                #{Name :: atom() => {Fields :: [atom()], Size :: pos_integer()}}
+                | [{Name :: atom(), Fields :: [atom()]}]}
+            | fun((tuple()) -> next | {halt, term()})
+        ],
+    pid => encode(pid()),
+    port => encode(port()),
+    reference => encode(reference())
 }.
 ```
 
@@ -83,24 +86,27 @@ The second argument of `euneus:decode/2` are options, and this is the spec:
 
 ```erlang
 -type options() :: #{
-    codecs => [ copy
-              | timestamp
-              | datetime
-              | ipv4
-              | ipv6
-              | pid
-              | port
-              | reference
-              | fun((binary()) -> next | {halt, term()})],
+    codecs => [
+        copy
+        | timestamp
+        | datetime
+        | ipv4
+        | ipv6
+        | pid
+        | port
+        | reference
+        | fun((binary()) -> next | {halt, term()})
+    ],
     array_start => json:array_start_fun(),
     array_push => json:array_push_fun(),
     array_finish => json:array_finish_fun(),
     object_start => json:object_start_fun(),
-    object_keys => binary
-                 | copy
-                 | atom
-                 | existing_atom
-                 | json:from_binary_fun(),
+    object_keys =>
+        binary
+        | copy
+        | atom
+        | existing_atom
+        | json:from_binary_fun(),
     object_push => json:object_push_fun(),
     object_finish => json:object_finish_fun(),
     float => json:from_binary_fun(),

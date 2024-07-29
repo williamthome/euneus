@@ -65,17 +65,16 @@
 -type options() :: #{
     nulls => [term()],
     skip_values => [term()],
-    escape => default | fun((binary()) -> iodata()),
-    integer => default | encode(integer()),
-    float => default | encode(float()),
-    atom => default | encode(atom()),
-    list => default | encode(list()),
+    escape => fun((binary()) -> iodata()),
+    integer => encode(integer()),
+    float => encode(float()),
+    atom => encode(atom()),
+    list => encode(list()),
     proplist => boolean() | {true, is_proplist()},
-    map => default | encode(map()),
+    map => encode(map()),
     sort_keys => boolean(),
     tuple =>
-        default
-        | encode(tuple())
+        encode(tuple())
         | [
             datetime
             | timestamp
@@ -86,9 +85,9 @@
                 | [{Name :: atom(), Fields :: [atom()]}]}
             | fun((tuple()) -> next | {halt, term()})
         ],
-    pid => default | encode(pid()),
-    port => default | encode(port()),
-    reference => default | encode(reference())
+    pid => encode(pid()),
+    port => encode(port()),
+    reference => encode(reference())
 }.
 -export_type([options/0]).
 
