@@ -36,32 +36,38 @@ The second argument of `euneus:encode/2` are options, and this is the spec:
 
 ```erlang
 -type options() :: #{
+    codecs => [codec()],
     nulls => [term()],
     skip_values => [term()],
-    escape => fun((binary()) -> iodata()),
-    integer => encode(integer()),
-    float => encode(float()),
-    atom => encode(atom()),
-    list => encode(list()),
-    proplist => boolean() | {true, is_proplist()},
-    map => encode(map()),
+    key_to_binary => fun((term()) -> binary()),
     sort_keys => boolean(),
-    tuple =>
-        encode(tuple())
-        | [
-            datetime
-            | timestamp
-            | ipv4
-            | ipv6
-            | {record,
-                #{Name :: atom() => {Fields :: [atom()], Size :: pos_integer()}}
-                | [{Name :: atom(), Fields :: [atom()]}]}
-            | fun((tuple()) -> next | {halt, term()})
-        ],
-    pid => encode(pid()),
-    port => encode(port()),
-    reference => encode(reference())
+    proplists => boolean() | {true, is_proplist()},
+    escape => fun((binary()) -> iodata()),
+    encode_integer => encode(integer()),
+    encode_float => encode(float()),
+    encode_atom => encode(atom()),
+    encode_list => encode(list()),
+    encode_map => encode(map()),
+    encode_tuple => encode(tuple()),
+    encode_pid => encode(pid()),
+    encode_port => encode(port()),
+    encode_reference => encode(reference())
 }.
+
+-type codec() ::
+    datetime
+    | timestamp
+    | ipv4
+    | ipv6
+    % {records, #{foo => {record_info(fields, foo), record_info(size, foo)}}}
+    | {records, #{Name :: atom() := {Fields :: [atom()], Size :: pos_integer()}}}
+    | codec_callback().
+
+-type codec_callback() :: fun((tuple()) -> next | {halt, term()}).
+
+-type is_proplist() :: fun((list()) -> boolean()).
+
+-type encode(Type) :: fun((Type, json:encoder(), state()) -> iodata()).
 ```
 
 ### Encode example
@@ -86,33 +92,35 @@ The second argument of `euneus:decode/2` are options, and this is the spec:
 
 ```erlang
 -type options() :: #{
-    codecs => [
-        copy
-        | timestamp
-        | datetime
-        | ipv4
-        | ipv6
-        | pid
-        | port
-        | reference
-        | fun((binary()) -> next | {halt, term()})
-    ],
+    codecs => [codec()],
+    null => term(),
+    binary_to_float => json:from_binary_fun(),
+    binary_to_integer => json:from_binary_fun(),
     array_start => json:array_start_fun(),
     array_push => json:array_push_fun(),
     array_finish => json:array_finish_fun(),
     object_start => json:object_start_fun(),
     object_keys =>
-        binary
-        | copy
+        copy
         | atom
         | existing_atom
         | json:from_binary_fun(),
     object_push => json:object_push_fun(),
-    object_finish => json:object_finish_fun(),
-    float => json:from_binary_fun(),
-    integer => json:from_binary_fun(),
-    null => term()
+    object_finish => json:object_finish_fun()
 }.
+
+-type codec() ::
+    copy
+    | timestamp
+    | datetime
+    | ipv4
+    | ipv6
+    | pid
+    | port
+    | reference
+    | codec_callback().
+
+-type codec_callback() :: fun((binary()) -> next | {halt, term()}).
 ```
 
 ### Decode example
