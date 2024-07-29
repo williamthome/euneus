@@ -51,6 +51,7 @@
     codecs => [codec()],
     nulls => [term()],
     skip_values => [term()],
+    key_to_binary => fun((term()) -> binary()),
     sort_keys => boolean(),
     proplists => boolean() | {true, is_proplist()},
     escape => fun((binary()) -> iodata()),
@@ -85,6 +86,7 @@
     codecs :: [codec()],
     nulls :: #{term() := null},
     skip_values :: #{term() := skip},
+    key_to_binary :: fun((term()) -> binary()),
     sort_keys :: boolean(),
     proplists :: boolean() | {true, is_proplist()},
     escape :: fun((binary()) -> iodata()),
@@ -122,6 +124,7 @@ new_state(Opts) ->
         codecs = maps:get(codecs, Opts, []),
         nulls = maps:from_keys(maps:get(nulls, Opts, [null]), null),
         skip_values = maps:from_keys(maps:get(skip_values, Opts, [undefined]), skip),
+        key_to_binary = maps:get(key_to_binary, Opts, fun key_to_binary/1),
         sort_keys = maps:get(sort_keys, Opts, false),
         proplists = maps:get(proplists, Opts, false),
         escape = maps:get(escape, Opts, fun json:encode_binary/1),
@@ -135,6 +138,15 @@ new_state(Opts) ->
         encode_port = maps:get(encode_port, Opts, fun encode_port/3),
         encode_reference = maps:get(encode_reference, Opts, fun encode_reference/3)
     }.
+
+key_to_binary(Bin) when is_binary(Bin) ->
+    Bin;
+key_to_binary(Str) when is_list(Str) ->
+    iolist_to_binary(Str);
+key_to_binary(Atom) when is_atom(Atom) ->
+    atom_to_binary(Atom, utf8);
+key_to_binary(Int) when is_integer(Int) ->
+    integer_to_binary(Int, 10).
 
 % Codecs
 
@@ -297,7 +309,7 @@ is_proplist([]) ->
 is_proplist(List) ->
     lists:all(fun is_proplist_prop/1, List).
 
-% Must be the same types handled by key/2.
+% Must be the same types handled by key_to_binary/1.
 is_proplist_prop({Key, _}) ->
     is_binary(Key) orelse
         is_list(Key) orelse
@@ -308,25 +320,19 @@ is_proplist_prop(Key) ->
 
 encode_map(Map, Encode, #state{sort_keys = false, skip_values = ValuesToSkip} = State) ->
     do_encode_map([
-        [$,, encode_map_key(Key, State#state.escape), $: | encode_term(Value, Encode, State)]
+        [$,, escape_map_key(Key, State), $: | encode_term(Value, Encode, State)]
      || Key := Value <- Map,
         not is_map_key(Value, ValuesToSkip)
     ]);
 encode_map(Map, Encode, #state{sort_keys = true, skip_values = ValuesToSkip} = State) ->
     do_encode_map([
-        [$,, encode_map_key(Key, State#state.escape), $: | encode_term(Value, Encode, State)]
+        [$,, escape_map_key(Key, State), $: | encode_term(Value, Encode, State)]
      || {Key, Value} <- lists:keysort(1, maps:to_list(Map)),
         not is_map_key(Value, ValuesToSkip)
     ]).
 
-encode_map_key(Bin, Escape) when is_binary(Bin) ->
-    Escape(Bin);
-encode_map_key(Str, Escape) when is_list(Str) ->
-    Escape(iolist_to_binary(Str));
-encode_map_key(Atom, Escape) when is_atom(Atom) ->
-    Escape(atom_to_binary(Atom, utf8));
-encode_map_key(Int, Escape) when is_integer(Int) ->
-    Escape(integer_to_binary(Int, 10)).
+escape_map_key(Key, State) ->
+    (State#state.escape)((State#state.key_to_binary)(Key)).
 
 do_encode_map([]) -> <<"{}">>;
 do_encode_map([[_Comma | Entry] | Rest]) -> ["{", Entry, Rest, "}"].

@@ -39,6 +39,7 @@ The second argument of `euneus:encode/2` are options, and this is the spec:
     codecs => [codec()],
     nulls => [term()],
     skip_values => [term()],
+    key_to_binary => fun((term()) -> binary()),
     sort_keys => boolean(),
     proplists => boolean() | {true, is_proplist()},
     escape => fun((binary()) -> iodata()),
