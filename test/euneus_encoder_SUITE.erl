@@ -27,8 +27,10 @@ test_encode(Config) when is_list(Config) ->
      || {Expect, Term, Opts} <- [
             % Nulls
             {<<"[\"foo\",null,null]">>, [foo, null, undefined], #{nulls => [null, undefined]}},
-            % Drop nulls
-            {<<"{\"foo\":\"foo\"}">>, #{foo => foo, bar => null}, #{drop_nulls => true}},
+            % Skip values
+            {<<"{\"foo\":\"foo\"}">>, #{foo => foo, bar => undefined}, #{
+                skip_values => [undefined]
+            }},
             % Atoms
             {<<"true">>, true, #{}},
             {<<"false">>, false, #{}},

@@ -37,7 +37,7 @@ The second argument of `euneus:encode/2` are options, and this is the spec:
 ```erlang
 -type options() :: #{
     nulls => [term()],
-    drop_nulls => boolean(),
+    skip_values => [term()],
     escape => default | fun((binary()) -> iodata()),
     integer => default | encode(integer()),
     float => default | encode(float()),
