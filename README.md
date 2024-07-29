@@ -92,33 +92,35 @@ The second argument of `euneus:decode/2` are options, and this is the spec:
 
 ```erlang
 -type options() :: #{
-    codecs => [
-        copy
-        | timestamp
-        | datetime
-        | ipv4
-        | ipv6
-        | pid
-        | port
-        | reference
-        | fun((binary()) -> next | {halt, term()})
-    ],
+    codecs => [codec()],
+    null => term(),
+    binary_to_float => json:from_binary_fun(),
+    binary_to_integer => json:from_binary_fun(),
     array_start => json:array_start_fun(),
     array_push => json:array_push_fun(),
     array_finish => json:array_finish_fun(),
     object_start => json:object_start_fun(),
     object_keys =>
-        binary
-        | copy
+        copy
         | atom
         | existing_atom
         | json:from_binary_fun(),
     object_push => json:object_push_fun(),
-    object_finish => json:object_finish_fun(),
-    float => json:from_binary_fun(),
-    integer => json:from_binary_fun(),
-    null => term()
+    object_finish => json:object_finish_fun()
 }.
+
+-type codec() ::
+    copy
+    | timestamp
+    | datetime
+    | ipv4
+    | ipv6
+    | pid
+    | port
+    | reference
+    | codec_callback().
+
+-type codec_callback() :: fun((binary()) -> next | {halt, term()}).
 ```
 
 ### Decode example
