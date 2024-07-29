@@ -16,7 +16,7 @@ For v1.0, please look at the [v1.2.2](https://github.com/williamthome/euneus/tre
 % rebar.config
 {deps, [
     {json_polyfill, "0.1.1"}, % Required only for OTP < 27
-    {euneus, {git, "https://github.com/williamthome/euneus.git", {branch, "dev/v2"}}}
+    {euneus, {git, "https://github.com/williamthome/euneus.git", {branch, "main"}}}
 ]}.
 ```
 
