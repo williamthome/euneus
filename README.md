@@ -33,6 +33,7 @@ For v1.0, please look at the [v1.2.2](https://github.com/williamthome/euneus/tre
 
 The functions `euneus:encode/1,2` encode an Erlang term into a binary JSON.
 The second argument of `euneus:encode/2` are options, and this is the spec:
+
 ```erlang
 -type options() :: #{
     nulls => [term()],
@@ -79,6 +80,7 @@ The second argument of `euneus:encode/2` are options, and this is the spec:
 
 The functions `euneus:decode/1,2` decode a binary JSON into an Erlang term.
 The second argument of `euneus:decode/2` are options, and this is the spec:
+
 ```erlang
 -type options() :: #{
     codecs => [ copy
@@ -145,4 +147,3 @@ Euneus is 100% open-source and community-driven. All components are
 available under the Apache 2 License on [GitHub](https://github.com/williamthome/euneus).
 
 See [LICENSE.md](LICENSE.md) for more information.
-
