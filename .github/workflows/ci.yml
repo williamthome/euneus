@@ -59,4 +59,3 @@ jobs:
           rebar3 unlock --all
           rebar3 upgrade --all
           git diff --exit-code
-
