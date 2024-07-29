@@ -4,9 +4,11 @@ An incredibly flexible and performant JSON parser, generator and formatter in pu
 
 Euneus is built on the top of the new [OTP json module](https://erlang.org/documentation/doc-15.0-rc3/lib/stdlib-6.0/doc/html/json.html).
 
-## Disclaimer ⚠️
+## ⚠️ Disclaimer
 
-Work in progress.
+This is a work-in-progress branch aiming to release a v2.0 of Euneus.
+
+For v1.0, please look at the [v1.2.2](https://github.com/williamthome/euneus/tree/v1.2.2) tag.
 
 ## Installation
 
@@ -67,10 +69,8 @@ The second argument of `euneus:encode/2` are options, and this is the spec:
 ..   ip => {0,0,0,0}
 .. }.
 #{id => 1,date => {{1970,1,1},{0,0,0}},ip => {0,0,0,0}}
-
 2> Opts = #{tuple => [datetime, ipv4]}.
 #{tuple => [datetime,ipv4]}
-
 3> euneus:encode(Term, Opts).
 <<"{\"id\":1,\"date\":\"1970-01-01T00:00:00Z\",\"ip\":\"0.0.0.0\"}">>
 ```
@@ -118,15 +118,31 @@ The second argument of `euneus:decode/2` are options, and this is the spec:
 .. }
 .. """.
 <<"{\n   \"id\": 1,\n   \"date\": \"1970-01-01T00:00:00Z\",\n   \"ip\": \"0.0.0.0\"\n}">>
-
 2> Opts = #{
 ..   codecs => [datetime, ipv4],
 ..   object_keys => atom
 .. }.
 #{codecs => [datetime,ipv4],object_keys => atom}
-
 3> euneus:decode(JSON, Opts).
 #{id => 1,date => {{1970,1,1},{0,0,0}},ip => {0,0,0,0}}
 
 ```
+
+## Sponsors
+
+If you like this tool, please consider [sponsoring me](https://github.com/sponsors/williamthome).
+I'm thankful for your never-ending support :heart:
+
+I also accept coffees :coffee:
+
+[!["Buy Me A Coffee"](https://www.buymeacoffee.com/assets/img/custom_images/orange_img.png)](https://www.buymeacoffee.com/williamthome)
+
+## License
+
+Copyright (c) 2024 [William Fank Thomé](https://github.com/williamthome)
+
+Euneus is 100% open-source and community-driven. All components are
+available under the Apache 2 License on [GitHub](https://github.com/williamthome/euneus).
+
+See [LICENSE.md](LICENSE.md) for more information.
 
