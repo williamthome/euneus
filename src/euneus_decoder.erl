@@ -18,37 +18,44 @@
 %% Macros
 %% --------------------------------------------------------------------
 
--define(is_number(X), (
-    X >= $0 andalso X =< $9
-)).
+-define(IS_NUMBER(X),
+    (X >= $0 andalso X =< $9)
+).
 
--define(range(X, Min, Max), (
-    is_integer(X) andalso X >= Min andalso X =< Max
-)).
+-define(IN_RANGE(X, Min, Max),
+    (is_integer(X) andalso X >= Min andalso X =< Max)
+).
+
+%
+
+-elvis([{elvis_style, no_macros, #{allow => ['IS_NUMBER', 'IN_RANGE']}}]).
 
 %% --------------------------------------------------------------------
 %% Types (and their exports)
 %% --------------------------------------------------------------------
 
 -type options() :: #{
-    codecs => [ copy
-              | timestamp
-              | datetime
-              | ipv4
-              | ipv6
-              | pid
-              | port
-              | reference
-              | fun((binary()) -> next | {halt, term()})],
+    codecs => [
+        copy
+        | timestamp
+        | datetime
+        | ipv4
+        | ipv6
+        | pid
+        | port
+        | reference
+        | fun((binary()) -> next | {halt, term()})
+    ],
     array_start => json:array_start_fun(),
     array_push => json:array_push_fun(),
     array_finish => json:array_finish_fun(),
     object_start => json:object_start_fun(),
-    object_keys => binary
-                 | copy
-                 | atom
-                 | existing_atom
-                 | json:from_binary_fun(),
+    object_keys =>
+        binary
+        | copy
+        | atom
+        | existing_atom
+        | json:from_binary_fun(),
     object_push => json:object_push_fun(),
     object_finish => json:object_finish_fun(),
     float => json:from_binary_fun(),
@@ -132,61 +139,77 @@ copy_codec(Bin) ->
 
 % <<"\"1970-01-01T00:00:00.000Z\"">> = {0,0,0}
 timestamp_codec(
-    << Y4/integer, Y3/integer, Y2/integer, Y1/integer, $-/integer
-     , M2/integer, M1/integer, $-/integer
-     , D2/integer, D1/integer
-     , $T/integer
-     , H2/integer, H1/integer, $:/integer
-     , Min2/integer, Min1/integer, $:/integer
-     , S2/integer, S1/integer
-     , $./integer
-     , MSec3/integer, MSec2/integer, MSec1/integer
-     , $Z/integer >>)
-    when ?is_number(Y4), ?is_number(Y3), ?is_number(Y2), ?is_number(Y1)
-       , ?is_number(M2), ?is_number(M1)
-       , ?is_number(D2), ?is_number(D1)
-       , ?is_number(H2), ?is_number(H1)
-       , ?is_number(Min2), ?is_number(Min1)
-       , ?is_number(S2), ?is_number(S1)
-       , ?is_number(MSec3), ?is_number(MSec2), ?is_number(MSec1) ->
-    {halt, timestamp(Y4, Y3, Y2, Y1, M2, M1, D2, D1, H2, H1, Min2, Min1, S2, S1, MSec3, MSec2, MSec1)};
+    <<Y4/integer, Y3/integer, Y2/integer, Y1/integer, $-/integer, M2/integer, M1/integer,
+        $-/integer, D2/integer, D1/integer, $T/integer, H2/integer, H1/integer, $:/integer,
+        Min2/integer, Min1/integer, $:/integer, S2/integer, S1/integer, $./integer, MSec3/integer,
+        MSec2/integer, MSec1/integer, $Z/integer>>
+) when
+    ?IS_NUMBER(Y4),
+    ?IS_NUMBER(Y3),
+    ?IS_NUMBER(Y2),
+    ?IS_NUMBER(Y1),
+    ?IS_NUMBER(M2),
+    ?IS_NUMBER(M1),
+    ?IS_NUMBER(D2),
+    ?IS_NUMBER(D1),
+    ?IS_NUMBER(H2),
+    ?IS_NUMBER(H1),
+    ?IS_NUMBER(Min2),
+    ?IS_NUMBER(Min1),
+    ?IS_NUMBER(S2),
+    ?IS_NUMBER(S1),
+    ?IS_NUMBER(MSec3),
+    ?IS_NUMBER(MSec2),
+    ?IS_NUMBER(MSec1)
+->
+    {halt,
+        timestamp(
+            {Y4, Y3, Y2, Y1, M2, M1, D2, D1},
+            {H2, H1, Min2, Min1, S2, S1},
+            {MSec3, MSec2, MSec1}
+        )};
 timestamp_codec(_Bin) ->
     next.
 
 % <<"\"1970-01-01T00:00:00Z\"">> = {{1970,1,1},{0,0,0}}
 datetime_codec(
-    << Y4/integer, Y3/integer, Y2/integer, Y1/integer, $-/integer
-     , M2/integer, M1/integer, $-/integer
-     , D2/integer, D1/integer
-     , $T/integer
-     , H2/integer, H1/integer, $:/integer
-     , Min2/integer, Min1/integer, $:/integer
-     , S2/integer, S1/integer
-     , $Z/integer >>)
-    when ?is_number(Y4), ?is_number(Y3), ?is_number(Y2), ?is_number(Y1)
-       , ?is_number(M2), ?is_number(M1)
-       , ?is_number(D2), ?is_number(D1)
-       , ?is_number(H2), ?is_number(H1)
-       , ?is_number(Min2), ?is_number(Min1)
-       , ?is_number(S2), ?is_number(S1) ->
-    {halt, datetime(Y4, Y3, Y2, Y1, M2, M1, D2, D1, H2, H1, Min2, Min1, S2, S1)};
+    <<Y4/integer, Y3/integer, Y2/integer, Y1/integer, $-/integer, M2/integer, M1/integer,
+        $-/integer, D2/integer, D1/integer, $T/integer, H2/integer, H1/integer, $:/integer,
+        Min2/integer, Min1/integer, $:/integer, S2/integer, S1/integer, $Z/integer>>
+) when
+    ?IS_NUMBER(Y4),
+    ?IS_NUMBER(Y3),
+    ?IS_NUMBER(Y2),
+    ?IS_NUMBER(Y1),
+    ?IS_NUMBER(M2),
+    ?IS_NUMBER(M1),
+    ?IS_NUMBER(D2),
+    ?IS_NUMBER(D1),
+    ?IS_NUMBER(H2),
+    ?IS_NUMBER(H1),
+    ?IS_NUMBER(Min2),
+    ?IS_NUMBER(Min1),
+    ?IS_NUMBER(S2),
+    ?IS_NUMBER(S1)
+->
+    {halt, datetime({Y4, Y3, Y2, Y1, M2, M1, D2, D1}, {H2, H1, Min2, Min1, S2, S1})};
 datetime_codec(_Bin) ->
     next.
 
-timestamp(Y4, Y3, Y2, Y1, M2, M1, D2, D1, H2, H1, Min2, Min1, S2, S1, MSec3, MSec2, MSec1) ->
-    Datetime = datetime(Y4, Y3, Y2, Y1, M2, M1, D2, D1, H2, H1, Min2, Min1, S2, S1),
-    GregSeconds = calendar:datetime_to_gregorian_seconds(Datetime),
+timestamp(Date, Time, {MSec3, MSec2, MSec1}) ->
+    DateTime = datetime(Date, Time),
+    GregSeconds = calendar:datetime_to_gregorian_seconds(DateTime),
     Seconds = GregSeconds - 62167219200,
     MilliSeconds = chars_to_integer(MSec3, MSec2, MSec1),
     {Seconds div 1000000, Seconds rem 1000000, MilliSeconds * 1000}.
 
-datetime(Y4, Y3, Y2, Y1, M2, M1, D2, D1, H2, H1, Min2, Min1, S2, S1) ->
-    {date(Y4, Y3, Y2, Y1, M2, M1, D2, D1), time(H2, H1, Min2, Min1, S2, S1)}.
+datetime(Date, Time) ->
+    {date(Date), time(Time)}.
 
-date(Y4, Y3, Y2, Y1, M2, M1, D2, D1) ->
+date({Y4, Y3, Y2, Y1, M2, M1, D2, D1}) ->
     {chars_to_integer(Y4, Y3, Y2, Y1), chars_to_integer(M2, M1), chars_to_integer(D2, D1)}.
 
-time(H2, H1, Min2, Min1, S2, S1) ->
+time({H2, H1, Min2, Min1, S2, S1}) ->
     {chars_to_integer(H2, H1), chars_to_integer(Min2, Min1), chars_to_integer(S2, S1)}.
 
 chars_to_integer(N2, N1) ->
@@ -198,14 +221,17 @@ chars_to_integer(N3, N2, N1) ->
 chars_to_integer(N4, N3, N2, N1) ->
     ((N4 - $0) * 1000) + ((N3 - $0) * 100) + ((N2 - $0) * 10) + (N1 - $0).
 
-ipv4_codec(<<A/integer, B/integer, C/integer, $., _/binary>> = Bin)
-    when ?range(A, 0, 255); ?range(B, 0, 255); ?range(C, 0, 255) ->
+ipv4_codec(<<A/integer, B/integer, C/integer, $., _/binary>> = Bin) when
+    ?IN_RANGE(A, 0, 255); ?IN_RANGE(B, 0, 255); ?IN_RANGE(C, 0, 255)
+->
     ipv4_codec_continue(Bin);
-ipv4_codec(<<A/integer, B/integer, $., _/binary>> = Bin)
-    when ?range(A, 0, 255); ?range(B, 0, 255) ->
+ipv4_codec(<<A/integer, B/integer, $., _/binary>> = Bin) when
+    ?IN_RANGE(A, 0, 255); ?IN_RANGE(B, 0, 255)
+->
     ipv4_codec_continue(Bin);
-ipv4_codec(<<A/integer, $., _/binary>> = Bin)
-    when ?range(A, 0, 255) ->
+ipv4_codec(<<A/integer, $., _/binary>> = Bin) when
+    ?IN_RANGE(A, 0, 255)
+->
     ipv4_codec_continue(Bin);
 ipv4_codec(_Bin) ->
     next.
@@ -219,7 +245,7 @@ ipv4_codec_continue(Bin) ->
     end.
 
 ipv6_codec(<<$:, $:>>) ->
-    {halt, {0,0,0,0,0,0,0,0}};
+    {halt, {0, 0, 0, 0, 0, 0, 0, 0}};
 ipv6_codec(<<$:, $:, _/binary>> = Bin) ->
     ipv6_codec_continue(Bin);
 ipv6_codec(<<_/integer, _/integer, _/integer, _/integer, $:, _/binary>> = Bin) ->
@@ -238,8 +264,9 @@ ipv6_codec_continue(Bin) ->
 pid_codec(<<$<, _/binary>> = Bin) ->
     try
         {halt, list_to_pid(binary_to_list(Bin))}
-    catch _:_ ->
-        next
+    catch
+        _:_ ->
+            next
     end;
 pid_codec(_Bin) ->
     next.
@@ -247,8 +274,9 @@ pid_codec(_Bin) ->
 port_codec(<<"#Port<", _/binary>> = Bin) ->
     try
         {halt, list_to_port(binary_to_list(Bin))}
-    catch _:_ ->
-        next
+    catch
+        _:_ ->
+            next
     end;
 port_codec(_Bin) ->
     next.
@@ -256,8 +284,9 @@ port_codec(_Bin) ->
 reference_codec(<<"#Ref<", _/binary>> = Bin) ->
     try
         {halt, list_to_ref(binary_to_list(Bin))}
-    catch _:_ ->
-        next
+    catch
+        _:_ ->
+            next
     end;
 reference_codec(_Bin) ->
     next.
@@ -269,15 +298,17 @@ decoders(Codecs, Opts) ->
         array_start => array_start_decoder(maps:get(array_start, Opts, empty)),
         array_push => array_push_decoder(maps:get(array_push, Opts, push), Codecs),
         array_finish => array_finish_decoder(maps:get(array_finish, Opts, ordered)),
-        object_push => object_push_decoder(maps:get(object_push, Opts, push),
-                                           maps:get(object_keys, Opts, binary),
-                                           Codecs),
+        object_push => object_push_decoder(
+            maps:get(object_push, Opts, push),
+            maps:get(object_keys, Opts, binary),
+            Codecs
+        ),
         object_finish => object_finish_decoder(maps:get(object_finish, Opts, map)),
         integer => maps:get(binary_to_integer, Opts, fun erlang:binary_to_integer/1),
         float => maps:get(binary_to_float, Opts, fun erlang:binary_to_float/1),
         % string => We skip this, since it transforms any string, including object keys.
         null => maps:get(null, Opts, null)
-     }.
+    }.
 
 array_start_decoder(empty) ->
     fun(_) -> [] end;
@@ -344,4 +375,3 @@ do_traverse_codecs([Codec | Codecs], Bin) ->
     end;
 do_traverse_codecs([], Bin) ->
     Bin.
-

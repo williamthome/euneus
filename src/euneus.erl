@@ -13,6 +13,17 @@
 -export([decode_iodata/1]).
 -export([decode_iodata/2]).
 
+%
+
+-ignore_xref([encode/1]).
+-ignore_xref([encode/2]).
+-ignore_xref([encode_iodata/1]).
+-ignore_xref([encode_iodata/2]).
+-ignore_xref([decode/1]).
+-ignore_xref([decode/2]).
+-ignore_xref([decode_iodata/1]).
+-ignore_xref([decode_iodata/2]).
+
 %% --------------------------------------------------------------------
 %% API functions
 %% --------------------------------------------------------------------
@@ -48,4 +59,3 @@ decode_iodata(JSON) ->
 -spec decode_iodata(iodata(), euneus_decoder:options()) -> term().
 decode_iodata(JSON, Opts) ->
     euneus_decoder:decode(iolist_to_binary(JSON), Opts).
-
