@@ -7,17 +7,31 @@
 
 -export([encode/2]).
 
+%
+
+-hank([
+    {unnecessary_function_arguments, [
+        encode_atom/3,
+        encode_float/3,
+        encode_integer/3
+    ]}
+]).
+
 %% --------------------------------------------------------------------
 %% Macros
 %% --------------------------------------------------------------------
 
--define(min(X, Min), (
-    is_integer(X) andalso X >= Min
-)).
+-define(IS_MIN(X, Min),
+    (is_integer(X) andalso X >= Min)
+).
 
--define(in_range(X, Min, Max), (
-    is_integer(X) andalso X >= Min andalso X =< Max
-)).
+-define(IN_RANGE(X, Min, Max),
+    (is_integer(X) andalso X >= Min andalso X =< Max)
+).
+
+%
+
+-elvis([{elvis_style, no_macros, #{allow => ['IS_MIN', 'IN_RANGE']}}]).
 
 %% --------------------------------------------------------------------
 %% Types (and their exports)
@@ -59,15 +73,19 @@
     proplist => boolean() | {true, is_proplist()},
     map => default | encode(map()),
     sort_keys => boolean(),
-    tuple => default
-           | encode(tuple())
-           | [ datetime
-             | timestamp
-             | ipv4
-             | ipv6
-             | {record, #{Name :: atom() => {Fields :: [atom()], Size :: pos_integer()}}
-                      | [{Name :: atom(), Fields :: [atom()]}]}
-             | fun((tuple()) -> next | {halt, term()})],
+    tuple =>
+        default
+        | encode(tuple())
+        | [
+            datetime
+            | timestamp
+            | ipv4
+            | ipv6
+            | {record,
+                #{Name :: atom() => {Fields :: [atom()], Size :: pos_integer()}}
+                | [{Name :: atom(), Fields :: [atom()]}]}
+            | fun((tuple()) -> next | {halt, term()})
+        ],
     pid => default | encode(pid()),
     port => default | encode(port()),
     reference => default | encode(reference())
@@ -93,20 +111,20 @@ encode(Input, Opts) ->
 
 new_state(Opts) ->
     #state{
-       nulls = nulls(maps:get(nulls, Opts, [null])),
-       drop_nulls = drop_nulls(maps:get(drop_nulls, Opts, false)),
-       escape = escape(maps:get(escape, Opts, default)),
-       integer = integer(maps:get(integer, Opts, default)),
-       float = float(maps:get(float, Opts, default)),
-       atom = atom(maps:get(atom, Opts, default)),
-       list = list(maps:get(list, Opts, default)),
-       proplist = proplist(maps:get(proplist, Opts, false)),
-       map = map(maps:get(map, Opts, default)),
-       sort_keys = sort_keys(maps:get(sort_keys, Opts, false)),
-       tuple = tuple(maps:get(tuple, Opts, default)),
-       pid = pid(maps:get(pid, Opts, default)),
-       port = port(maps:get(port, Opts, default)),
-       reference = reference(maps:get(reference, Opts, default))
+        nulls = nulls(maps:get(nulls, Opts, [null])),
+        drop_nulls = drop_nulls(maps:get(drop_nulls, Opts, false)),
+        escape = escape(maps:get(escape, Opts, default)),
+        integer = integer(maps:get(integer, Opts, default)),
+        float = float(maps:get(float, Opts, default)),
+        atom = atom(maps:get(atom, Opts, default)),
+        list = list(maps:get(list, Opts, default)),
+        proplist = proplist(maps:get(proplist, Opts, false)),
+        map = map(maps:get(map, Opts, default)),
+        sort_keys = sort_keys(maps:get(sort_keys, Opts, false)),
+        tuple = tuple(maps:get(tuple, Opts, default)),
+        pid = pid(maps:get(pid, Opts, default)),
+        port = port(maps:get(port, Opts, default)),
+        reference = reference(maps:get(reference, Opts, default))
     }.
 
 nulls(Nulls) when is_list(Nulls) ->
@@ -155,9 +173,9 @@ is_proplist(List) ->
 % Must be the same types handled by key/2.
 is_proplist_prop({Key, _}) ->
     is_binary(Key) orelse
-    is_list(Key) orelse
-    is_atom(Key) orelse
-    is_integer(Key);
+        is_list(Key) orelse
+        is_atom(Key) orelse
+        is_integer(Key);
 is_proplist_prop(Key) ->
     is_atom(Key).
 
@@ -231,24 +249,34 @@ norm_codec(Codec) when is_function(Codec, 1) ->
 norm_records_list(List) ->
     maps:from_list([{Name, {Fields, length(Fields) + 1}} || {Name, Fields} <- List]).
 
-datetime_codec({{YYYY, MM, DD}, {H, M, S}})
-    when ?min(YYYY, 0), ?in_range(MM, 1, 12), ?in_range(DD, 1, 31),
-         ?in_range(H, 0, 23), ?in_range(M, 0, 59), ?in_range(S, 0, 59) ->
-    Datetime = iolist_to_binary(io_lib:format(
-        "~4.10.0B-~2.10.0B-~2.10.0BT~2.10.0B:~2.10.0B:~2.10.0BZ",
-        [YYYY, MM, DD, H, M, S])
+datetime_codec({{YYYY, MM, DD}, {H, M, S}}) when
+    ?IS_MIN(YYYY, 0),
+    ?IN_RANGE(MM, 1, 12),
+    ?IN_RANGE(DD, 1, 31),
+    ?IN_RANGE(H, 0, 23),
+    ?IN_RANGE(M, 0, 59),
+    ?IN_RANGE(S, 0, 59)
+->
+    DateTime = iolist_to_binary(
+        io_lib:format(
+            "~4.10.0B-~2.10.0B-~2.10.0BT~2.10.0B:~2.10.0B:~2.10.0BZ",
+            [YYYY, MM, DD, H, M, S]
+        )
     ),
-    {halt, Datetime};
+    {halt, DateTime};
 datetime_codec(_Tuple) ->
     next.
 
-timestamp_codec({MegaSecs, Secs, MicroSecs} = Timestamp)
-    when ?min(MegaSecs, 0), ?min(Secs, 0), ?min(MicroSecs, 0) ->
+timestamp_codec({MegaSecs, Secs, MicroSecs} = Timestamp) when
+    ?IS_MIN(MegaSecs, 0), ?IS_MIN(Secs, 0), ?IS_MIN(MicroSecs, 0)
+->
     MilliSecs = MicroSecs div 1000,
     {{YYYY, MM, DD}, {H, M, S}} = calendar:now_to_datetime(Timestamp),
-    DateTime = iolist_to_binary(io_lib:format(
-        "~4.10.0B-~2.10.0B-~2.10.0BT~2.10.0B:~2.10.0B:~2.10.0B.~3.10.0BZ",
-        [YYYY, MM, DD, H, M, S, MilliSecs])
+    DateTime = iolist_to_binary(
+        io_lib:format(
+            "~4.10.0B-~2.10.0B-~2.10.0BT~2.10.0B:~2.10.0B:~2.10.0B.~3.10.0BZ",
+            [YYYY, MM, DD, H, M, S, MilliSecs]
+        )
     ),
     {halt, DateTime};
 timestamp_codec(_Tuple) ->
@@ -343,24 +371,24 @@ encode_list(List, Encode, #state{proplist = {true, IsProplist}} = State) ->
 encode_map(Map, Encode, #state{sort_keys = false, drop_nulls = false} = State) ->
     do_encode_map([
         [$,, key(Key, State#state.escape), $: | value(Value, Encode, State)]
-        || Key := Value <- Map
+     || Key := Value <- Map
     ]);
 encode_map(Map, Encode, #state{sort_keys = false, drop_nulls = true} = State) ->
     do_encode_map([
         [$,, key(Key, State#state.escape), $: | value(Value, Encode, State)]
-        || Key := Value <- Map,
-           not is_map_key(Value, State#state.nulls)
+     || Key := Value <- Map,
+        not is_map_key(Value, State#state.nulls)
     ]);
 encode_map(Map, Encode, #state{sort_keys = true, drop_nulls = false} = State) ->
     do_encode_map([
         [$,, key(Key, State#state.escape), $: | value(Value, Encode, State)]
-        || {Key, Value} <- lists:keysort(1, maps:to_list(Map))
+     || {Key, Value} <- lists:keysort(1, maps:to_list(Map))
     ]);
 encode_map(Map, Encode, #state{sort_keys = true, drop_nulls = true} = State) ->
     do_encode_map([
         [$,, key(Key, State#state.escape), $: | value(Value, Encode, State)]
-        || {Key, Value} <- lists:keysort(1, maps:to_list(Map)),
-           not is_map_key(Value, State#state.nulls)
+     || {Key, Value} <- lists:keysort(1, maps:to_list(Map)),
+        not is_map_key(Value, State#state.nulls)
     ]).
 
 key(Bin, Escape) when is_binary(Bin) ->
@@ -386,4 +414,3 @@ encode_port(Port, Encode, State) ->
 
 encode_reference(Ref, Encode, State) ->
     error(unsuported_reference, [Ref, Encode, State]).
-

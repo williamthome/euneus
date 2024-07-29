@@ -1,5 +1,6 @@
 {application, euneus, [
-    {description, "An incredibly flexible and performant JSON parser, generator and formatter in pure Erlang"},
+    {description,
+        "An incredibly flexible and performant JSON parser, generator and formatter in pure Erlang"},
     {vsn, semver},
     {registered, []},
     {applications, [
@@ -13,5 +14,4 @@
         {"GitHub", "https://github.com/williamthome/euneus"},
         {"Sponsor", "https://github.com/sponsors/williamthome"}
     ]}
- ]}.
-
+]}.
