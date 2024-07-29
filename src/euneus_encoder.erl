@@ -67,8 +67,8 @@
 }.
 
 -type codec() ::
-    datetime
-    | timestamp
+    timestamp
+    | datetime
     | ipv4
     | ipv6
     % {records, #{foo => {record_info(fields, foo), record_info(size, foo)}}}
@@ -160,10 +160,10 @@ traverse_codecs([Codec | Codecs], Tuple) ->
 traverse_codecs([], Tuple) ->
     Tuple.
 
-codec_callback(datetime, Tuple) ->
-    datetime_codec_callback(Tuple);
 codec_callback(timestamp, Tuple) ->
     timestamp_codec_callback(Tuple);
+codec_callback(datetime, Tuple) ->
+    datetime_codec_callback(Tuple);
 codec_callback(ipv4, Tuple) ->
     ipv4_codec_callback(Tuple);
 codec_callback(ipv6, Tuple) ->
@@ -172,6 +172,21 @@ codec_callback({records, Records}, Tuple) ->
     records_codec_callback(Tuple, Records);
 codec_callback(Callback, Tuple) ->
     Callback(Tuple).
+
+timestamp_codec_callback({MegaSecs, Secs, MicroSecs} = Timestamp) when
+    ?IS_MIN(MegaSecs, 0), ?IS_MIN(Secs, 0), ?IS_MIN(MicroSecs, 0)
+->
+    MilliSecs = MicroSecs div 1000,
+    {{YYYY, MM, DD}, {H, M, S}} = calendar:now_to_datetime(Timestamp),
+    DateTime = iolist_to_binary(
+        io_lib:format(
+            "~4.10.0B-~2.10.0B-~2.10.0BT~2.10.0B:~2.10.0B:~2.10.0B.~3.10.0BZ",
+            [YYYY, MM, DD, H, M, S, MilliSecs]
+        )
+    ),
+    {halt, DateTime};
+timestamp_codec_callback(_Tuple) ->
+    next.
 
 datetime_codec_callback({{YYYY, MM, DD}, {H, M, S}}) when
     ?IS_MIN(YYYY, 0),
@@ -189,21 +204,6 @@ datetime_codec_callback({{YYYY, MM, DD}, {H, M, S}}) when
     ),
     {halt, DateTime};
 datetime_codec_callback(_Tuple) ->
-    next.
-
-timestamp_codec_callback({MegaSecs, Secs, MicroSecs} = Timestamp) when
-    ?IS_MIN(MegaSecs, 0), ?IS_MIN(Secs, 0), ?IS_MIN(MicroSecs, 0)
-->
-    MilliSecs = MicroSecs div 1000,
-    {{YYYY, MM, DD}, {H, M, S}} = calendar:now_to_datetime(Timestamp),
-    DateTime = iolist_to_binary(
-        io_lib:format(
-            "~4.10.0B-~2.10.0B-~2.10.0BT~2.10.0B:~2.10.0B:~2.10.0B.~3.10.0BZ",
-            [YYYY, MM, DD, H, M, S, MilliSecs]
-        )
-    ),
-    {halt, DateTime};
-timestamp_codec_callback(_Tuple) ->
     next.
 
 ipv4_codec_callback({_A, _B, _C, _D} = Tuple) ->
