@@ -1,234 +1,93 @@
-%%%---------------------------------------------------------------------
-%%% @copyright 2023 William Fank Thomé
-%%% @author William Fank Thomé <willilamthome@hotmail.com>
-%%% @doc JSON parser tests.
-%%%
-%%% Copyright 2023 William Fank Thomé
-%%%
-%%% Licensed under the Apache License, Version 2.0 (the "License");
-%%% you may not use this file except in compliance with the License.
-%%% You may obtain a copy of the License at
-%%%
-%%%     http://www.apache.org/licenses/LICENSE-2.0
-%%%
-%%% Unless required by applicable law or agreed to in writing, software
-%%% distributed under the License is distributed on an "AS IS" BASIS,
-%%% WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-%%% See the License for the specific language governing permissions and
-%%% limitations under the License.
-%%%
-%%% @end
-%%%---------------------------------------------------------------------
 -module(euneus_decoder_SUITE).
+-behaviour(ct_suite).
+-include_lib("stdlib/include/assert.hrl").
+-compile([export_all, nowarn_export_all]).
 
-% -include_lib("common_test/include/ct.hrl").
+%% --------------------------------------------------------------------
+%% Behaviour (ct_suite) callbacks
+%% --------------------------------------------------------------------
 
-%% Callback functions
--export([ suite/0
-        , all/0
-        , init_per_suite/1
-        , end_per_suite/1
-        , init_per_testcase/2
-        , end_per_testcase/2
-        ]).
-
-%% Test cases
--export([ null_term/1
-        , keys/1
-        , values/1
-        , arrays/1
-        , objects/1
-        , error_handler/1
-        , plugins/1
-        ]).
-
-%%%=====================================================================
-%%% Callback functions
-%%%=====================================================================
-
-%%----------------------------------------------------------------------
-%% @doc Returns list of tuples to set default properties for the suite.
-%%
-%% @param Info List of key/value pairs.
-%%
-%% @end
-%%----------------------------------------------------------------------
--spec suite() -> Info when
-    Info :: [tuple()].
-
-suite() ->
-    [].
-
-%%----------------------------------------------------------------------
-%% @doc Initialization before the suite.
-%%
-%% @param Config A list of key/value pairs, holding the test case configuration.
-%%
-%% @end
-%%----------------------------------------------------------------------
--spec init_per_suite(Config0) -> Config when
-    Config0 :: [tuple()],
-    Config :: [tuple()].
+all() ->
+    [
+        Fun
+     || {Fun, 1} <- ?MODULE:module_info(exports),
+        re:run(atom_to_binary(Fun), <<"^test_">>) =/= nomatch
+    ].
 
 init_per_suite(Config) ->
     Config.
 
-%%----------------------------------------------------------------------
-%% @doc Cleanup after the suite.
-%%
-%% @param Config A list of key/value pairs, holding the test case configuration.
-%%
-%% @end
-%%----------------------------------------------------------------------
--spec end_per_suite(Config) -> Result when
-    Config :: [tuple()],
-    Result :: term().
-
-end_per_suite(_Config) ->
-    ok.
-
-%%----------------------------------------------------------------------
-%% @doc Initialization before each test case.
-%%
-%% @param TestCase Name of the test case that is about to run.
-%% @param Config A list of key/value pairs, holding the test case configuration.
-%%
-%% @end
-%%----------------------------------------------------------------------
--spec init_per_testcase(TestCase, Config0) -> Config when
-    TestCase :: atom(),
-    Config0 :: [tuple()],
-    Config :: [tuple()].
-
-init_per_testcase(_TestCase, Config) ->
+end_per_suite(Config) ->
     Config.
 
-%%----------------------------------------------------------------------
-%% @doc Cleanup after each test case.
-%%
-%% @param TestCase Name of the test case that is finished.
-%% @param Config A list of key/value pairs, holding the test case configuration.
-%%
-%% @end
-%%----------------------------------------------------------------------
--spec end_per_testcase(TestCase, Config) -> Result when
-    TestCase :: atom(),
-    Config :: [tuple()],
-    Result :: term().
+%% --------------------------------------------------------------------
+%% Tests
+%% --------------------------------------------------------------------
 
-end_per_testcase(_TestCase, _Config) ->
-    ok.
-
-%%----------------------------------------------------------------------
-%% @doc Returns the list of groups and test cases that are to be executed.
-%%
-%% @param GroupName Name of a test case group.
-%% @param TestCase Name of a test case.
-%%
-%% @end
-%%----------------------------------------------------------------------
--spec all() -> GroupsAndTestCases when
-    GroupsAndTestCases :: [Group | TestCase],
-    Group :: {group, GroupName},
-    GroupName :: atom(),
-    TestCase :: atom().
-
-all() ->
-    [ null_term
-    , keys
-    , values
-    , arrays
-    , objects
-    , error_handler
-    , plugins
+test_decode(Config) when is_list(Config) ->
+    [
+        ?assertEqual(Expect, euneus_decoder:decode(JSON, Opts))
+     || {Expect, JSON, Opts} <- [
+            % Null
+            {null, <<"null">>, #{}},
+            % Simple values
+            {
+                [null, <<"foo">>, 1, 1.0, #{<<"foo">> => <<"bar">>, <<"bar">> => 1}],
+                <<"[null, \"foo\", 1, 1.0, {\"foo\": \"bar\", \"bar\": 1}]">>,
+                #{}
+            },
+            % Object keys: binary
+            {#{<<"foo">> => <<"bar">>}, <<"{\"foo\": \"bar\"}">>, #{object_keys => binary}},
+            % Object keys: copy
+            {#{<<"foo">> => <<"bar">>}, <<"{\"foo\": \"bar\"}">>, #{object_keys => copy}},
+            % Object keys: atom
+            {#{foo => <<"bar">>}, <<"{\"foo\": \"bar\"}">>, #{object_keys => atom}},
+            % Object keys: existing_atom
+            {#{foo => <<"bar">>}, <<"{\"foo\": \"bar\"}">>, #{object_keys => existing_atom}},
+            % Object keys: fun/1
+            {#{<<"foo">> => <<"bar">>}, <<"{\"foo\": \"bar\"}">>, #{
+                object_keys => fun(K) -> K end
+            }},
+            % Codec: copy
+            {<<"foo">>, <<"\"foo\"">>, #{codecs => [copy]}},
+            % Codec: timestamp
+            {{0, 0, 0}, <<"\"1970-01-01T00:00:00.000Z\"">>, #{codecs => [timestamp]}},
+            % Codec: datetime
+            {{{1970, 1, 1}, {0, 0, 0}}, <<"\"1970-01-01T00:00:00Z\"">>, #{codecs => [datetime]}},
+            % Code: ipv4
+            {{0, 0, 0, 0}, <<"\"0.0.0.0\"">>, #{codecs => [ipv4]}},
+            % Codec: ipv6
+            {{0, 0, 0, 0, 0, 0, 0, 0}, <<"\"::\"">>, #{codecs => [ipv6]}},
+            {{0, 0, 0, 0, 0, 0, 0, 1}, <<"\"::1\"">>, #{codecs => [ipv6]}},
+            {
+                {0, 0, 0, 0, 0, 0, (192 bsl 8) bor 168, (42 bsl 8) bor 2},
+                <<"\"::192.168.42.2\"">>,
+                #{codecs => [ipv6]}
+            },
+            {
+                {0, 0, 0, 0, 0, 16#FFFF, (192 bsl 8) bor 168, (42 bsl 8) bor 2},
+                <<"\"::ffff:192.168.42.2\"">>,
+                #{codecs => [ipv6]}
+            },
+            {
+                {16#3ffe, 16#b80, 16#1f8d, 16#2, 16#204, 16#acff, 16#fe17, 16#bf38},
+                <<"\"3ffe:b80:1f8d:2:204:acff:fe17:bf38\"">>,
+                #{codecs => [ipv6]}
+            },
+            {
+                {16#fe80, 0, 0, 0, 16#204, 16#acff, 16#fe17, 16#bf38},
+                <<"\"fe80::204:acff:fe17:bf38\"">>,
+                #{codecs => [ipv6]}
+            },
+            % Codec: pid
+            {list_to_pid("<0.92.0>"), <<"\"<0.92.0>\"">>, #{codecs => [pid]}},
+            % Codec: port
+            {list_to_port("#Port<0.1>"), <<"\"#Port<0.1>\"">>, #{codecs => [port]}},
+            % Codec: reference
+            {
+                list_to_ref("#Ref<0.314572725.1088159747.110918>"),
+                <<"\"#Ref<0.314572725.1088159747.110918>\"">>,
+                #{codecs => [reference]}
+            }
+        ]
     ].
-
-%%%=====================================================================
-%%% Test cases
-%%%=====================================================================
-
-null_term(Config) when is_list(Config) ->
-    {ok, undefined} = decode(<<"null">>, #{}),
-    {ok, nil} = decode(<<"null">>, #{null_term => nil}).
-
-keys(Config) when is_list(Config) ->
-    {ok, #{<<"foo">> := <<"bar">>}} = decode(<<"{\"foo\":\"bar\"}">>, #{}),
-    {ok, #{<<"foo">> := <<"bar">>}} = decode(<<"{\"foo\":\"bar\"}">>, #{
-        keys => copy
-    }),
-    {ok, #{foo := <<"bar">>}} = decode(<<"{\"foo\":\"bar\"}">>, #{
-        keys => to_atom
-    }),
-    {ok, #{foo := <<"bar">>}} = decode(<<"{\"foo\":\"bar\"}">>, #{
-        keys => to_existing_atom
-    }),
-    {ok, #{0 := <<"0">>}} = decode(<<"{\"0\":\"0\"}">>, #{
-        keys => to_integer
-    }),
-    {ok, #{foo := <<"bar">>}} = decode(<<"{\"foo\":\"bar\"}">>, #{
-        keys => fun(<<"foo">>, _Opts) ->
-            foo
-        end
-    }).
-
-values(Config) when is_list(Config) ->
-    {ok, #{<<"foo">> := <<"bar">>}} = decode(<<"{\"foo\":\"bar\"}">>, #{}),
-    {ok, #{<<"foo">> := <<"bar">>}} = decode(<<"{\"foo\":\"bar\"}">>, #{
-        values => copy
-    }),
-    {ok, #{<<"foo">> := bar}} = decode(<<"{\"foo\":\"bar\"}">>, #{
-        values => to_atom
-    }),
-    {ok, #{<<"foo">> := bar}} = decode(<<"{\"foo\":\"bar\"}">>, #{
-        values => to_existing_atom
-    }),
-    {ok, #{<<"0">> := 0}} = decode(<<"{\"0\":\"0\"}">>, #{
-        values => to_integer
-    }),
-    {ok, #{<<"foo">> := bar}} = decode(<<"{\"foo\":\"bar\"}">>, #{
-        values => fun(<<"bar">>, _Opts) ->
-            bar
-        end
-    }).
-
-arrays(Config) when is_list(Config) ->
-    {ok, [<<"foo">>,true,0,undefined]} = decode(<<"[\"foo\",true,0,null]">>, #{}),
-    {ok, [foo]} = decode(<<"[]">>, #{
-        arrays => fun([], _Opts) ->
-            [foo]
-        end
-    }).
-
-objects(Config) when is_list(Config) ->
-    {ok, #{<<"foo">> := <<"bar">>, <<"0">> := undefined}} =
-        decode(<<"{\"foo\":\"bar\",\"0\":null}">>, #{}),
-    {ok, #{}} = decode(<<"{\"foo\":\"bar\",\"0\":null}">>, #{
-        objects => fun(#{<<"foo">> := <<"bar">>, <<"0">> := undefined}, _Opts) ->
-            #{}
-        end
-    }).
-
-error_handler(Config) when is_list(Config) ->
-    {error, bar} = decode(<<"[]">>, #{
-        arrays => fun([], _Opts) ->
-            throw(foo)
-        end,
-        error_handler => fun (throw, foo, _Stacktrace) ->
-            {error, bar}
-        end
-    }).
-
-plugins(Config) when is_list(Config) ->
-    {halt, {test, foo}} =
-        euneus_test_plugin:decode(<<"test::foo">>, euneus_decoder:parse_opts(#{})),
-    next =
-        euneus_test_plugin:decode(<<"test::bar">>, euneus_decoder:parse_opts(#{})),
-    {ok, {test, foo}} =
-        euneus_decoder:decode(<<"\"test::foo\"">>, #{plugins => [euneus_test_plugin]}).
-
-%%%=====================================================================
-%%% Support functions
-%%%=====================================================================
-
-decode(Input, Opts) ->
-    euneus_decoder:decode(Input, Opts).
