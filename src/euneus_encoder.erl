@@ -39,7 +39,7 @@
 
 -record(state, {
     nulls :: #{term() := null},
-    drop_nulls :: boolean(),
+    skip_values :: false | {true, #{term() := skip}},
     escape :: fun((binary()) -> iodata()),
     integer :: encode(integer()),
     float :: encode(float()),
@@ -64,7 +64,7 @@
 
 -type options() :: #{
     nulls => [term()],
-    drop_nulls => boolean(),
+    skip_values => [term()],
     escape => default | fun((binary()) -> iodata()),
     integer => default | encode(integer()),
     float => default | encode(float()),
@@ -112,7 +112,7 @@ encode(Input, Opts) ->
 new_state(Opts) ->
     #state{
         nulls = nulls(maps:get(nulls, Opts, [null])),
-        drop_nulls = drop_nulls(maps:get(drop_nulls, Opts, false)),
+        skip_values = skip_values(maps:get(skip_values, Opts, [undefined])),
         escape = escape(maps:get(escape, Opts, default)),
         integer = integer(maps:get(integer, Opts, default)),
         float = float(maps:get(float, Opts, default)),
@@ -130,8 +130,10 @@ new_state(Opts) ->
 nulls(Nulls) when is_list(Nulls) ->
     maps:from_keys(Nulls, null).
 
-drop_nulls(Drop) when is_boolean(Drop) ->
-    Drop.
+skip_values([]) ->
+    false;
+skip_values(Values) when is_list(Values) ->
+    {true, maps:from_keys(Values, skip)}.
 
 escape(default) ->
     fun json:encode_binary/1;
@@ -368,27 +370,27 @@ encode_list(List, Encode, #state{proplist = {true, IsProplist}} = State) ->
             json:encode_list(List, Encode)
     end.
 
-encode_map(Map, Encode, #state{sort_keys = false, drop_nulls = false} = State) ->
+encode_map(Map, Encode, #state{sort_keys = false, skip_values = false} = State) ->
     do_encode_map([
         [$,, key(Key, State#state.escape), $: | value(Value, Encode, State)]
      || Key := Value <- Map
     ]);
-encode_map(Map, Encode, #state{sort_keys = false, drop_nulls = true} = State) ->
+encode_map(Map, Encode, #state{sort_keys = false, skip_values = {true, Skip}} = State) ->
     do_encode_map([
         [$,, key(Key, State#state.escape), $: | value(Value, Encode, State)]
      || Key := Value <- Map,
-        not is_map_key(Value, State#state.nulls)
+        not is_map_key(Value, Skip)
     ]);
-encode_map(Map, Encode, #state{sort_keys = true, drop_nulls = false} = State) ->
+encode_map(Map, Encode, #state{sort_keys = true, skip_values = false} = State) ->
     do_encode_map([
         [$,, key(Key, State#state.escape), $: | value(Value, Encode, State)]
      || {Key, Value} <- lists:keysort(1, maps:to_list(Map))
     ]);
-encode_map(Map, Encode, #state{sort_keys = true, drop_nulls = true} = State) ->
+encode_map(Map, Encode, #state{sort_keys = true, skip_values = {true, Skip}} = State) ->
     do_encode_map([
         [$,, key(Key, State#state.escape), $: | value(Value, Encode, State)]
      || {Key, Value} <- lists:keysort(1, maps:to_list(Map)),
-        not is_map_key(Value, State#state.nulls)
+        not is_map_key(Value, Skip)
     ]).
 
 key(Bin, Escape) when is_binary(Bin) ->
