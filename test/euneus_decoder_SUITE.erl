@@ -18,6 +18,39 @@ all() ->
 %% Tests
 %% --------------------------------------------------------------------
 
+decode_test(Config) ->
+    DataDir = proplists:get_value(data_dir, Config),
+    {ok, Files} = file:list_dir(DataDir),
+    lists:foreach(
+        fun(Filename) ->
+            AbsFilename = filename:join(DataDir, Filename),
+            {ok, JSON} = file:read_file(AbsFilename),
+            assert(Filename, JSON)
+        end,
+        Files
+    ).
+
+assert("y_" ++ _, JSON) ->
+    ?assertNotException(
+        error,
+        Reason when
+            Reason =:= unexpected_end;
+            (is_tuple(Reason) andalso element(1, Reason) =:= invalid_byte);
+            (is_tuple(Reason) andalso element(1, Reason) =:= unexpected_sequence),
+        decode(JSON)
+    );
+assert("n_" ++ _, JSON) ->
+    ?assertException(
+        error,
+        Reason when
+            Reason =:= unexpected_end;
+            (is_tuple(Reason) andalso element(1, Reason) =:= invalid_byte);
+            (is_tuple(Reason) andalso element(1, Reason) =:= unexpected_sequence),
+        decode(JSON)
+    );
+assert("i_" ++ _, _JSON) ->
+    ?assert(true).
+
 codecs_test(Config) when is_list(Config) ->
     [
         ?assertEqual([], decode(<<"[]">>, #{codecs => []})),
