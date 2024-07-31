@@ -18,6 +18,30 @@ all() ->
 %% Tests
 %% --------------------------------------------------------------------
 
+encode_test(Config) ->
+    DataDir = proplists:get_value(data_dir, Config),
+    {ok, Files} = file:list_dir(DataDir),
+    lists:foreach(
+        fun(Filename) ->
+            case string:find(Filename, "invalid") of
+                nomatch ->
+                    AbsFilename = filename:join(DataDir, Filename),
+                    {ok, JSON} = file:read_file(AbsFilename),
+                    Term = euneus:decode(JSON),
+                    ?assertNotException(
+                        error,
+                        Reason when
+                            Reason =:= unexpected_end;
+                            (is_tuple(Reason) andalso element(1, Reason) =:= invalid_byte),
+                        encode(Term)
+                    );
+                _Invalid ->
+                    ?assert(true)
+            end
+        end,
+        Files
+    ).
+
 codecs_test(Config) when is_list(Config) ->
     [
         ?assertEqual(<<"\"foo\"">>, encode(foo, #{codecs => []})),
