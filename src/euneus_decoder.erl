@@ -87,8 +87,20 @@ decode(JSON, Opts) when is_binary(JSON), is_map(Opts) ->
 %% --------------------------------------------------------------------
 
 decode(Codecs, JSON, Decoders) ->
-    {Result, [], <<>>} = json:decode(JSON, [], Decoders),
-    traverse_codecs(Codecs, Result).
+    case json:decode(JSON, [], Decoders) of
+        {Result, [], <<>>} ->
+            traverse_codecs(Codecs, Result);
+        {_Result, [], Rest} ->
+            invalid_byte(Rest, 0)
+    end.
+
+% This is a copy of json:invalid_byte/2, since it is not exported.
+invalid_byte(Bin, Skip) ->
+    Byte = binary:at(Bin, Skip),
+    error({invalid_byte, Byte}, none, error_info(Skip)).
+
+error_info(Skip) ->
+    [{error_info, #{cause => #{position => Skip}}}].
 
 %% Decoders
 
