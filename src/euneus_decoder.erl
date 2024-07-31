@@ -6,14 +6,6 @@
 
 -export([decode/2]).
 
-%
-
-% Suppress the error:
-% > The call json:decode_continue(JSON::binary(), State::json:continuation_state())
-% > contains an opaque term as 2nd argument when terms of different types
-% > are expected in these positions
--dialyzer({no_opaque, [decode_continue/2]}).
-
 %% --------------------------------------------------------------------
 %% Macros
 %% --------------------------------------------------------------------
@@ -49,7 +41,10 @@
     binary_to_integer => json:from_binary_fun(),
     array_start => json:array_start_fun(),
     array_push => json:array_push_fun(),
-    array_finish => json:array_finish_fun(),
+    array_finish =>
+        ordered
+        | reversed
+        | json:array_finish_fun(),
     object_start => json:object_start_fun(),
     object_keys =>
         copy
@@ -57,7 +52,11 @@
         | existing_atom
         | json:from_binary_fun(),
     object_push => json:object_push_fun(),
-    object_finish => json:object_finish_fun()
+    object_finish =>
+        map
+        | proplist
+        | reversed_proplist
+        | json:object_finish_fun()
 }.
 
 -type codec() ::
@@ -87,37 +86,9 @@ decode(JSON, Opts) when is_binary(JSON), is_map(Opts) ->
 %% Internal functions
 %% --------------------------------------------------------------------
 
-% If no codec is provided, we are good to go with json:decode/3, otherwise,
-% we use json:decode_start/3 to be able to use traverse_codecs when the result
-% is a simple value, like a string or number, e.g.:
-% > decode(<<"\"1970-01-01T00:00:00Z\"">>, #{codecs => [datetime]}).
-% > {{1970,1,1},{0,0,0}}
-% Otherwise, the result above will be the date as string.
-decode([], JSON, Decoders) ->
-    {Result, [], <<>>} = json:decode(JSON, [], Decoders),
-    Result;
 decode(Codecs, JSON, Decoders) ->
-    case json:decode_start(JSON, [], Decoders) of
-        {Result, [], <<>>} ->
-            traverse_codecs(Codecs, Result);
-        Continue ->
-            decode_continue(Continue, JSON)
-    end.
-
-decode_continue({continue, State}, JSON) ->
-    decode_continue(json:decode_continue(JSON, State), JSON);
-decode_continue({Result, [], <<>>}, _JSON) ->
-    Result;
-decode_continue({_Result, [], Rest}, _JSON) ->
-    invalid_byte(Rest, 0).
-
-% This is a copy of json:invalid_byte/2, since it is not exported.
-invalid_byte(Bin, Skip) ->
-    Byte = binary:at(Bin, Skip),
-    error({invalid_byte, Byte}, none, error_info(Skip)).
-
-error_info(Skip) ->
-    [{error_info, #{cause => #{position => Skip}}}].
+    {Result, [], <<>>} = json:decode(JSON, [], Decoders),
+    traverse_codecs(Codecs, Result).
 
 %% Decoders
 
@@ -328,7 +299,7 @@ ipv4_codec_callback(_Bin) ->
     next.
 
 ipv4_codec_parse_callback(Bin) ->
-    case inet_parse:ipv4_address(binary_to_list(Bin)) of
+    case inet_parse:ipv4strict_address(binary_to_list(Bin)) of
         {ok, IPv4} ->
             {halt, IPv4};
         {error, einval} ->

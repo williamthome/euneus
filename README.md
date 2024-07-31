@@ -98,7 +98,10 @@ The second argument of `euneus:decode/2` are options, and this is the spec:
     binary_to_integer => json:from_binary_fun(),
     array_start => json:array_start_fun(),
     array_push => json:array_push_fun(),
-    array_finish => json:array_finish_fun(),
+    array_finish =>
+        ordered
+        | reversed
+        | json:array_finish_fun(),
     object_start => json:object_start_fun(),
     object_keys =>
         copy
@@ -106,7 +109,11 @@ The second argument of `euneus:decode/2` are options, and this is the spec:
         | existing_atom
         | json:from_binary_fun(),
     object_push => json:object_push_fun(),
-    object_finish => json:object_finish_fun()
+    object_finish =>
+        map
+        | proplist
+        | reversed_proplist
+        | json:object_finish_fun()
 }.
 
 -type codec() ::
