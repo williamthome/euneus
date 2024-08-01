@@ -15,33 +15,42 @@ all() ->
     [
         Fun
      || {Fun, 1} <- ?MODULE:module_info(exports),
-        re:run(atom_to_binary(Fun), <<"^test_">>) =/= nomatch
+        re:run(atom_to_binary(Fun), <<".*_test$">>) =/= nomatch
     ].
 
 %% --------------------------------------------------------------------
 %% Tests
 %% --------------------------------------------------------------------
 
-test_encode(Config) when is_list(Config) ->
+encode_test(Config) when is_list(Config) ->
     [
         ?assertEqual(<<"[\"foo\"]">>, euneus:encode([foo])),
         ?assertEqual(<<"[\"foo\"]">>, euneus:encode([foo], #{}))
     ].
 
-test_encode_iodata(Config) when is_list(Config) ->
+encode_iodata_test(Config) when is_list(Config) ->
     [
         ?assertEqual([$[, [$", <<"foo">>, $"], $]], euneus:encode_iodata([foo])),
         ?assertEqual([$[, [$", <<"foo">>, $"], $]], euneus:encode_iodata([foo], #{}))
     ].
 
-test_decode(Config) when is_list(Config) ->
+decode_test(Config) when is_list(Config) ->
     [
         ?assertEqual([<<"foo">>], euneus:decode(<<"[\"foo\"]">>)),
         ?assertEqual([<<"foo">>], euneus:decode(<<"[\"foo\"]">>, #{}))
     ].
 
-test_decode_iodata(Config) when is_list(Config) ->
+decode_iodata_test(Config) when is_list(Config) ->
     [
         ?assertEqual([<<"foo">>], euneus:decode_iodata([$[, [$", <<"foo">>, $"], $]])),
         ?assertEqual([<<"foo">>], euneus:decode_iodata([$[, [$", <<"foo">>, $"], $]], #{}))
     ].
+
+minify_test(Config) when is_list(Config) ->
+    ?assertEqual(
+        <<"{\"foo\":\"bar\",\"0\":0,[null,true,false,0.001,\"foo\",{\"foo\":0.0001]}">>,
+        euneus:minify(<<
+            "{\"foo\"   :  \"bar\",\"0\"  :\n   0, [  null, \ntrue,   "
+            "false, 0.001, \"foo\" \n, {\n    \"foo\"  \n : \n 0.0001 \n]}"
+        >>)
+    ).
