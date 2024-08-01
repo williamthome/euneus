@@ -12,6 +12,8 @@
 -export([decode/2]).
 -export([decode_iodata/1]).
 -export([decode_iodata/2]).
+-export([minify/1]).
+-export([format/2]).
 
 %
 
@@ -23,6 +25,8 @@
 -ignore_xref([decode/2]).
 -ignore_xref([decode_iodata/1]).
 -ignore_xref([decode_iodata/2]).
+-ignore_xref([minify/1]).
+-ignore_xref([format/2]).
 
 %% --------------------------------------------------------------------
 %% API functions
@@ -59,3 +63,16 @@ decode_iodata(JSON) ->
 -spec decode_iodata(iodata(), euneus_decoder:options()) -> term().
 decode_iodata(JSON, Opts) ->
     euneus_decoder:decode(iolist_to_binary(JSON), Opts).
+
+-spec minify(binary()) -> binary().
+minify(JSON) ->
+    format(JSON, #{
+        indent_type => spaces,
+        indent_width => 0,
+        spaced_values => false,
+        crlf => none
+    }).
+
+-spec format(binary(), euneus_formatter:options()) -> binary().
+format(JSON, Opts) ->
+    iolist_to_binary(euneus_formatter:format(JSON, Opts)).
