@@ -160,8 +160,8 @@ since no optimizations have been made. You will find the data and tests under th
 $ rebar3 as benchmark shell
 
 % ---------------------------------------------------------------------
-% The following command builds the erlperf escript. Run it only for the
-% first time or if it does not exist.
+% The following command builds the erlperf escript.
+% IMPORTANT! Run it only for the first time or if it does not exist.
 % ---------------------------------------------------------------------
 1> euneus_benchmarker:bootstrap().
 ===> Verifying dependencies...
@@ -171,37 +171,37 @@ $ rebar3 as benchmark shell
 ok
 
 % ---------------------------------------------------------------------
-% Since erlperf currently does not accept labels:
-% - euneus: #Fun<euneus_benchmarker.0.129271664>
-% - jiffy:  #Fun<euneus_benchmarker.1.129271664>
-% - thoas:  #Fun<euneus_benchmarker.2.129271664>
+% Since erlperf currently does not accept labels, `Code` returns something like:
+% - #Fun<euneus_benchmarker.0.129271664> = euneus
+% - #Fun<euneus_benchmarker.1.129271664> = jiffy
+% - #Fun<euneus_benchmarker.2.129271664> = thoas
 % ---------------------------------------------------------------------
 2> euneus_benchmarker:encode_benchmark().
 OS : Linux
 CPU: 12th Gen Intel(R) Core(TM) i9-12900HX
 VM : Erlang/OTP 27 [erts-15.0.1] [source] [64-bit] [smp:24:24] [ds:24:24:10] [async-threads:1] [jit:ns]
 
-Code                                     ||   Samples       Avg   StdDev    Median      P99  Iteration    Rel
-#Fun<euneus_benchmarker.1.129271664>      1         3        37    2.70%        37       38   27036 us   100%
-#Fun<euneus_benchmarker.0.129271664>      1         3        24    6.28%        24       26   41110 us    66%
-#Fun<euneus_benchmarker.2.129271664>      1         3        14    4.22%        14       14   73195 us    37%
+Code      ||   Samples       Avg   StdDev    Median      P99  Iteration    Rel
+jiffy      1         3        37    2.70%        37       38   27036 us   100%
+euneus     1         3        24    6.28%        24       26   41110 us    66%
+thoas      1         3        14    4.22%        14       14   73195 us    37%
 ok
 
 % ---------------------------------------------------------------------
-% Since erlperf currently does not accept labels:
-% - euneus: #Fun<euneus_benchmarker.3.129271664>
-% - jiffy:  #Fun<euneus_benchmarker.4.129271664>
-% - thoas:  #Fun<euneus_benchmarker.5.129271664>
+% Since erlperf currently does not accept labels, `Code` returns something like:
+% - #Fun<euneus_benchmarker.3.129271664> = euneus
+% - #Fun<euneus_benchmarker.4.129271664> = jiffy
+% - #Fun<euneus_benchmarker.5.129271664> = thoas
 % ---------------------------------------------------------------------
 3> euneus_benchmarker:decode_benchmark().
 OS : Linux
 CPU: 12th Gen Intel(R) Core(TM) i9-12900HX
 VM : Erlang/OTP 27 [erts-15.0.1] [source] [64-bit] [smp:24:24] [ds:24:24:10] [async-threads:1] [jit:ns]
 
-Code                                     ||   Samples       Avg   StdDev    Median      P99  Iteration    Rel
-#Fun<euneus_benchmarker.3.129271664>      1         3        24    2.44%        24       24   42268 us   100%
-#Fun<euneus_benchmarker.4.129271664>      1         3        19    3.09%        19       19   53589 us    79%
-#Fun<euneus_benchmarker.5.129271664>      1         3        14    0.00%        14       14   71452 us    59%
+Code       ||   Samples       Avg   StdDev    Median      P99  Iteration    Rel
+euneus      1         3        24    2.44%        24       24   42268 us   100%
+jiffy       1         3        19    3.09%        19       19   53589 us    79%
+thoas       1         3        14    0.00%        14       14   71452 us    59%
 ok
 ```
 
