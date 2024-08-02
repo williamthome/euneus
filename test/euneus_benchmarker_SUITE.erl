@@ -45,7 +45,7 @@ encode_test(Config) when is_list(Config) ->
     Data = read_decoded_data_dir_files(get_data_dir(Config)),
     lists:foreach(
         fun({_Filename, Term}) ->
-            euneus:encode(Term, #{}),
+            _ = euneus:encode(Term, #{}),
             ?assert(true)
         end,
         Data
