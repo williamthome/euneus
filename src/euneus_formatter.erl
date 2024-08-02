@@ -35,6 +35,62 @@
 %% --------------------------------------------------------------------
 
 -spec format(binary(), options()) -> iodata().
+%% @doc Formats a binary JSON.
+%%
+%% Option details:
+%%
+%% <ul>
+%%   <blockquote>
+%%     <h4 class="info">Note</h4>
+%%     There is no default for any option, all are required.
+%%   </blockquote>
+%%   <li>
+%%     `indent_type' - Indent using `tabs' or `spaces'.
+%%
+%%     <ul>
+%%       <li>
+%%         `tabs' - The indent char will be `$\t'.
+%%
+%%       </li>
+%%       <li>
+%%         `spaces' - The indent char will be `$\s'.
+%%
+%%       </li>
+%%     </ul>
+%%
+%%   </li>
+%%   <li>
+%%     `indent_width' - The `indent_type' will be copied N times based on it.
+%%
+%%   </li>
+%%   <li>
+%%     `spaced_values' - Defines if keys and values of objects should be
+%%     spaced by one `$\s' char.
+%%
+%%   </li>
+%%   <li>
+%%     `crlf' - Defines the Carriage Return/Line Feed.
+%%
+%%     <ul>
+%%       <li>
+%%         `r' - The CRLF will be `<<$\r>>'.
+%%
+%%       </li>
+%%       <li>
+%%         `n' - The CRLF will be `<<$\n>>'.
+%%
+%%       </li>
+%%       <li>
+%%         `rn' - The CRLF will be `<<$\r, $\n>>'.
+%%
+%%       </li>
+%%       <li>
+%%         `none' - The CRLF will be `<<>>'.
+%%
+%%       </li>
+%%     </ul>
+%%   </li>
+%% </ul>
 format(JSON, Opts) when is_binary(JSON), is_map(Opts) ->
     do_format(JSON, new_state(Opts)).
 

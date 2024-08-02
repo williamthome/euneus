@@ -103,10 +103,230 @@
 -opaque state() :: #state{}.
 
 %% --------------------------------------------------------------------
+%% DocTest
+%% --------------------------------------------------------------------
+
+-ifdef(TEST).
+-include_lib("doctest/include/doctest.hrl").
+-endif.
+
+%% --------------------------------------------------------------------
 %% API functions
 %% --------------------------------------------------------------------
 
 -spec encode(term(), options()) -> iodata().
+%% @doc Encode a term into an iodata JSON.
+%%
+%% <em>Example:</em>
+%%
+%% ```
+%% 1> euneus_encoder:encode(foo, #{}).
+%% [$", <<"foo">>, $"]
+%% '''
+%%
+%% Option details:
+%%
+%% <ul>
+%%   <blockquote>
+%%     <h4 class="info">Note</h4>
+%%     For better visualization and understanding, all options examples use
+%%     `euneus:encode/2', which returns a binary.
+%%   </blockquote>
+%%   <li>
+%%     `codecs' - Transforms tuples into any other Erlang term that will be encoded
+%%     again into a JSON value. By returning `next', the next codec will be called,
+%%     or by returning `{halt, Term :: term()}', the Term will be encoded again.
+%%
+%%     You can use the built-in codecs or your own.
+%%     Please see the `t:euneus_encoder:codec/0' type for details.
+%%
+%%     Default is `[]'.
+%%
+%%     Built-in codecs:
+%%
+%%     <ul>
+%%       <li>
+%%         `timestamp' - Transforms an `t:erlang:timestamp/0' into an ISO 8601 string
+%%         with milliseconds.
+%%
+%%         <em>Example:</em>
+%%
+%% ```
+%% 1> euneus:encode({0, 0, 0}, #{codecs => [timestamp]}).
+%% <<"\"1970-01-01T00:00:00.000Z\"">>
+%% '''
+%%       </li>
+%%       <li>
+%%         `datetime' - Transforms a `t:calendar:datetime/0' into an ISO 8601 string.
+%%
+%%         <em>Example:</em>
+%%
+%% ```
+%% 1> euneus:encode({{1970, 01, 01}, {00, 00, 00}}, #{codecs => [datetime]}).
+%% <<"\"1970-01-01T00:00:00Z\"">>
+%% '''
+%%       </li>
+%%       <li>
+%%         `ipv4' - Transforms an `t:inet:ip4_address/0' into a JSON string.
+%%
+%%         <em>Example:</em>
+%%
+%% ```
+%% 1> euneus:encode({127, 0, 0, 1}, #{codecs => [ipv4]}).
+%% <<"\"127.0.0.1\"">>
+%% '''
+%%       </li>
+%%       <li>
+%%         `ipv6' - Transforms an `t:inet:ip6_address/0' into a JSON string.
+%%
+%%         <em>Example:</em>
+%%
+%% ```
+%% 1> euneus:encode({0, 0, 0, 0, 0, 0, 0, 0}, #{codecs => [ipv6]}).
+%% <<"\"::\"">>
+%% 2> euneus:encode({0, 0, 0, 0, 0, 0, 0, 1}, #{codecs => [ipv6]}).
+%% <<"\"::1\"">>
+%% 3> euneus:encode(
+%% ..     {0, 0, 0, 0, 0, 0, (192 bsl 8) bor 168, (42 bsl 8) bor 2},
+%% ..     #{codecs => [ipv6]}
+%% .. ).
+%% <<"\"::192.168.42.2\"">>
+%% 4> euneus:encode(
+%% ..     {0, 0, 0, 0, 0, 16#FFFF, (192 bsl 8) bor 168, (42 bsl 8) bor 2},
+%% ..     #{codecs => [ipv6]}
+%% .. ).
+%% <<"\"::ffff:192.168.42.2\"">>
+%% 5> euneus:encode(
+%% ..     {16#3ffe, 16#b80, 16#1f8d, 16#2, 16#204, 16#acff, 16#fe17, 16#bf38},
+%% ..     #{codecs => [ipv6]}
+%% .. ).
+%% <<"\"3ffe:b80:1f8d:2:204:acff:fe17:bf38\"">>
+%% 6> euneus:encode(
+%% ..     {16#fe80, 0, 0, 0, 16#204, 16#acff, 16#fe17, 16#bf38},
+%% ..     #{codecs => [ipv6]}
+%% .. ).
+%% <<"\"fe80::204:acff:fe17:bf38\"">>
+%% '''
+%%       </li>
+%%       <li>
+%%         `records' - Transforms records into JSON objects.
+%%
+%%          <em>Example:</em>
+%%
+%% ```
+%% 1> euneus:encode(
+%% ..     % Same as '-record(foo, {bar, baz}).'
+%% ..     {foo, bar, baz},
+%% ..     #{codecs => [{records, #{
+%% ..         % Same as 'foo => {record_info(fields, foo), record_info(size, foo)}'
+%% ..         foo => {[bar, baz], 3}
+%% ..     }}]}
+%% .. ).
+%% <<"{\"bar\":\"bar\",\"baz\":\"baz\"}">>
+%% '''
+%%       </li>
+%%     </ul>
+%%
+%%     Custom codec example:
+%%
+%% ```
+%% 1> euneus:encode({foo}, #{codecs => [fun({foo}) -> {halt, foo} end]}).
+%% <<"\"foo\"">>
+%% '''
+%%   </li>
+%%   <li>
+%%     `nulls' - Defines which values should be encoded as null.
+%%
+%%     Default is `[null]'.
+%%
+%%     <em>Example:</em>
+%%
+%% ```
+%% 1> euneus:encode([null, nil, foo], #{nulls => [null, nil]}).
+%% <<"[null,null,\"foo\"]">>
+%% '''
+%%   </li>
+%%   <li>
+%%     `skip_values' - Defines which map values should be ignored.
+%%     This option permits achieves the same behavior as Javascript,
+%%     which ignores undefined values of objects.
+%%
+%%     Default is `[undefined]'.
+%%
+%%     <em>Example:</em>
+%%
+%% ```
+%% 1> euneus:encode(
+%% ..     #{foo => bar, bar => undefined, baz => null},
+%% ..     #{skip_values => [undefined, null]}
+%% .. ).
+%% <<"{\"foo\":\"bar\"}">>
+%% '''
+%%   </li>
+%%   <li>
+%%     `key_to_binary' - Overrides the default conversion of map keys to a string.
+%%   </li>
+%%   <li>
+%%     `sort_keys' - Defines if the object keys should be sorted.
+%%
+%%     Default is `false'.
+%%
+%%     <em>Example:</em>
+%%
+%% ```
+%% 1> euneus:encode(#{c => c, a => a, b => b}, #{sort_keys => true}).
+%% <<"{\"a\":\"a\",\"b\":\"b\",\"c\":\"c\"}">>
+%% '''
+%%   </li>
+%%   <li>
+%%     `proplists' - If true, converts proplists into objects.
+%%
+%%     Default is `false'.
+%%
+%%     <em>Example:</em>
+%%
+%% ```
+%% 1> euneus:encode([{foo, bar}, baz], #{proplists => true}).
+%% <<"{\"foo\":\"bar\",\"baz\":true}">>
+%% 2> euneus:encode(
+%% ..     [{foo, bar}, {baz, true}],
+%% ..     % Overrides the default is proplist check:
+%% ..     #{proplists => {true, fun([{_, _} | _]) -> true end}}
+%% .. ).
+%% <<"{\"foo\":\"bar\",\"baz\":true}">>
+%% '''
+%%   </li>
+%%   <li>
+%%     `escape' - Overrides the default string escaping.
+%%   </li>
+%%   <li>
+%%     `encode_integer' - Overrides the default integer encoder.
+%%   </li>
+%%   <li>
+%%     `encode_float' - Overrides the default float encoder.
+%%   </li>
+%%   <li>
+%%     `encode_atom' - Overrides the default atom encoder.
+%%   </li>
+%%   <li>
+%%     `encode_list' - Overrides the default list encoder.
+%%   </li>
+%%   <li>
+%%     `encode_map' - Overrides the default map encoder.
+%%   </li>
+%%   <li>
+%%     `encode_tuple'- Overrides the default tuple encoder.
+%%   </li>
+%%   <li>
+%%     `encode_pid' - Overrides the default pid encoder.
+%%   </li>
+%%   <li>
+%%     `encode_port' - Overrides the default port encoder.
+%%   </li>
+%%   <li>
+%%     `encode_reference' - Overrides the default reference encoder.
+%%   </li>
+%% </ul>
 encode(Input, Opts) ->
     State = new_state(Opts),
     json:encode(Input, fun(Term, Encode) ->

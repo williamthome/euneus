@@ -47,7 +47,8 @@
         | json:array_finish_fun(),
     object_start => json:object_start_fun(),
     object_keys =>
-        copy
+        binary
+        | copy
         | atom
         | existing_atom
         | json:from_binary_fun(),
@@ -73,10 +74,286 @@
 -type codec_callback() :: fun((binary()) -> next | {halt, term()}).
 
 %% --------------------------------------------------------------------
+%% DocTest
+%% --------------------------------------------------------------------
+
+-ifdef(TEST).
+-include_lib("doctest/include/doctest.hrl").
+-endif.
+
+%% --------------------------------------------------------------------
 %% API functions
 %% --------------------------------------------------------------------
 
 -spec decode(binary(), options()) -> term().
+%% @doc Decodes a binary JSON into a term.
+%%
+%% <em>Example:</em>
+%%
+%% ```
+%% 1> euneus_decoder:decode(<<"\"foo\"">>, #{}).
+%% <<"foo">>
+%% '''
+%%
+%% Option details:
+%%
+%% <ul>
+%%   <li>
+%%     `codecs' - Transforms a JSON binary value into an Erlang term.
+%%     By returning `next', the next codec will be called, or by returning
+%%     `{halt, Term :: term()}', the Term is returned as the value.
+%%
+%%     You can use the built-in codecs or your own.
+%%     Please see the `t:euneus_decoder:codec/0' type for details.
+%%
+%%     Default is `[]'.
+%%
+%%     Built-in codecs:
+%%
+%%     <ul>
+%%       <li>
+%%         `timestamp' - Transforms an ISO 8601 string with milliseconds into
+%%         an `t:erlang:timestamp/0'.
+%%
+%%         <em>Example:</em>
+%%
+%% ```
+%% 1> euneus_decoder:decode(<<"\"1970-01-01T00:00:00.000Z\"">>, #{codecs => [timestamp]}).
+%% {0, 0, 0}
+%% '''
+%%       </li>
+%%       <li>
+%%         `datetime' - Transforms an ISO 8601 string into a `t:calendar:datetime/0'.
+%%
+%%         <em>Example:</em>
+%%
+%% ```
+%% 1> euneus_decoder:decode(<<"\"1970-01-01T00:00:00Z\"">>, #{codecs => [datetime]}).
+%% {{1970, 01, 01},{00, 00, 00}}
+%% '''
+%%       </li>
+%%       <li>
+%%         `ipv4' - Transforms a JSON string into an `t:inet:ip4_address/0'.
+%%
+%%         <em>Example:</em>
+%%
+%% ```
+%% 1> euneus_decoder:decode(<<"\"127.0.0.1\"">>, #{codecs => [ipv4]}).
+%% {127, 0, 0, 1}
+%% '''
+%%       </li>
+%%       <li>
+%%         `ipv6' - Transforms a JSON string into an `t:inet:ip6_address/0'.
+%%
+%%         <em>Example:</em>
+%%
+%% ```
+%% 1> euneus_decoder:decode(<<"\"::\"">>, #{codecs => [ipv6]}).
+%% {0, 0, 0, 0, 0, 0, 0, 0}
+%% 2> euneus_decoder:decode(<<"\"::1\"">>, #{codecs => [ipv6]}).
+%% {0, 0, 0, 0, 0, 0, 0, 1}
+%% 3> euneus_decoder:decode(<<"\"::192.168.42.2\"">>, #{codecs => [ipv6]}).
+%% {0, 0, 0, 0, 0, 0, (192 bsl 8) bor 168, (42 bsl 8) bor 2}
+%% 4> euneus_decoder:decode(<<"\"::ffff:192.168.42.2\"">>, #{codecs => [ipv6]}).
+%% {0, 0, 0, 0, 0, 16#FFFF, (192 bsl 8) bor 168, (42 bsl 8) bor 2}
+%% 5> euneus_decoder:decode(<<"\"3ffe:b80:1f8d:2:204:acff:fe17:bf38\"">>, #{codecs => [ipv6]}).
+%% {16#3ffe, 16#b80, 16#1f8d, 16#2, 16#204, 16#acff, 16#fe17, 16#bf38}
+%% 6> euneus_decoder:decode(<<"\"fe80::204:acff:fe17:bf38\"">>, #{codecs => [ipv6]}).
+%% {16#fe80, 0, 0, 0, 16#204, 16#acff, 16#fe17, 16#bf38}
+%% '''
+%%       </li>
+%%       <li>
+%%         `pid' - Transforms a JSON string into an `t:erlang:pid/0'.
+%%
+%%         <em>Example:</em>
+%%
+%% ```
+%% 1> euneus_decoder:decode(<<"\"<0.92.0>\"">>, #{codecs => [pid]})
+%% .. =:= list_to_pid("<0.92.0>").
+%% true
+%% '''
+%%       </li>
+%%       <li>
+%%         `port' - Transforms a JSON string into an `t:erlang:port/0'.
+%%
+%%         <em>Example:</em>
+%%
+%% ```
+%% 1> euneus_decoder:decode(<<"\"#Port<0.1>\"">>, #{codecs => [port]})
+%% .. =:= list_to_port("#Port<0.1>").
+%% true
+%% '''
+%%       </li>
+%%       <li>
+%%         `reference' - Transforms a JSON string into an `t:erlang:reference/0'.
+%%
+%%         <em>Example:</em>
+%%
+%% ```
+%% 1> euneus_decoder:decode(<<"\"#Ref<0.314572725.1088159747.110918>\"">>, #{codecs => [reference]})
+%% .. =:= list_to_ref("#Ref<0.314572725.1088159747.110918>").
+%% true
+%% '''
+%%       </li>
+%%     </ul>
+%%
+%%     Custom codec example:
+%%
+%% ```
+%% 1> euneus:decode(<<"\"foo\"">>, #{codecs => [fun(<<"foo">>) -> {halt, foo} end]}).
+%% foo
+%% '''
+%%   </li>
+%%   <li>
+%%     `null' - Defines which term should be considered null.
+%%
+%%     Default is `null'.
+%%
+%%     <em>Example:</em>
+%%
+%% ```
+%% 1> euneus_decoder:decode(<<"null">>, #{null => nil}).
+%% nil
+%% '''
+%%   </li>
+%%   <li>
+%%     `binary_to_float' - Overrides the default binary to float conversion.
+%%
+%%   </li>
+%%   <li>
+%%     `binary_to_integer' - Overrides the default binary to integer conversion..
+%%
+%%   </li>
+%%   <li>
+%%     `array_start' - Overrides the `t:json:array_start_fun/0' callback.
+%%
+%%   </li>
+%%   <li>
+%%     `array_push' - Overrides the `t:json:array_push_fun/0' callback.
+%%
+%%   </li>
+%%   <li>
+%%     `array_finish' - Overrides the `t:json:array_finish_fun/0' callback.
+%%
+%%     In addition to the custom function, there are:
+%%
+%%     <ul>
+%%       <li>
+%%         `ordered' - Returns the array in the same order as the JSON.
+%%
+%%         That's the slower option.
+%%
+%%         <em>Example:</em>
+%%
+%% ```
+%% 1> euneus_decoder:decode(<<"[1,2,3]">>, #{array_finish => ordered}).
+%% [1,2,3]
+%% '''
+%%       </li>
+%%       <li>
+%%         `reversed' - Returns the array in a reversed order.
+%%
+%%         That's the faster option.
+%%
+%%         <em>Example:</em>
+%%
+%% ```
+%% 1> euneus_decoder:decode(<<"[1,2,3]">>, #{array_finish => reversed}).
+%% [3,2,1]
+%% '''
+%%       </li>
+%%     </ul>
+%%
+%%     Default is `ordered'.
+%%
+%%   </li>
+%%   <li>
+%%     `object_start' - Overrides the `t:json:object_start_fun/0' callback.
+%%
+%%   </li>
+%%   <li>
+%%     `object_keys' - Transforms JSON objects key into Erlang term.
+%%
+%%     In addition to the custom function, there are:
+%%
+%%     <ul>
+%%       <li>
+%%         `binary' - Returns the key as `t:erlang:binary/0'.
+%%       </li>
+%%       <li>
+%%         `copy' - Copies the key via `binary:copy/1' returning it as `t:erlang:binary/0'.
+%%       </li>
+%%       <li>
+%%         `atom' - Returns the key as `t:erlang:atom/0' via `erlang:binary_to_atom/2'.
+%%       </li>
+%%       <li>
+%%         `existing_atom' - Returns the key as `t:erlang:atom/0' via
+%%         `erlang:binary_to_existing_atom/2'.
+%%       </li>
+%%     </ul>
+%%
+%%     Default is `binary'.
+%%
+%%   </li>
+%%   <li>
+%%     `object_push' - Overrides the `t:json:object_push_fun/0' callback.
+%%
+%%   </li>
+%%   <li>
+%%     `object_finish' - Overrides the `t:json:object_finish_fun/0' callback.
+%%
+%%     In addition to the custom function, there are:
+%%
+%%     <ul>
+%%       <li>
+%%         `map' - Returns the object as a `t:erlang:map/0'.
+%%
+%%         That's the slower option.
+%%
+%%         <em>Example:</em>
+%%
+%% ```
+%% 1> euneus_decoder:decode(
+%% ..     <<"{\"a\":\"a\",\"b\":\"b\",\"c\":\"c\"}">>,
+%% ..     #{object_finish => map}
+%% .. ).
+%% #{<<"a">> => <<"a">>,<<"b">> => <<"b">>,<<"c">> => <<"c">>}
+%% '''
+%%       </li>
+%%       <li>
+%%         `proplist' - Returns the object as an ordered `t:proplists:proplist/0'.
+%%
+%%         <em>Example:</em>
+%%
+%% ```
+%% 1> euneus_decoder:decode(
+%% ..     <<"{\"a\":\"a\",\"b\":\"b\",\"c\":\"c\"}">>,
+%% ..     #{object_finish => proplist}
+%% .. ).
+%% [{<<"a">>, <<"a">>},{<<"b">>, <<"b">>},{<<"c">>, <<"c">>}]
+%% '''
+%%       </li>
+%%       <li>
+%%         `reversed_proplist' - Returns the object as a reversed `t:proplists:proplist/0'.
+%%
+%%         That's the faster option.
+%%
+%%         <em>Example:</em>
+%%
+%% ```
+%% 1> euneus_decoder:decode(
+%% ..     <<"{\"a\":\"a\",\"b\":\"b\",\"c\":\"c\"}">>,
+%% ..     #{object_finish => reversed_proplist}
+%% .. ).
+%% [{<<"c">>, <<"c">>},{<<"b">>, <<"b">>},{<<"a">>, <<"a">>}]
+%% '''
+%%       </li>
+%%     </ul>
+%%
+%%     Default is `map'.
+%%
+%%   </li>
+%% </ul>
 decode(JSON, Opts) when is_binary(JSON), is_map(Opts) ->
     Codecs = maps:get(codecs, Opts, []),
     Decoders = decoders(Codecs, Opts),
