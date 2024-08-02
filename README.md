@@ -29,10 +29,14 @@ For v1.0, please look at the [v1.2.2](https://github.com/williamthome/euneus/tre
 #{<<"age">> => 68,<<"name">> => <<"Joe Armstrong">>,<<"nationality">> => <<"British">>}
 ```
 
+Please see the [documentation](https://hexdocs.pm/euneus/readme.html) for more examples.
+
 ## Encode
 
 The functions `euneus:encode/1,2` encode an Erlang term into a binary JSON.
-The second argument of `euneus:encode/2` are options, and this is the spec:
+The second argument of `euneus:encode/2` are options.
+
+### Encode options
 
 ```erlang
 -type options() :: #{
@@ -70,7 +74,16 @@ The second argument of `euneus:encode/2` are options, and this is the spec:
 -type encode(Type) :: fun((Type, json:encoder(), state()) -> iodata()).
 ```
 
-### Encode example
+#### `codecs`
+
+Transforms tuples into any other Erlang term that will be encoded again.
+By returning `next`, the next codec will be called, or by returning
+`{halt, Term :: term()}`, the Term will be encoded again.
+
+You can use the built-in codecs or your own.
+Please see the `t:euneus_encoder:codec/0` type for details.
+
+Example:
 
 ```erlang
 1> Term = #{
@@ -79,16 +92,19 @@ The second argument of `euneus:encode/2` are options, and this is the spec:
 ..   ip => {0,0,0,0}
 .. }.
 #{id => 1,date => {{1970,1,1},{0,0,0}},ip => {0,0,0,0}}
-2> Opts = #{codecs => [datetime, ipv4]}.
-#{codecs => [datetime,ipv4]}
-3> euneus:encode(Term, Opts).
+2> euneus:encode(Term, #{codecs => [datetime, ipv4]}).
 <<"{\"id\":1,\"date\":\"1970-01-01T00:00:00Z\",\"ip\":\"0.0.0.0\"}">>
 ```
+
+> [!IMPORTANT]
+> The codecs list is traversed for every tuple.
 
 ## Decode
 
 The functions `euneus:decode/1,2` decode a binary JSON into an Erlang term.
-The second argument of `euneus:decode/2` are options, and this is the spec:
+The second argument of `euneus:decode/2` are options.
+
+### Options
 
 ```erlang
 -type options() :: #{
@@ -130,7 +146,16 @@ The second argument of `euneus:decode/2` are options, and this is the spec:
 -type codec_callback() :: fun((binary()) -> next | {halt, term()}).
 ```
 
-### Decode example
+#### `codecs`
+
+Transforms binary values into any other Erlang term.
+By returning `next`, the next codec will be called, or by returning
+`{halt, Term :: term()}`, the Term is returned as the value.
+
+You can use the built-in codecs or your own.
+Please see the `t:euneus_decoder:codec/0` type for details.
+
+Example:
 
 ```erlang
 1> JSON = ~"""
@@ -141,69 +166,64 @@ The second argument of `euneus:decode/2` are options, and this is the spec:
 .. }
 .. """.
 <<"{\n   \"id\": 1,\n   \"date\": \"1970-01-01T00:00:00Z\",\n   \"ip\": \"0.0.0.0\"\n}">>
-2> Opts = #{
-..   codecs => [datetime, ipv4],
-..   object_keys => atom
-.. }.
-#{codecs => [datetime,ipv4],object_keys => atom}
-3> euneus:decode(JSON, Opts).
-#{id => 1,date => {{1970,1,1},{0,0,0}},ip => {0,0,0,0}}
-
+2> euneus:decode(JSON, #{codecs => [datetime, ipv4]}).
+#{<<"id">> => 1,<<"date">> => {{1970,1,1},{0,0,0}},<<"ip">> => {0,0,0,0}}
 ```
 
 ## Benchmark
 
-The benchmarks are implemented very simply, but they are a good start for optimizing Euneus
-since no optimizations have been made. You will find the data and tests under the test folder.
+The benchmarks are implemented very simply, but they are a good start foroptimizing
+Euneus since no optimizations have been made. You will find the benchmark commands
+in `euneus_benchmarker`, and data and tests under the test folder.
 
-```shell
+> [!IMPORTANT]
+> For the first benchmark run, bootstrapping `erlperf` is required:
+>
+> ```console
+> $ rebar3 as benchmark shell
+>
+> 1> euneus_benchmarker:bootstrap().
+> ===> Verifying dependencies...
+> ===> Analyzing applications...
+> ===> Compiling erlperf
+> ===> Building escript for erlperf...
+> ok
+> ```
+
+### Setup
+
+- OS : Linux
+- CPU: 12th Gen Intel(R) Core(TM) i9-12900HX
+- VM : Erlang/OTP 27 [erts-15.0.1] [source] [64-bit] [smp:24:24] [ds:24:24:10] [async-threads:1] [jit:ns]
+
+### Results
+
+```console
 $ rebar3 as benchmark shell
 
-% ---------------------------------------------------------------------
-% The following command builds the erlperf escript.
-% IMPORTANT! Run it only for the first time or if it does not exist.
-% ---------------------------------------------------------------------
-1> euneus_benchmarker:bootstrap().
-===> Verifying dependencies...
-===> Analyzing applications...
-===> Compiling erlperf
-===> Building escript for erlperf...
-ok
-
-% ---------------------------------------------------------------------
-% Since erlperf currently does not accept labels, `Code` returns something like:
-% - #Fun<euneus_benchmarker.0.129271664> = euneus
-% - #Fun<euneus_benchmarker.1.129271664> = jiffy
-% - #Fun<euneus_benchmarker.2.129271664> = thoas
-% ---------------------------------------------------------------------
-2> euneus_benchmarker:encode_benchmark().
-OS : Linux
-CPU: 12th Gen Intel(R) Core(TM) i9-12900HX
-VM : Erlang/OTP 27 [erts-15.0.1] [source] [64-bit] [smp:24:24] [ds:24:24:10] [async-threads:1] [jit:ns]
-
+1> euneus_benchmarker:encode_benchmark().
 Code      ||   Samples       Avg   StdDev    Median      P99  Iteration    Rel
 jiffy      1         3        37    2.70%        37       38   27036 us   100%
 euneus     1         3        24    6.28%        24       26   41110 us    66%
 thoas      1         3        14    4.22%        14       14   73195 us    37%
-ok
 
-% ---------------------------------------------------------------------
-% Since erlperf currently does not accept labels, `Code` returns something like:
-% - #Fun<euneus_benchmarker.3.129271664> = euneus
-% - #Fun<euneus_benchmarker.4.129271664> = jiffy
-% - #Fun<euneus_benchmarker.5.129271664> = thoas
-% ---------------------------------------------------------------------
-3> euneus_benchmarker:decode_benchmark().
-OS : Linux
-CPU: 12th Gen Intel(R) Core(TM) i9-12900HX
-VM : Erlang/OTP 27 [erts-15.0.1] [source] [64-bit] [smp:24:24] [ds:24:24:10] [async-threads:1] [jit:ns]
-
+2> euneus_benchmarker:decode_benchmark().
 Code       ||   Samples       Avg   StdDev    Median      P99  Iteration    Rel
 euneus      1         3        24    2.44%        24       24   42268 us   100%
 jiffy       1         3        19    3.09%        19       19   53589 us    79%
 thoas       1         3        14    0.00%        14       14   71452 us    59%
-ok
 ```
+
+> [!NOTE]
+> Since `erlperf` currently does not accept labels, `Code` returns something like:
+> - euneus_benchmarker:encode_benchmark/0:
+>   - #Fun<euneus_benchmarker.0.129271664> = euneus
+>   - #Fun<euneus_benchmarker.1.129271664> = jiffy
+>   - #Fun<euneus_benchmarker.2.129271664> = thoas
+> - euneus_benchmarker:decode_benchmark/0:
+>   - #Fun<euneus_benchmarker.3.129271664> = euneus
+>   - #Fun<euneus_benchmarker.4.129271664> = jiffy
+>   - #Fun<euneus_benchmarker.5.129271664> = thoas
 
 ## Sponsors
 
