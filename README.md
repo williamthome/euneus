@@ -79,8 +79,8 @@ The second argument of `euneus:encode/2` are options, and this is the spec:
 ..   ip => {0,0,0,0}
 .. }.
 #{id => 1,date => {{1970,1,1},{0,0,0}},ip => {0,0,0,0}}
-2> Opts = #{tuple => [datetime, ipv4]}.
-#{tuple => [datetime,ipv4]}
+2> Opts = #{codecs => [datetime, ipv4]}.
+#{codecs => [datetime,ipv4]}
 3> euneus:encode(Term, Opts).
 <<"{\"id\":1,\"date\":\"1970-01-01T00:00:00Z\",\"ip\":\"0.0.0.0\"}">>
 ```
