@@ -17,7 +17,7 @@ concurrency:
 
 jobs:
   ci:
-    name: OTP-${{matrix.otp-version}}
+    name: CI OTP-${{matrix.otp-version}}
 
     runs-on: ${{matrix.os}}
 
