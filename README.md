@@ -5,8 +5,8 @@ An incredibly flexible and performant JSON parser, generator and formatter in pu
 Euneus is built on the top of the new [OTP json module](https://erlang.org/documentation/doc-15.0-rc3/lib/stdlib-6.0/doc/html/json.html).
 
 Both encoder and decoder fully conform to [RFC 8259](https://datatracker.ietf.org/doc/html/rfc8259)
-and [ECMA 404](https://ecma-international.org/publications-and-standards/standards/ecma-404/) standards.
-The decoder is tested using [JSONTestSuite](https://github.com/nst/JSONTestSuite).
+and [ECMA 404](https://ecma-international.org/publications-and-standards/standards/ecma-404/) standards
+and are tested using [JSONTestSuite](https://github.com/nst/JSONTestSuite).
 
 Detailed examples and further explanation can be found at [hexdocs](https://hexdocs.pm/euneus).
 
@@ -45,20 +45,20 @@ end
 
 ## Encode
 
-The functions `euneus:encode/1,2` encode an Erlang term into a binary JSON.
+The functions `euneus:encode/1` `euneus:encode/2` encodes an Erlang term into a binary JSON.
 The second argument of `euneus:encode/2` are options.
 
-Please see the `euneus_encoder` [documentation](https://hexdocs.pm/euneus/doc/euneus_encoder.html)
+Please see the `m:euneus_encoder` [documentation](https://hexdocs.pm/euneus/doc/euneus_encoder.html)
 for more examples and detailed explanation.
 
 The data mapping and error reasons can be found in the OTP json encode function [documentation](https://erlang.org/documentation/doc-15.0-rc3/lib/stdlib-6.0/doc/html/json.html#encode/1).
 
 ## Decode
 
-The functions `euneus:decode/1,2` decode a binary JSON into an Erlang term.
+The functions `euneus:decode/1` and `euneus:decode/2` decodes a binary JSON into an Erlang term.
 The second argument of `euneus:decode/2` are options.
 
-Please see the `euneus_decoder` [documentation](https://hexdocs.pm/euneus/doc/euneus_decoder.html)
+Please see the `m:euneus_decoder` [documentation](https://hexdocs.pm/euneus/doc/euneus_decoder.html)
 for more examples and detailed explanation.
 
 The data mapping and error reasons can be found in the OTP json decode function [documentation](https://erlang.org/documentation/doc-15.0-rc3/lib/stdlib-6.0/doc/html/json.html#decode/1).
@@ -69,7 +69,7 @@ Two functions provide JSON formatting:
 - `euneus:minify/1` - Removes any extra spaces and new line characters;
 - `euneus:format/2` - Formats the JSON by passing custom options.
 
-Please see the `euneus_formatter` [documentation](https://hexdocs.pm/euneus/doc/euneus_formatter.html)
+Please see the `m:euneus_formatter` [documentation](https://hexdocs.pm/euneus/doc/euneus_formatter.html)
 for more examples and detailed explanation.
 
 ## Benchmark
@@ -92,13 +92,13 @@ in `euneus_benchmarker`, and data and tests under the test folder.
 > ok
 > ```
 
-### Setup
-
-- OS : Linux
-- CPU: 12th Gen Intel(R) Core(TM) i9-12900HX
-- VM : Erlang/OTP 27 [erts-15.0.1] [source] [64-bit] [smp:24:24] [ds:24:24:10] [async-threads:1] [jit:ns]
-
 ### Results
+
+> Setup:
+>
+> - OS : Linux
+> - CPU: 12th Gen Intel(R) Core(TM) i9-12900HX
+> - VM : Erlang/OTP 27 [erts-15.0.1] [source] [64-bit] [smp:24:24] [ds:24:24:10] [async-threads:1] [jit:ns]
 
 ```console
 $ rebar3 as benchmark shell
