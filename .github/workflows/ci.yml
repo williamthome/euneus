@@ -56,12 +56,12 @@ jobs:
                 -hash-${{hashFiles('rebar.lock')}}"
 
       - name: Continuous Integration (Polyfill)
-        if: ${{matrix.otp-version != '27'}}
+        if: ${{fromJSON(matrix.otp-version) < 27}}
         run: |
           rebar3 as test polyfill_ci
 
       - name: Continuous Integration
-        if: ${{matrix.otp-version == '27'}}
+        if: ${{fromJSON(matrix.otp-version) >= 27}}
         run: |
           rebar3 as test ci
 
