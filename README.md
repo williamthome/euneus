@@ -66,6 +66,7 @@ The data mapping and error reasons can be found in the OTP json decode function 
 ## Format
 
 Two functions provide JSON formatting:
+
 - `euneus:minify/1` - Removes any extra spaces and new line characters;
 - `euneus:format/2` - Formats the JSON by passing custom options.
 
@@ -118,6 +119,7 @@ thoas       1         3        14    0.00%        14       14   71452 us    59%
 
 > [!NOTE]
 > Since `erlperf` currently does not accept labels, `Code` returns something like:
+>
 > - euneus_benchmarker:encode_benchmark/0:
 >   - #Fun<euneus_benchmarker.0.129271664> = euneus
 >   - #Fun<euneus_benchmarker.1.129271664> = jiffy
