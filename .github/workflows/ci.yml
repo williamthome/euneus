@@ -23,7 +23,7 @@ jobs:
 
     strategy:
       matrix:
-        otp-version: [24, 25, 26, 27]
+        otp-version: [25, 26, 27]
         os: [ubuntu-24.04]
 
     steps:
@@ -55,7 +55,13 @@ jobs:
                 -rebar3-${{steps.setup-beam.outputs.rebar3-version}}\
                 -hash-${{hashFiles('rebar.lock')}}"
 
+      - name: Continuous Integration (Polyfill)
+        if: ${{matrix.otp-version != '27'}}
+        run: |
+          rebar3 as test polyfill_ci
+
       - name: Continuous Integration
+        if: ${{matrix.otp-version == '27'}}
         run: |
           rebar3 as test ci
 
