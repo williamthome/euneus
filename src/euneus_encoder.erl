@@ -537,17 +537,48 @@ is_proplist_prop({Key, _}) ->
 is_proplist_prop(Key) ->
     is_atom(Key).
 
+-if(?OTP_RELEASE >= 26).
 encode_map(Map, Encode, #state{sort_keys = false, skip_values = ValuesToSkip} = State) ->
     do_encode_map([
         [$,, escape_map_key(Key, State), $: | encode_term(Value, Encode, State)]
      || Key := Value <- Map,
         not is_map_key(Value, ValuesToSkip)
     ]);
-encode_map(Map, Encode, #state{sort_keys = true, skip_values = ValuesToSkip} = State) ->
+encode_map(Map, Encode, State) ->
+    encode_sort_keys_map(Map, Encode, State).
+-else.
+encode_map(Map, Encode, #state{sort_keys = false, skip_values = ValuesToSkip} = State) ->
+    do_encode_map(
+        maps:fold(
+            fun(Key, Value, Acc) ->
+                case is_map_key(Value, ValuesToSkip) of
+                    true ->
+                        [];
+                    false ->
+                        [
+                            [
+                                $,,
+                                escape_map_key(Key, State),
+                                $:
+                                | encode_term(Value, Encode, State)
+                            ]
+                            | Acc
+                        ]
+                end
+            end,
+            [],
+            Map
+        )
+    );
+encode_map(Map, Encode, State) ->
+    encode_sort_keys_map(Map, Encode, State).
+-endif.
+
+encode_sort_keys_map(Map, Encode, #state{sort_keys = true} = State) ->
     do_encode_map([
         [$,, escape_map_key(Key, State), $: | encode_term(Value, Encode, State)]
      || {Key, Value} <- lists:keysort(1, maps:to_list(Map)),
-        not is_map_key(Value, ValuesToSkip)
+        not is_map_key(Value, State#state.skip_values)
     ]).
 
 escape_map_key(Key, State) ->
