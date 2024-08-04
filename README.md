@@ -17,8 +17,8 @@ Detailed examples and further explanation can be found at [hexdocs](https://hexd
 ```erlang
 % rebar.config
 {deps, [
-    {json_polyfill, "0.1.1"}, % Required only for OTP < 27
-    {euneus, {git, "https://github.com/williamthome/euneus.git", {branch, "main"}}}
+    {json_polyfill, "0.1.3"}, % Required only for OTP < 27
+    {euneus, "2.0.0"}
 ]}.
 ```
 
@@ -28,8 +28,8 @@ Detailed examples and further explanation can be found at [hexdocs](https://hexd
 # mix.exs
 defp deps do
   [
-    {:json_polyfill, "~> 0.1.1"}, # Required only for OTP < 27
-    {:euneus, git: "https://github.com/williamthome/euneus.git", branch: "main"}
+    {:json_polyfill, "~> 0.1.3"}, # Required only for OTP < 27
+    {:euneus, "~> 2.0.0"}
   ]
 end
 ```
