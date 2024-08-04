@@ -493,8 +493,13 @@ encode_term(Term, Encode, State) ->
 encode_integer(Int, _Encode, _State) ->
     erlang:integer_to_binary(Int, 10).
 
+-if(?OTP_RELEASE >= 25).
 encode_float(Float, _Encode, _State) ->
     erlang:float_to_binary(Float, [short]).
+-else.
+encode_float(Float, _Encode, _State) ->
+    erlang:float_to_binary(Float, [compact, {decimals, 10}]).
+-endif.
 
 encode_atom(true, _Encode, _State) ->
     <<"true">>;
