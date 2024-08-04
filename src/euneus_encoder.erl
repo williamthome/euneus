@@ -105,10 +105,10 @@
 %% DocTest
 %% --------------------------------------------------------------------
 
+-if(?OTP_RELEASE >= 27).
 -ifdef(TEST).
 -include_lib("doctest/include/doctest.hrl").
-% TODO: Remove this.
--doctest(false).
+-endif.
 -endif.
 
 %% --------------------------------------------------------------------
