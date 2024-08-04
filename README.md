@@ -4,11 +4,11 @@ An incredibly flexible and performant JSON parser, generator and formatter in pu
 
 Euneus is built on the top of the new [OTP json module](https://erlang.org/documentation/doc-15.0-rc3/lib/stdlib-6.0/doc/html/json.html).
 
-## ⚠️ Disclaimer
+Both encoder and decoder fully conform to [RFC 8259](https://datatracker.ietf.org/doc/html/rfc8259)
+and [ECMA 404](https://ecma-international.org/publications-and-standards/standards/ecma-404/) standards.
+The decoder is tested using [JSONTestSuite](https://github.com/nst/JSONTestSuite).
 
-This is a work-in-progress branch aiming to release a v2.0 of Euneus.
-
-For v1.0, please look at the [v1.2.2](https://github.com/williamthome/euneus/tree/v1.2.2) tag.
+Detailed examples and further explanation can be found at [hexdocs](https://hexdocs.pm/euneus).
 
 ## Installation
 
@@ -43,146 +43,34 @@ end
 #{<<"age">> => 68,<<"name">> => <<"Joe Armstrong">>,<<"nationality">> => <<"British">>}
 ```
 
-Please see the [documentation](https://hexdocs.pm/euneus/readme.html) for more examples.
-
 ## Encode
 
 The functions `euneus:encode/1,2` encode an Erlang term into a binary JSON.
 The second argument of `euneus:encode/2` are options.
 
-### Encode options
+Please see the `euneus_encoder` [documentation](https://hexdocs.pm/euneus/doc/euneus_encoder.html)
+for more examples and detailed explanation.
 
-```erlang
--type options() :: #{
-    codecs => [codec()],
-    nulls => [term()],
-    skip_values => [term()],
-    key_to_binary => fun((term()) -> binary()),
-    sort_keys => boolean(),
-    proplists => boolean() | {true, is_proplist()},
-    escape => fun((binary()) -> iodata()),
-    encode_integer => encode(integer()),
-    encode_float => encode(float()),
-    encode_atom => encode(atom()),
-    encode_list => encode(list()),
-    encode_map => encode(map()),
-    encode_tuple => encode(tuple()),
-    encode_pid => encode(pid()),
-    encode_port => encode(port()),
-    encode_reference => encode(reference())
-}.
-
--type codec() ::
-    datetime
-    | timestamp
-    | ipv4
-    | ipv6
-    % {records, #{foo => {record_info(fields, foo), record_info(size, foo)}}}
-    | {records, #{Name :: atom() := {Fields :: [atom()], Size :: pos_integer()}}}
-    | codec_callback().
-
--type codec_callback() :: fun((tuple()) -> next | {halt, term()}).
-
--type is_proplist() :: fun((list()) -> boolean()).
-
--type encode(Type) :: fun((Type, json:encoder(), state()) -> iodata()).
-```
-
-#### `codecs`
-
-Transforms tuples into any other Erlang term that will be encoded again.
-By returning `next`, the next codec will be called, or by returning
-`{halt, Term :: term()}`, the Term will be encoded again.
-
-You can use the built-in codecs or your own.
-Please see the `t:euneus_encoder:codec/0` type for details.
-
-Example:
-
-```erlang
-1> Term = #{
-..   id => 1,
-..   date => {{1970,1,1},{0,0,0}},
-..   ip => {0,0,0,0}
-.. }.
-#{id => 1,date => {{1970,1,1},{0,0,0}},ip => {0,0,0,0}}
-2> euneus:encode(Term, #{codecs => [datetime, ipv4]}).
-<<"{\"id\":1,\"date\":\"1970-01-01T00:00:00Z\",\"ip\":\"0.0.0.0\"}">>
-```
-
-> [!IMPORTANT]
-> The codecs list is traversed for every tuple.
+The data mapping and error reasons can be found in the OTP json encode function [documentation](https://erlang.org/documentation/doc-15.0-rc3/lib/stdlib-6.0/doc/html/json.html#encode/1).
 
 ## Decode
 
 The functions `euneus:decode/1,2` decode a binary JSON into an Erlang term.
 The second argument of `euneus:decode/2` are options.
 
-### Options
+Please see the `euneus_decoder` [documentation](https://hexdocs.pm/euneus/doc/euneus_decoder.html)
+for more examples and detailed explanation.
 
-```erlang
--type options() :: #{
-    codecs => [codec()],
-    null => term(),
-    binary_to_float => json:from_binary_fun(),
-    binary_to_integer => json:from_binary_fun(),
-    array_start => json:array_start_fun(),
-    array_push => json:array_push_fun(),
-    array_finish =>
-        ordered
-        | reversed
-        | json:array_finish_fun(),
-    object_start => json:object_start_fun(),
-    object_keys =>
-        copy
-        | atom
-        | existing_atom
-        | json:from_binary_fun(),
-    object_push => json:object_push_fun(),
-    object_finish =>
-        map
-        | proplist
-        | reversed_proplist
-        | json:object_finish_fun()
-}.
+The data mapping and error reasons can be found in the OTP json decode function [documentation](https://erlang.org/documentation/doc-15.0-rc3/lib/stdlib-6.0/doc/html/json.html#decode/1).
 
--type codec() ::
-    copy
-    | timestamp
-    | datetime
-    | ipv4
-    | ipv6
-    | pid
-    | port
-    | reference
-    | codec_callback().
+## Format
 
--type codec_callback() :: fun((binary()) -> next | {halt, term()}).
-```
+Two functions provide JSON formatting:
+- `euneus:minify/1` - Removes any extra spaces and new line characters;
+- `euneus:format/2` - Formats the JSON by passing custom options.
 
-#### `codecs`
-
-Transforms binary values into any other Erlang term.
-By returning `next`, the next codec will be called, or by returning
-`{halt, Term :: term()}`, the Term is returned as the value.
-
-You can use the built-in codecs or your own.
-Please see the `t:euneus_decoder:codec/0` type for details.
-
-Example:
-
-```erlang
-1> JSON = ~"""
-.. {
-..    "id": 1,
-..    "date": "1970-01-01T00:00:00Z",
-..    "ip": "0.0.0.0"
-.. }
-.. """.
-<<"{\n   \"id\": 1,\n   \"date\": \"1970-01-01T00:00:00Z\",\n   \"ip\": \"0.0.0.0\"\n}">>
-2> euneus:decode(JSON, #{codecs => [datetime, ipv4]}).
-#{<<"id">> => 1,<<"date">> => {{1970,1,1},{0,0,0}},<<"ip">> => {0,0,0,0}}
-```
+Please see the `euneus_formatter` [documentation](https://hexdocs.pm/euneus/doc/euneus_formatter.html)
+for more examples and detailed explanation.
 
 ## Benchmark
 
