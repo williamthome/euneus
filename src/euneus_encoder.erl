@@ -105,8 +105,10 @@
 %% DocTest
 %% --------------------------------------------------------------------
 
+-if(?OTP_RELEASE >= 27).
 -ifdef(TEST).
 -include_lib("doctest/include/doctest.hrl").
+-endif.
 -endif.
 
 %% --------------------------------------------------------------------
@@ -491,8 +493,13 @@ encode_term(Term, Encode, State) ->
 encode_integer(Int, _Encode, _State) ->
     erlang:integer_to_binary(Int, 10).
 
+-if(?OTP_RELEASE >= 25).
 encode_float(Float, _Encode, _State) ->
     erlang:float_to_binary(Float, [short]).
+-else.
+encode_float(Float, _Encode, _State) ->
+    erlang:float_to_binary(Float, [compact, {decimals, 10}]).
+-endif.
 
 encode_atom(true, _Encode, _State) ->
     <<"true">>;
@@ -537,17 +544,48 @@ is_proplist_prop({Key, _}) ->
 is_proplist_prop(Key) ->
     is_atom(Key).
 
+-if(?OTP_RELEASE >= 26).
 encode_map(Map, Encode, #state{sort_keys = false, skip_values = ValuesToSkip} = State) ->
     do_encode_map([
         [$,, escape_map_key(Key, State), $: | encode_term(Value, Encode, State)]
      || Key := Value <- Map,
         not is_map_key(Value, ValuesToSkip)
     ]);
-encode_map(Map, Encode, #state{sort_keys = true, skip_values = ValuesToSkip} = State) ->
+encode_map(Map, Encode, State) ->
+    encode_sort_keys_map(Map, Encode, State).
+-else.
+encode_map(Map, Encode, #state{sort_keys = false, skip_values = ValuesToSkip} = State) ->
+    do_encode_map(
+        maps:fold(
+            fun(Key, Value, Acc) ->
+                case is_map_key(Value, ValuesToSkip) of
+                    true ->
+                        [];
+                    false ->
+                        [
+                            [
+                                $,,
+                                escape_map_key(Key, State),
+                                $:
+                                | encode_term(Value, Encode, State)
+                            ]
+                            | Acc
+                        ]
+                end
+            end,
+            [],
+            Map
+        )
+    );
+encode_map(Map, Encode, State) ->
+    encode_sort_keys_map(Map, Encode, State).
+-endif.
+
+encode_sort_keys_map(Map, Encode, #state{sort_keys = true} = State) ->
     do_encode_map([
         [$,, escape_map_key(Key, State), $: | encode_term(Value, Encode, State)]
      || {Key, Value} <- lists:keysort(1, maps:to_list(Map)),
-        not is_map_key(Value, ValuesToSkip)
+        not is_map_key(Value, State#state.skip_values)
     ]).
 
 escape_map_key(Key, State) ->

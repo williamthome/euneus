@@ -17,9 +17,14 @@ concurrency:
 
 jobs:
   ci:
-    name: CI
+    name: CI OTP-${{matrix.otp-version}}
 
-    runs-on: ubuntu-24.04
+    runs-on: ${{matrix.os}}
+
+    strategy:
+      matrix:
+        otp-version: [24, 25, 26, 27]
+        os: [ubuntu-24.04]
 
     steps:
       - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
@@ -27,8 +32,8 @@ jobs:
       - uses: erlef/setup-beam@b9c58b0450cd832ccdb3c17cc156a47065d2114f # v1.18.1
         id: setup-beam
         with:
-          version-type: strict
-          version-file: .tool-versions
+          otp-version: ${{matrix.otp-version}}
+          rebar3-version: 3.23.0
 
       - name: Restore _build
         uses: actions/cache@0c45773b623bea8c8e75f6c82b208c3cf94ea4f9 # v4.0.2
@@ -50,7 +55,13 @@ jobs:
                 -rebar3-${{steps.setup-beam.outputs.rebar3-version}}\
                 -hash-${{hashFiles('rebar.lock')}}"
 
+      - name: Continuous Integration (Polyfill)
+        if: ${{fromJSON(matrix.otp-version) < 27}}
+        run: |
+          rebar3 as test polyfill_ci
+
       - name: Continuous Integration
+        if: ${{fromJSON(matrix.otp-version) >= 27}}
         run: |
           rebar3 as test ci
 

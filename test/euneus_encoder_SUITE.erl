@@ -3,6 +3,10 @@
 -include_lib("stdlib/include/assert.hrl").
 -compile([export_all, nowarn_export_all]).
 
+%
+
+-elvis([{elvis_style, dont_repeat_yourself, disable}]).
+
 %% --------------------------------------------------------------------
 %% Behaviour (ct_suite) callbacks
 %% --------------------------------------------------------------------
@@ -86,6 +90,7 @@ ipv6_codec_test(Config) when is_list(Config) ->
 
 -record(foo, {foo, bar}).
 -record(bar, {bar, baz}).
+-if(?OTP_RELEASE >= 26).
 records_codec_test(Config) when is_list(Config) ->
     [
         ?assertError(
@@ -116,6 +121,38 @@ records_codec_test(Config) when is_list(Config) ->
             )
         )
     ].
+-else.
+records_codec_test(Config) when is_list(Config) ->
+    [
+        ?assertError(
+            unsuported_tuple,
+            encode({foo, bar, baz, qux}, #{
+                codecs => [
+                    {records, #{
+                        foo => {record_info(fields, foo), record_info(size, foo)}
+                    }}
+                ]
+            })
+        ),
+        ?assertEqual(
+            <<"[{\"foo\":\"foo\",\"bar\":\"bar\"},{\"baz\":\"baz\",\"bar\":\"bar\"}]">>,
+            encode(
+                [
+                    #foo{foo = foo, bar = bar},
+                    #bar{bar = bar, baz = baz}
+                ],
+                #{
+                    codecs => [
+                        {records, #{
+                            foo => {record_info(fields, foo), record_info(size, foo)},
+                            bar => {record_info(fields, bar), record_info(size, bar)}
+                        }}
+                    ]
+                }
+            )
+        )
+    ].
+-endif.
 
 nulls_test(Config) when is_list(Config) ->
     [
@@ -132,6 +169,7 @@ skip_values_test(Config) when is_list(Config) ->
         )
     ].
 
+-if(?OTP_RELEASE >= 26).
 key_to_binary_test(Config) when is_list(Config) ->
     [
         ?assertEqual(
@@ -148,6 +186,24 @@ key_to_binary_test(Config) when is_list(Config) ->
             encode(#{foo => world}, #{key_to_binary => fun(_) -> <<"hello">> end})
         )
     ].
+-else.
+key_to_binary_test(Config) when is_list(Config) ->
+    [
+        ?assertEqual(
+            <<"{\"foo\":\"foo\",\"baz\":\"baz\",\"bar\":\"bar\",\"0\":0}">>,
+            encode(#{
+                <<"foo">> => foo,
+                bar => bar,
+                "baz" => baz,
+                0 => 0
+            })
+        ),
+        ?assertEqual(
+            <<"{\"hello\":\"world\"}">>,
+            encode(#{foo => world}, #{key_to_binary => fun(_) -> <<"hello">> end})
+        )
+    ].
+-endif.
 
 sort_keys_test(Config) when is_list(Config) ->
     [
@@ -158,6 +214,7 @@ sort_keys_test(Config) when is_list(Config) ->
         )
     ].
 
+-if(?OTP_RELEASE >= 26).
 proplists_test(Config) when is_list(Config) ->
     [
         ?assertEqual(<<"[]">>, encode([], #{proplists => true})),
@@ -176,6 +233,26 @@ proplists_test(Config) when is_list(Config) ->
             })
         )
     ].
+-else.
+proplists_test(Config) when is_list(Config) ->
+    [
+        ?assertEqual(<<"[]">>, encode([], #{proplists => true})),
+        ?assertEqual(
+            <<"[null,{\"foo\":\"bar\",\"baz\":true,\"0\":0}]">>,
+            encode([null, [{foo, bar}, baz, {0, 0}]], #{proplists => true})
+        ),
+        ?assertEqual(
+            <<"[null,{\"foo\":\"bar\"}]">>,
+            encode([null, [{foo, bar}]], #{
+                proplists =>
+                    {true, fun
+                        ([{_, _}]) -> true;
+                        (_) -> false
+                    end}
+            })
+        )
+    ].
+-endif.
 
 escape_test(Config) when is_list(Config) ->
     ?assertEqual(<<"bar">>, encode(foo, #{escape => fun(_) -> <<"bar">> end})).
