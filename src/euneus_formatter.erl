@@ -20,14 +20,16 @@
     indent_type := tabs | spaces,
     indent_width := non_neg_integer(),
     spaced_values := boolean(),
-    crlf := r | n | rn | none
+    crlf := crlf()
 }.
 
+-type crlf() :: r | n | rn | none.
+
 -record(state, {
-    depth,
-    indent,
-    spaces,
-    crlf
+    depth :: non_neg_integer(),
+    indent :: binary(),
+    spaces :: binary(),
+    crlf :: crlf()
 }).
 
 %% --------------------------------------------------------------------
@@ -127,8 +129,8 @@ parse_spaces(false) ->
 incr_depth(State) ->
     State#state{depth = State#state.depth + 1}.
 
-decr_depth(State) ->
-    State#state{depth = State#state.depth - 1}.
+decr_depth(#state{depth = Depth} = State) when Depth > 0 ->
+    State#state{depth = Depth - 1}.
 
 % Format
 
