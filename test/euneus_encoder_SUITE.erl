@@ -270,7 +270,7 @@ encode_reference_test(Config) when is_list(Config) ->
         )
     ].
 
-unsuported_term_test() ->
+unsuported_term_test(Config) when is_list(Config) ->
     ?assertError(unsuported_term, encode(fun() -> error end)).
 
 %% --------------------------------------------------------------------

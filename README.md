@@ -4,13 +4,15 @@ An incredibly flexible and performant JSON parser, generator and formatter in pu
 
 Euneus is built on the top of the new [OTP json module](https://erlang.org/documentation/doc-15.0-rc3/lib/stdlib-6.0/doc/html/json.html).
 
-## ⚠️ Disclaimer
+Both encoder and decoder fully conform to [RFC 8259](https://datatracker.ietf.org/doc/html/rfc8259)
+and [ECMA 404](https://ecma-international.org/publications-and-standards/standards/ecma-404/) standards
+and are tested using [JSONTestSuite](https://github.com/nst/JSONTestSuite).
 
-This is a work-in-progress branch aiming to release a v2.0 of Euneus.
-
-For v1.0, please look at the [v1.2.2](https://github.com/williamthome/euneus/tree/v1.2.2) tag.
+Detailed examples and further explanation can be found at [hexdocs](https://hexdocs.pm/euneus).
 
 ## Installation
+
+### Erlang
 
 ```erlang
 % rebar.config
@@ -18,6 +20,18 @@ For v1.0, please look at the [v1.2.2](https://github.com/williamthome/euneus/tre
     {json_polyfill, "0.1.1"}, % Required only for OTP < 27
     {euneus, {git, "https://github.com/williamthome/euneus.git", {branch, "main"}}}
 ]}.
+```
+
+### Elixir
+
+```elixir
+# mix.exs
+defp deps do
+  [
+    {:json_polyfill, "~> 0.1.1"}, # Required only for OTP < 27
+    {:euneus, git: "https://github.com/williamthome/euneus.git", branch: "main"}
+  ]
+end
 ```
 
 ## Basic usage
@@ -31,179 +45,89 @@ For v1.0, please look at the [v1.2.2](https://github.com/williamthome/euneus/tre
 
 ## Encode
 
-The functions `euneus:encode/1,2` encode an Erlang term into a binary JSON.
-The second argument of `euneus:encode/2` are options, and this is the spec:
+The functions `euneus:encode/1` `euneus:encode/2` encodes an Erlang term into a binary JSON.
+The second argument of `euneus:encode/2` are options.
 
-```erlang
--type options() :: #{
-    codecs => [codec()],
-    nulls => [term()],
-    skip_values => [term()],
-    key_to_binary => fun((term()) -> binary()),
-    sort_keys => boolean(),
-    proplists => boolean() | {true, is_proplist()},
-    escape => fun((binary()) -> iodata()),
-    encode_integer => encode(integer()),
-    encode_float => encode(float()),
-    encode_atom => encode(atom()),
-    encode_list => encode(list()),
-    encode_map => encode(map()),
-    encode_tuple => encode(tuple()),
-    encode_pid => encode(pid()),
-    encode_port => encode(port()),
-    encode_reference => encode(reference())
-}.
+Please see the `m:euneus_encoder` [documentation](https://hexdocs.pm/euneus/doc/euneus_encoder.html)
+for more examples and detailed explanation.
 
--type codec() ::
-    datetime
-    | timestamp
-    | ipv4
-    | ipv6
-    % {records, #{foo => {record_info(fields, foo), record_info(size, foo)}}}
-    | {records, #{Name :: atom() := {Fields :: [atom()], Size :: pos_integer()}}}
-    | codec_callback().
-
--type codec_callback() :: fun((tuple()) -> next | {halt, term()}).
-
--type is_proplist() :: fun((list()) -> boolean()).
-
--type encode(Type) :: fun((Type, json:encoder(), state()) -> iodata()).
-```
-
-### Encode example
-
-```erlang
-1> Term = #{
-..   id => 1,
-..   date => {{1970,1,1},{0,0,0}},
-..   ip => {0,0,0,0}
-.. }.
-#{id => 1,date => {{1970,1,1},{0,0,0}},ip => {0,0,0,0}}
-2> Opts = #{tuple => [datetime, ipv4]}.
-#{tuple => [datetime,ipv4]}
-3> euneus:encode(Term, Opts).
-<<"{\"id\":1,\"date\":\"1970-01-01T00:00:00Z\",\"ip\":\"0.0.0.0\"}">>
-```
+The data mapping and error reasons can be found in the OTP json encode function [documentation](https://erlang.org/documentation/doc-15.0-rc3/lib/stdlib-6.0/doc/html/json.html#encode/1).
 
 ## Decode
 
-The functions `euneus:decode/1,2` decode a binary JSON into an Erlang term.
-The second argument of `euneus:decode/2` are options, and this is the spec:
+The functions `euneus:decode/1` and `euneus:decode/2` decodes a binary JSON into an Erlang term.
+The second argument of `euneus:decode/2` are options.
 
-```erlang
--type options() :: #{
-    codecs => [codec()],
-    null => term(),
-    binary_to_float => json:from_binary_fun(),
-    binary_to_integer => json:from_binary_fun(),
-    array_start => json:array_start_fun(),
-    array_push => json:array_push_fun(),
-    array_finish =>
-        ordered
-        | reversed
-        | json:array_finish_fun(),
-    object_start => json:object_start_fun(),
-    object_keys =>
-        copy
-        | atom
-        | existing_atom
-        | json:from_binary_fun(),
-    object_push => json:object_push_fun(),
-    object_finish =>
-        map
-        | proplist
-        | reversed_proplist
-        | json:object_finish_fun()
-}.
+Please see the `m:euneus_decoder` [documentation](https://hexdocs.pm/euneus/doc/euneus_decoder.html)
+for more examples and detailed explanation.
 
--type codec() ::
-    copy
-    | timestamp
-    | datetime
-    | ipv4
-    | ipv6
-    | pid
-    | port
-    | reference
-    | codec_callback().
+The data mapping and error reasons can be found in the OTP json decode function [documentation](https://erlang.org/documentation/doc-15.0-rc3/lib/stdlib-6.0/doc/html/json.html#decode/1).
 
--type codec_callback() :: fun((binary()) -> next | {halt, term()}).
-```
+## Format
 
-### Decode example
+Two functions provide JSON formatting:
 
-```erlang
-1> JSON = ~"""
-.. {
-..    "id": 1,
-..    "date": "1970-01-01T00:00:00Z",
-..    "ip": "0.0.0.0"
-.. }
-.. """.
-<<"{\n   \"id\": 1,\n   \"date\": \"1970-01-01T00:00:00Z\",\n   \"ip\": \"0.0.0.0\"\n}">>
-2> Opts = #{
-..   codecs => [datetime, ipv4],
-..   object_keys => atom
-.. }.
-#{codecs => [datetime,ipv4],object_keys => atom}
-3> euneus:decode(JSON, Opts).
-#{id => 1,date => {{1970,1,1},{0,0,0}},ip => {0,0,0,0}}
+- `euneus:minify/1` - Removes any extra spaces and new line characters;
+- `euneus:format/2` - Formats the JSON by passing custom options.
 
-```
+Please see the `m:euneus_formatter` [documentation](https://hexdocs.pm/euneus/doc/euneus_formatter.html)
+for more examples and detailed explanation.
 
 ## Benchmark
 
-The benchmarks are implemented very simply, but they are a good start for optimizing Euneus
-since no optimizations have been made. You will find the data and tests under the test folder.
+The benchmarks are implemented very simply, but they are a good start foroptimizing
+Euneus since no optimizations have been made. You will find the benchmark commands
+in `euneus_benchmarker`, and data and tests under the test folder.
 
-```shell
+> [!IMPORTANT]
+> For the first benchmark run, bootstrapping `erlperf` is required:
+>
+> ```console
+> $ rebar3 as benchmark shell
+>
+> 1> euneus_benchmarker:bootstrap().
+> ===> Verifying dependencies...
+> ===> Analyzing applications...
+> ===> Compiling erlperf
+> ===> Building escript for erlperf...
+> ok
+> ```
+
+### Results
+
+> Setup:
+>
+> - OS : Linux
+> - CPU: 12th Gen Intel(R) Core(TM) i9-12900HX
+> - VM : Erlang/OTP 27 [erts-15.0.1] [source] [64-bit] [smp:24:24] [ds:24:24:10] [async-threads:1] [jit:ns]
+
+```console
 $ rebar3 as benchmark shell
 
-% ---------------------------------------------------------------------
-% The following command builds the erlperf escript. Run it only for the
-% first time or if it does not exist.
-% ---------------------------------------------------------------------
-1> euneus_benchmarker:bootstrap().
-===> Verifying dependencies...
-===> Analyzing applications...
-===> Compiling erlperf
-===> Building escript for erlperf...
-ok
+1> euneus_benchmarker:encode_benchmark().
+Code      ||   Samples       Avg   StdDev    Median      P99  Iteration    Rel
+jiffy      1         3        37    2.70%        37       38   27036 us   100%
+euneus     1         3        24    6.28%        24       26   41110 us    66%
+thoas      1         3        14    4.22%        14       14   73195 us    37%
 
-% ---------------------------------------------------------------------
-% Since erlperf currently does not accept labels:
-% - euneus: #Fun<euneus_benchmarker.0.129271664>
-% - jiffy:  #Fun<euneus_benchmarker.1.129271664>
-% - thoas:  #Fun<euneus_benchmarker.2.129271664>
-% ---------------------------------------------------------------------
-2> euneus_benchmarker:encode_benchmark().
-OS : Linux
-CPU: 12th Gen Intel(R) Core(TM) i9-12900HX
-VM : Erlang/OTP 27 [erts-15.0.1] [source] [64-bit] [smp:24:24] [ds:24:24:10] [async-threads:1] [jit:ns]
-
-Code                                     ||   Samples       Avg   StdDev    Median      P99  Iteration    Rel
-#Fun<euneus_benchmarker.1.129271664>      1         3        37    2.70%        37       38   27036 us   100%
-#Fun<euneus_benchmarker.0.129271664>      1         3        24    6.28%        24       26   41110 us    66%
-#Fun<euneus_benchmarker.2.129271664>      1         3        14    4.22%        14       14   73195 us    37%
-ok
-
-% ---------------------------------------------------------------------
-% Since erlperf currently does not accept labels:
-% - euneus: #Fun<euneus_benchmarker.3.129271664>
-% - jiffy:  #Fun<euneus_benchmarker.4.129271664>
-% - thoas:  #Fun<euneus_benchmarker.5.129271664>
-% ---------------------------------------------------------------------
-3> euneus_benchmarker:decode_benchmark().
-OS : Linux
-CPU: 12th Gen Intel(R) Core(TM) i9-12900HX
-VM : Erlang/OTP 27 [erts-15.0.1] [source] [64-bit] [smp:24:24] [ds:24:24:10] [async-threads:1] [jit:ns]
-
-Code                                     ||   Samples       Avg   StdDev    Median      P99  Iteration    Rel
-#Fun<euneus_benchmarker.3.129271664>      1         3        24    2.44%        24       24   42268 us   100%
-#Fun<euneus_benchmarker.4.129271664>      1         3        19    3.09%        19       19   53589 us    79%
-#Fun<euneus_benchmarker.5.129271664>      1         3        14    0.00%        14       14   71452 us    59%
-ok
+2> euneus_benchmarker:decode_benchmark().
+Code       ||   Samples       Avg   StdDev    Median      P99  Iteration    Rel
+euneus      1         3        24    2.44%        24       24   42268 us   100%
+jiffy       1         3        19    3.09%        19       19   53589 us    79%
+thoas       1         3        14    0.00%        14       14   71452 us    59%
 ```
+
+> [!NOTE]
+> Since `erlperf` currently does not accept labels, `Code` returns something like:
+>
+> - euneus_benchmarker:encode_benchmark/0:
+>   - #Fun<euneus_benchmarker.0.129271664> = euneus
+>   - #Fun<euneus_benchmarker.1.129271664> = jiffy
+>   - #Fun<euneus_benchmarker.2.129271664> = thoas
+> - euneus_benchmarker:decode_benchmark/0:
+>   - #Fun<euneus_benchmarker.3.129271664> = euneus
+>   - #Fun<euneus_benchmarker.4.129271664> = jiffy
+>   - #Fun<euneus_benchmarker.5.129271664> = thoas
 
 ## Sponsors
 

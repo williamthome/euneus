@@ -20,14 +20,16 @@
     indent_type := tabs | spaces,
     indent_width := non_neg_integer(),
     spaced_values := boolean(),
-    crlf := r | n | rn | none
+    crlf := crlf()
 }.
 
+-type crlf() :: r | n | rn | none.
+
 -record(state, {
-    depth,
-    indent,
-    spaces,
-    crlf
+    depth :: non_neg_integer(),
+    indent :: binary(),
+    spaces :: binary(),
+    crlf :: crlf()
 }).
 
 %% --------------------------------------------------------------------
@@ -35,6 +37,62 @@
 %% --------------------------------------------------------------------
 
 -spec format(binary(), options()) -> iodata().
+%% @doc Formats a binary JSON.
+%%
+%% Option details:
+%%
+%% <ul>
+%%   <blockquote>
+%%     <h4 class="info">Note</h4>
+%%     There is no default for any option, all are required.
+%%   </blockquote>
+%%   <li>
+%%     `indent_type' - Indent using `tabs' or `spaces'.
+%%
+%%     <ul>
+%%       <li>
+%%         `tabs' - The indent char will be `$\t'.
+%%
+%%       </li>
+%%       <li>
+%%         `spaces' - The indent char will be `$\s'.
+%%
+%%       </li>
+%%     </ul>
+%%
+%%   </li>
+%%   <li>
+%%     `indent_width' - The `indent_type' will be copied N times based on it.
+%%
+%%   </li>
+%%   <li>
+%%     `spaced_values' - Defines if keys and values of objects should be
+%%     spaced by one `$\s' char.
+%%
+%%   </li>
+%%   <li>
+%%     `crlf' - Defines the Carriage Return/Line Feed.
+%%
+%%     <ul>
+%%       <li>
+%%         `r' - The CRLF will be `<<$\r>>'.
+%%
+%%       </li>
+%%       <li>
+%%         `n' - The CRLF will be `<<$\n>>'.
+%%
+%%       </li>
+%%       <li>
+%%         `rn' - The CRLF will be `<<$\r, $\n>>'.
+%%
+%%       </li>
+%%       <li>
+%%         `none' - The CRLF will be `<<>>'.
+%%
+%%       </li>
+%%     </ul>
+%%   </li>
+%% </ul>
 format(JSON, Opts) when is_binary(JSON), is_map(Opts) ->
     do_format(JSON, new_state(Opts)).
 
@@ -71,8 +129,8 @@ parse_spaces(false) ->
 incr_depth(State) ->
     State#state{depth = State#state.depth + 1}.
 
-decr_depth(State) ->
-    State#state{depth = State#state.depth - 1}.
+decr_depth(#state{depth = Depth} = State) when Depth > 0 ->
+    State#state{depth = Depth - 1}.
 
 % Format
 
