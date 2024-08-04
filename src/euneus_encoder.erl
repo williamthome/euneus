@@ -71,7 +71,6 @@
     | datetime
     | ipv4
     | ipv6
-    % {records, #{foo => {record_info(fields, foo), record_info(size, foo)}}}
     | {records, #{Name :: atom() := {Fields :: [atom()], Size :: pos_integer()}}}
     | codec_callback().
 -export_type([codec/0]).
