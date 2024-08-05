@@ -48,7 +48,7 @@ end
 The functions `euneus:encode/1` `euneus:encode/2` encodes an Erlang term into a binary JSON.
 The second argument of `euneus:encode/2` are options.
 
-Please see the `m:euneus_encoder` [documentation](https://hexdocs.pm/euneus/doc/euneus_encoder.html)
+Please see the `m:euneus_encoder` [documentation](https://hexdocs.pm/euneus/euneus_encoder.html)
 for more examples and detailed explanation.
 
 The data mapping and error reasons can be found in the OTP json encode function [documentation](https://erlang.org/documentation/doc-15.0-rc3/lib/stdlib-6.0/doc/html/json.html#encode/1).
@@ -58,7 +58,7 @@ The data mapping and error reasons can be found in the OTP json encode function 
 The functions `euneus:decode/1` and `euneus:decode/2` decodes a binary JSON into an Erlang term.
 The second argument of `euneus:decode/2` are options.
 
-Please see the `m:euneus_decoder` [documentation](https://hexdocs.pm/euneus/doc/euneus_decoder.html)
+Please see the `m:euneus_decoder` [documentation](https://hexdocs.pm/euneus/euneus_decoder.html)
 for more examples and detailed explanation.
 
 The data mapping and error reasons can be found in the OTP json decode function [documentation](https://erlang.org/documentation/doc-15.0-rc3/lib/stdlib-6.0/doc/html/json.html#decode/1).
@@ -70,7 +70,7 @@ Two functions provide JSON formatting:
 - `euneus:minify/1` - Removes any extra spaces and new line characters;
 - `euneus:format/2` - Formats the JSON by passing custom options.
 
-Please see the `m:euneus_formatter` [documentation](https://hexdocs.pm/euneus/doc/euneus_formatter.html)
+Please see the `m:euneus_formatter` [documentation](https://hexdocs.pm/euneus/euneus_formatter.html)
 for more examples and detailed explanation.
 
 ## Benchmark
