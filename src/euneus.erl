@@ -6,8 +6,8 @@
 
 -export([encode/1]).
 -export([encode/2]).
--export([encode_iodata/1]).
--export([encode_iodata/2]).
+-export([encode_to_iodata/1]).
+-export([encode_to_iodata/2]).
 -export([decode/1]).
 -export([decode/2]).
 -export([decode_iodata/1]).
@@ -19,8 +19,8 @@
 
 -ignore_xref([encode/1]).
 -ignore_xref([encode/2]).
--ignore_xref([encode_iodata/1]).
--ignore_xref([encode_iodata/2]).
+-ignore_xref([encode_to_iodata/1]).
+-ignore_xref([encode_to_iodata/2]).
 -ignore_xref([decode/1]).
 -ignore_xref([decode/2]).
 -ignore_xref([decode_iodata/1]).
@@ -66,28 +66,28 @@ encode(Term) ->
 encode(Term, Opts) ->
     iolist_to_binary(euneus_encoder:encode(Term, Opts)).
 
--spec encode_iodata(term()) -> iodata().
+-spec encode_to_iodata(term()) -> iodata().
 %% @doc Encodes a term into an iodata JSON.
 %%
 %% <em>Example:</em>
 %%
 %% ```
-%% 1> euneus:encode_iodata(foo).
+%% 1> euneus:encode_to_iodata(foo).
 %% [$", <<"foo">>, $"]
 %% '''
-encode_iodata(Term) ->
-    encode_iodata(Term, #{}).
+encode_to_iodata(Term) ->
+    encode_to_iodata(Term, #{}).
 
--spec encode_iodata(term(), euneus_encoder:options()) -> iodata().
+-spec encode_to_iodata(term(), euneus_encoder:options()) -> iodata().
 %% @doc Encodes a term into an iodata JSON.
 %%
 %% <em>Example:</em>
 %%
 %% ```
-%% 1> euneus:encode_iodata(foo, #{}).
+%% 1> euneus:encode_to_iodata(foo, #{}).
 %% [$", <<"foo">>, $"]
 %% '''
-encode_iodata(Term, Opts) ->
+encode_to_iodata(Term, Opts) ->
     euneus_encoder:encode(Term, Opts).
 
 -spec decode(binary()) -> term().

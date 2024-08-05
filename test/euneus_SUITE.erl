@@ -28,10 +28,10 @@ encode_test(Config) when is_list(Config) ->
         ?assertEqual(<<"[\"foo\"]">>, euneus:encode([foo], #{}))
     ].
 
-encode_iodata_test(Config) when is_list(Config) ->
+encode_to_iodata_test(Config) when is_list(Config) ->
     [
-        ?assertEqual([$[, [$", <<"foo">>, $"], $]], euneus:encode_iodata([foo])),
-        ?assertEqual([$[, [$", <<"foo">>, $"], $]], euneus:encode_iodata([foo], #{}))
+        ?assertEqual([$[, [$", <<"foo">>, $"], $]], euneus:encode_to_iodata([foo])),
+        ?assertEqual([$[, [$", <<"foo">>, $"], $]], euneus:encode_to_iodata([foo], #{}))
     ].
 
 decode_test(Config) when is_list(Config) ->
