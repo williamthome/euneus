@@ -359,28 +359,28 @@
 %%   <li>
 %%     `encode_tuple'- Overrides the default tuple encoder.
 %%
-%%     Default is `encode_tuple/3', which raises `unsuported_tuple' error.
+%%     Default is `encode_tuple/3', which raises `unsupported_tuple' error.
 %%   </li>
 %%   <li>
 %%     `encode_pid' - Overrides the default pid encoder.
 %%
-%%     Default is `encode_pid/3', which raises `unsuported_pid' error.
+%%     Default is `encode_pid/3', which raises `unsupported_pid' error.
 %%   </li>
 %%   <li>
 %%     `encode_port' - Overrides the default port encoder.
 %%
-%%     Default is `encode_port/3', which raises `unsuported_port' error.
+%%     Default is `encode_port/3', which raises `unsupported_port' error.
 %%   </li>
 %%   <li>
 %%     `encode_reference' - Overrides the default reference encoder.
 %%
-%%     Default is `encode_reference/3', which raises `unsuported_reference' error.
+%%     Default is `encode_reference/3', which raises `unsupported_reference' error.
 %%   </li>
 %%   <li>
-%%     `encode_term' - Overrides the default encoder for unsuported terms,
+%%     `encode_term' - Overrides the default encoder for unsupported terms,
 %%     like functions.
 %%
-%%     Default is `encode_term/3', which raises `unsuported_term' error.
+%%     Default is `encode_term/3', which raises `unsupported_term' error.
 %%   </li>
 %% </ul>
 encode(Input, Opts) ->
@@ -485,23 +485,23 @@ encode_map(Map, Encode, State) ->
 
 -spec encode_tuple(tuple(), json:encoder(), state()) -> no_return().
 encode_tuple(Tuple, Encode, State) ->
-    error(unsuported_tuple, [Tuple, Encode, State]).
+    error(unsupported_tuple, [Tuple, Encode, State]).
 
 -spec encode_pid(pid(), json:encoder(), state()) -> no_return().
 encode_pid(Pid, Encode, State) ->
-    error(unsuported_pid, [Pid, Encode, State]).
+    error(unsupported_pid, [Pid, Encode, State]).
 
 -spec encode_port(port(), json:encoder(), state()) -> no_return().
 encode_port(Port, Encode, State) ->
-    error(unsuported_port, [Port, Encode, State]).
+    error(unsupported_port, [Port, Encode, State]).
 
 -spec encode_reference(reference(), json:encoder(), state()) -> no_return().
 encode_reference(Ref, Encode, State) ->
-    error(unsuported_reference, [Ref, Encode, State]).
+    error(unsupported_reference, [Ref, Encode, State]).
 
 -spec encode_term(term(), json:encoder(), state()) -> no_return().
 encode_term(Term, Encode, State) ->
-    error(unsuported_term, [Term, Encode, State]).
+    error(unsupported_term, [Term, Encode, State]).
 
 %% --------------------------------------------------------------------
 %% Internal functions

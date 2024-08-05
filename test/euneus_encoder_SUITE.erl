@@ -75,13 +75,13 @@ datetime_codec_test(Config) when is_list(Config) ->
 
 ipv4_codec_test(Config) when is_list(Config) ->
     [
-        ?assertError(unsuported_tuple, encode({0, 0, 0, 256}, #{codecs => [ipv4]})),
+        ?assertError(unsupported_tuple, encode({0, 0, 0, 256}, #{codecs => [ipv4]})),
         ?assertEqual(<<"\"0.0.0.0\"">>, encode({0, 0, 0, 0}, #{codecs => [ipv4]}))
     ].
 
 ipv6_codec_test(Config) when is_list(Config) ->
     [
-        ?assertError(unsuported_tuple, encode({0, 0, 0, 0, 0, 0, 0, -1}, #{codecs => [ipv6]})),
+        ?assertError(unsupported_tuple, encode({0, 0, 0, 0, 0, 0, 0, -1}, #{codecs => [ipv6]})),
         ?assertEqual(
             <<"\"fe80::204:acff:fe17:bf38\"">>,
             encode({16#fe80, 0, 0, 0, 16#204, 16#acff, 16#fe17, 16#bf38}, #{codecs => [ipv6]})
@@ -94,7 +94,7 @@ ipv6_codec_test(Config) when is_list(Config) ->
 records_codec_test(Config) when is_list(Config) ->
     [
         ?assertError(
-            unsuported_tuple,
+            unsupported_tuple,
             encode({foo, bar, baz, qux}, #{
                 codecs => [
                     {records, #{
@@ -125,7 +125,7 @@ records_codec_test(Config) when is_list(Config) ->
 records_codec_test(Config) when is_list(Config) ->
     [
         ?assertError(
-            unsuported_tuple,
+            unsupported_tuple,
             encode({foo, bar, baz, qux}, #{
                 codecs => [
                     {records, #{
@@ -293,7 +293,7 @@ encode_map_test(Config) when is_list(Config) ->
 
 encode_tuple_test(Config) when is_list(Config) ->
     [
-        ?assertError(unsuported_tuple, encode({})),
+        ?assertError(unsupported_tuple, encode({})),
         ?assertEqual(
             <<"[]">>,
             encode({}, #{
@@ -306,7 +306,7 @@ encode_tuple_test(Config) when is_list(Config) ->
 
 encode_pid_test(Config) when is_list(Config) ->
     [
-        ?assertError(unsuported_pid, encode(list_to_pid("<0.66.6>"))),
+        ?assertError(unsupported_pid, encode(list_to_pid("<0.66.6>"))),
         ?assertEqual(
             <<"\"<0.66.6>\"">>,
             encode(list_to_pid("<0.66.6>"), #{
@@ -319,7 +319,7 @@ encode_pid_test(Config) when is_list(Config) ->
 
 encode_port_test(Config) when is_list(Config) ->
     [
-        ?assertError(unsuported_port, encode(list_to_port("#Port<0.1>"))),
+        ?assertError(unsupported_port, encode(list_to_port("#Port<0.1>"))),
         ?assertEqual(
             <<"\"#Port<0.1>\"">>,
             encode(list_to_port("#Port<0.1>"), #{
@@ -333,7 +333,7 @@ encode_port_test(Config) when is_list(Config) ->
 encode_reference_test(Config) when is_list(Config) ->
     [
         ?assertError(
-            unsuported_reference, encode(list_to_ref("#Ref<0.314572725.1088159747.110918>"))
+            unsupported_reference, encode(list_to_ref("#Ref<0.314572725.1088159747.110918>"))
         ),
         ?assertEqual(
             <<"\"#Ref<0.314572725.1088159747.110918>\"">>,
@@ -349,10 +349,10 @@ encode_reference_test(Config) when is_list(Config) ->
 
 encode_term_test(Config) when is_list(Config) ->
     [
-        ?assertError(unsuported_term, encode(fun() -> error end)),
+        ?assertError(unsupported_term, encode(fun() -> error end)),
         ?assertNotException(
             error,
-            unsuported_term,
+            unsupported_term,
             encode(
                 fun() -> ok end,
                 #{
