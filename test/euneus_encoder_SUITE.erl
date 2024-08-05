@@ -347,8 +347,23 @@ encode_reference_test(Config) when is_list(Config) ->
         )
     ].
 
-unsuported_term_test(Config) when is_list(Config) ->
-    ?assertError(unsuported_term, encode(fun() -> error end)).
+encode_term_test(Config) when is_list(Config) ->
+    [
+        ?assertError(unsuported_term, encode(fun() -> error end)),
+        ?assertNotException(
+            error,
+            unsuported_term,
+            encode(
+                fun() -> ok end,
+                #{
+                    encode_term =>
+                        fun(Fun, Encode, _State) when is_function(Fun) ->
+                            Encode(iolist_to_binary(erlang:fun_to_list(Fun)), Encode)
+                        end
+                }
+            )
+        )
+    ].
 
 %% --------------------------------------------------------------------
 %% Test support
