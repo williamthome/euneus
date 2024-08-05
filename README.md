@@ -1,5 +1,15 @@
 # Euneus
 
+[![Github Actions](https://github.com/williamthome/euneus/workflows/CI/badge.svg)](https://github.com/williamthome/euneus/actions)
+[![Coverage](https://raw.githubusercontent.com/cicirello/jacoco-badge-generator/main/tests/100.svg)](https://github.com/williamthome/euneus/actions/workflows/ci.yml)
+[![Erlang Versions](https://img.shields.io/badge/Erlang%2FOTP-24%2B-green?style=flat-square)](http://www.erlang.org)
+[![Latest Release](https://img.shields.io/github/release/williamthome/euneus.svg?style=flat-square)](https://github.com/williamthome/euneus/releases/latest)
+[![Hex Version](https://img.shields.io/hexpm/v/euneus.svg)](https://hex.pm/packages/euneus)
+[![Hex Docs](https://img.shields.io/badge/hex-docs-lightgreen.svg)](https://hexdocs.pm/euneus/)
+[![Total Download](https://img.shields.io/hexpm/dt/euneus.svg)](https://hex.pm/packages/euneus)
+[![License](https://img.shields.io/hexpm/l/euneus.svg)](https://github.com/williamthome/euneus/blob/main/LICENSE)
+[![Last Updated](https://img.shields.io/github/last-commit/williamthome/euneus.svg)](https://github.com/williamthome/euneus/commits/main)
+
 An incredibly flexible and performant JSON parser, generator and formatter in pure Erlang.
 
 Euneus is built on the top of the new [OTP json module](https://erlang.org/documentation/doc-15.0-rc3/lib/stdlib-6.0/doc/html/json.html).
