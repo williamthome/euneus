@@ -6,8 +6,33 @@
 %% --------------------------------------------------------------------
 
 -export([encode/2]).
+-export([key_to_binary/1]).
+-export([escape/1]).
+-export([encode_integer/3]).
+-export([encode_float/3]).
+-export([encode_atom/3]).
+-export([encode_list/3]).
+-export([encode_map/3]).
+-export([encode_tuple/3]).
+-export([encode_pid/3]).
+-export([encode_port/3]).
+-export([encode_reference/3]).
+-export([encode_term/3]).
 
 %
+
+-ignore_xref([key_to_binary/1]).
+-ignore_xref([escape/1]).
+-ignore_xref([encode_integer/3]).
+-ignore_xref([encode_float/3]).
+-ignore_xref([encode_atom/3]).
+-ignore_xref([encode_list/3]).
+-ignore_xref([encode_map/3]).
+-ignore_xref([encode_tuple/3]).
+-ignore_xref([encode_pid/3]).
+-ignore_xref([encode_port/3]).
+-ignore_xref([encode_reference/3]).
+-ignore_xref([encode_term/3]).
 
 -hank([
     {unnecessary_function_arguments, [
@@ -268,6 +293,8 @@
 %%   </li>
 %%   <li>
 %%     `key_to_binary' - Overrides the default conversion of map keys to a string.
+%%
+%%     Default is `key_to_binary/1'.
 %%   </li>
 %%   <li>
 %%     `sort_keys' - Defines if the object keys should be sorted.
@@ -301,39 +328,59 @@
 %%   </li>
 %%   <li>
 %%     `escape' - Overrides the default string escaping.
+%%
+%%     Default is `escape/1'.
 %%   </li>
 %%   <li>
 %%     `encode_integer' - Overrides the default integer encoder.
+%%
+%%     Default is `encode_integer/3'.
 %%   </li>
 %%   <li>
 %%     `encode_float' - Overrides the default float encoder.
+%%
+%%     Default is `encode_float/3'.
 %%   </li>
 %%   <li>
 %%     `encode_atom' - Overrides the default atom encoder.
+%%
+%%     Default is `encode_atom/3'.
 %%   </li>
 %%   <li>
 %%     `encode_list' - Overrides the default list encoder.
+%%
+%%     Default is `encode_list/3'.
 %%   </li>
 %%   <li>
 %%     `encode_map' - Overrides the default map encoder.
+%%
+%%     Default is `encode_map/3'.
 %%   </li>
 %%   <li>
 %%     `encode_tuple'- Overrides the default tuple encoder.
+%%
+%%     Default is `encode_tuple/3', which raises `unsuported_tuple' error.
 %%   </li>
 %%   <li>
 %%     `encode_pid' - Overrides the default pid encoder.
+%%
+%%     Default is `encode_pid/3', which raises `unsuported_pid' error.
 %%   </li>
 %%   <li>
 %%     `encode_port' - Overrides the default port encoder.
+%%
+%%     Default is `encode_port/3', which raises `unsuported_port' error.
 %%   </li>
 %%   <li>
 %%     `encode_reference' - Overrides the default reference encoder.
+%%
+%%     Default is `encode_reference/3', which raises `unsuported_reference' error.
 %%   </li>
 %%   <li>
 %%     `encode_term' - Overrides the default encoder for unsuported terms,
 %%     like functions.
 %%
-%%     By default, the `unsuported_term' error is raised.
+%%     Default is `encode_term/3', which raises `unsuported_term' error.
 %%   </li>
 %% </ul>
 encode(Input, Opts) ->
@@ -341,6 +388,120 @@ encode(Input, Opts) ->
     json:encode(Input, fun(Term, Encode) ->
         do_encode(Term, Encode, State)
     end).
+
+-spec key_to_binary(Term) -> binary() when
+    Term :: binary() | string() | atom() | integer().
+key_to_binary(Bin) when is_binary(Bin) ->
+    Bin;
+key_to_binary(Str) when is_list(Str) ->
+    iolist_to_binary(Str);
+key_to_binary(Atom) when is_atom(Atom) ->
+    atom_to_binary(Atom, utf8);
+key_to_binary(Int) when is_integer(Int) ->
+    integer_to_binary(Int, 10).
+
+-spec escape(binary()) -> iodata().
+escape(Bin) ->
+    json:encode_binary(Bin).
+
+-spec encode_integer(integer(), json:encoder(), state()) -> iodata().
+encode_integer(Int, _Encode, _State) ->
+    erlang:integer_to_binary(Int, 10).
+
+-spec encode_float(float(), json:encoder(), state()) -> iodata().
+-if(?OTP_RELEASE >= 25).
+encode_float(Float, _Encode, _State) ->
+    erlang:float_to_binary(Float, [short]).
+-else.
+encode_float(Float, _Encode, _State) ->
+    erlang:float_to_binary(Float, [compact, {decimals, 10}]).
+-endif.
+
+-spec encode_atom(atom(), json:encoder(), state()) -> iodata().
+encode_atom(true, _Encode, _State) ->
+    <<"true">>;
+encode_atom(false, _Encode, _State) ->
+    <<"false">>;
+encode_atom(Atom, _Encode, #state{nulls = Nulls}) when is_map_key(Atom, Nulls) ->
+    <<"null">>;
+encode_atom(Atom, _Encode, #state{escape = Escape}) ->
+    Escape(atom_to_binary(Atom, utf8)).
+
+-spec encode_list(list(), json:encoder(), state()) -> iodata().
+encode_list(List, Encode, #state{proplists = false}) ->
+    json:encode_list(List, Encode);
+encode_list(List, Encode, #state{proplists = true} = State) ->
+    case is_proplist(List) of
+        true ->
+            encode_proplist(List, Encode, State);
+        false ->
+            json:encode_list(List, Encode)
+    end;
+encode_list(List, Encode, #state{proplists = {true, IsProplist}} = State) ->
+    case IsProplist(List) of
+        true ->
+            encode_proplist(List, Encode, State);
+        false ->
+            json:encode_list(List, Encode)
+    end.
+
+-spec encode_map(map(), json:encoder(), state()) -> iodata().
+-if(?OTP_RELEASE >= 26).
+encode_map(Map, Encode, #state{sort_keys = false, skip_values = ValuesToSkip} = State) ->
+    do_encode_map([
+        [$,, escape_map_key(Key, State), $: | do_encode(Value, Encode, State)]
+     || Key := Value <- Map,
+        not is_map_key(Value, ValuesToSkip)
+    ]);
+encode_map(Map, Encode, State) ->
+    encode_sort_keys_map(Map, Encode, State).
+-else.
+encode_map(Map, Encode, #state{sort_keys = false, skip_values = ValuesToSkip} = State) ->
+    do_encode_map(
+        maps:fold(
+            fun(Key, Value, Acc) ->
+                case is_map_key(Value, ValuesToSkip) of
+                    true ->
+                        [];
+                    false ->
+                        [
+                            [
+                                $,,
+                                escape_map_key(Key, State),
+                                $:
+                                | do_encode(Value, Encode, State)
+                            ]
+                            | Acc
+                        ]
+                end
+            end,
+            [],
+            Map
+        )
+    );
+encode_map(Map, Encode, State) ->
+    encode_sort_keys_map(Map, Encode, State).
+-endif.
+
+-spec encode_tuple(tuple(), json:encoder(), state()) -> no_return().
+encode_tuple(Tuple, Encode, State) ->
+    error(unsuported_tuple, [Tuple, Encode, State]).
+
+-spec encode_pid(pid(), json:encoder(), state()) -> no_return().
+encode_pid(Pid, Encode, State) ->
+    error(unsuported_pid, [Pid, Encode, State]).
+
+-spec encode_port(port(), json:encoder(), state()) -> no_return().
+encode_port(Port, Encode, State) ->
+    error(unsuported_port, [Port, Encode, State]).
+
+-spec encode_reference(reference(), json:encoder(), state()) -> no_return().
+encode_reference(Ref, Encode, State) ->
+    error(unsuported_reference, [Ref, Encode, State]).
+
+-spec encode_term(term(), json:encoder(), state()) -> no_return().
+encode_term(Term, Encode, State) ->
+    error(unsuported_term, [Term, Encode, State]).
 
 %% --------------------------------------------------------------------
 %% Internal functions
@@ -356,7 +517,7 @@ new_state(Opts) ->
         key_to_binary = maps:get(key_to_binary, Opts, fun key_to_binary/1),
         sort_keys = maps:get(sort_keys, Opts, false),
         proplists = maps:get(proplists, Opts, false),
-        escape = maps:get(escape, Opts, fun json:encode_binary/1),
+        escape = maps:get(escape, Opts, fun escape/1),
         encode_integer = maps:get(encode_integer, Opts, fun encode_integer/3),
         encode_float = maps:get(encode_float, Opts, fun encode_float/3),
         encode_atom = maps:get(encode_atom, Opts, fun encode_atom/3),
@@ -368,15 +529,6 @@ new_state(Opts) ->
         encode_reference = maps:get(encode_reference, Opts, fun encode_reference/3),
         encode_term = maps:get(encode_term, Opts, fun encode_term/3)
     }.
-
-key_to_binary(Bin) when is_binary(Bin) ->
-    Bin;
-key_to_binary(Str) when is_list(Str) ->
-    iolist_to_binary(Str);
-key_to_binary(Atom) when is_atom(Atom) ->
-    atom_to_binary(Atom, utf8);
-key_to_binary(Int) when is_integer(Int) ->
-    integer_to_binary(Int, 10).
 
 % Codecs
 
@@ -499,43 +651,6 @@ do_encode(Ref, Encode, State) when is_reference(Ref) ->
 do_encode(Term, Encode, State) ->
     (State#state.encode_term)(Term, Encode, State).
 
-encode_integer(Int, _Encode, _State) ->
-    erlang:integer_to_binary(Int, 10).
-
--if(?OTP_RELEASE >= 25).
-encode_float(Float, _Encode, _State) ->
-    erlang:float_to_binary(Float, [short]).
--else.
-encode_float(Float, _Encode, _State) ->
-    erlang:float_to_binary(Float, [compact, {decimals, 10}]).
--endif.
-
-encode_atom(true, _Encode, _State) ->
-    <<"true">>;
-encode_atom(false, _Encode, _State) ->
-    <<"false">>;
-encode_atom(Atom, _Encode, #state{nulls = Nulls}) when is_map_key(Atom, Nulls) ->
-    <<"null">>;
-encode_atom(Atom, _Encode, #state{escape = Escape}) ->
-    Escape(atom_to_binary(Atom, utf8)).
-
-encode_list(List, Encode, #state{proplists = false}) ->
-    json:encode_list(List, Encode);
-encode_list(List, Encode, #state{proplists = true} = State) ->
-    case is_proplist(List) of
-        true ->
-            encode_proplist(List, Encode, State);
-        false ->
-            json:encode_list(List, Encode)
-    end;
-encode_list(List, Encode, #state{proplists = {true, IsProplist}} = State) ->
-    case IsProplist(List) of
-        true ->
-            encode_proplist(List, Encode, State);
-        false ->
-            json:encode_list(List, Encode)
-    end.
-
 encode_proplist(Proplist, Encode, State) ->
     do_encode(proplists:to_map(Proplist), Encode, State).
 
@@ -553,43 +668,6 @@ is_proplist_prop({Key, _}) ->
 is_proplist_prop(Key) ->
     is_atom(Key).
 
--if(?OTP_RELEASE >= 26).
-encode_map(Map, Encode, #state{sort_keys = false, skip_values = ValuesToSkip} = State) ->
-    do_encode_map([
-        [$,, escape_map_key(Key, State), $: | do_encode(Value, Encode, State)]
-     || Key := Value <- Map,
-        not is_map_key(Value, ValuesToSkip)
-    ]);
-encode_map(Map, Encode, State) ->
-    encode_sort_keys_map(Map, Encode, State).
--else.
-encode_map(Map, Encode, #state{sort_keys = false, skip_values = ValuesToSkip} = State) ->
-    do_encode_map(
-        maps:fold(
-            fun(Key, Value, Acc) ->
-                case is_map_key(Value, ValuesToSkip) of
-                    true ->
-                        [];
-                    false ->
-                        [
-                            [
-                                $,,
-                                escape_map_key(Key, State),
-                                $:
-                                | do_encode(Value, Encode, State)
-                            ]
-                            | Acc
-                        ]
-                end
-            end,
-            [],
-            Map
-        )
-    );
-encode_map(Map, Encode, State) ->
-    encode_sort_keys_map(Map, Encode, State).
--endif.
-
 encode_sort_keys_map(Map, Encode, #state{sort_keys = true} = State) ->
     do_encode_map([
         [$,, escape_map_key(Key, State), $: | do_encode(Value, Encode, State)]
@@ -602,18 +680,3 @@ escape_map_key(Key, State) ->
 
 do_encode_map([]) -> <<"{}">>;
 do_encode_map([[_Comma | Entry] | Rest]) -> ["{", Entry, Rest, "}"].
-
-encode_tuple(Tuple, Encode, State) ->
-    error(unsuported_tuple, [Tuple, Encode, State]).
-
-encode_pid(Pid, Encode, State) ->
-    error(unsuported_pid, [Pid, Encode, State]).
-
-encode_port(Port, Encode, State) ->
-    error(unsuported_port, [Port, Encode, State]).
-
-encode_reference(Ref, Encode, State) ->
-    error(unsuported_reference, [Ref, Encode, State]).
-
-encode_term(Term, Encode, State) ->
-    error(unsuported_term, [Term, Encode, State]).
