@@ -63,7 +63,8 @@
     encode_tuple => encode(tuple()),
     encode_pid => encode(pid()),
     encode_port => encode(port()),
-    encode_reference => encode(reference())
+    encode_reference => encode(reference()),
+    encode_term => encode(term())
 }.
 
 -type codec() ::
@@ -97,7 +98,8 @@
     encode_tuple :: encode(tuple()),
     encode_pid :: encode(pid()),
     encode_port :: encode(port()),
-    encode_reference :: encode(reference())
+    encode_reference :: encode(reference()),
+    encode_term :: encode(term())
 }).
 -opaque state() :: #state{}.
 
@@ -327,11 +329,17 @@
 %%   <li>
 %%     `encode_reference' - Overrides the default reference encoder.
 %%   </li>
+%%   <li>
+%%     `encode_term' - Overrides the default encoder for unsuported terms,
+%%     like functions.
+%%
+%%     By default, the `unsuported_term' error is raised.
+%%   </li>
 %% </ul>
 encode(Input, Opts) ->
     State = new_state(Opts),
     json:encode(Input, fun(Term, Encode) ->
-        encode_term(Term, Encode, State)
+        do_encode(Term, Encode, State)
     end).
 
 %% --------------------------------------------------------------------
@@ -357,7 +365,8 @@ new_state(Opts) ->
         encode_tuple = maps:get(encode_tuple, Opts, fun encode_tuple/3),
         encode_pid = maps:get(encode_pid, Opts, fun encode_pid/3),
         encode_port = maps:get(encode_port, Opts, fun encode_port/3),
-        encode_reference = maps:get(encode_reference, Opts, fun encode_reference/3)
+        encode_reference = maps:get(encode_reference, Opts, fun encode_reference/3),
+        encode_term = maps:get(encode_term, Opts, fun encode_term/3)
     }.
 
 key_to_binary(Bin) when is_binary(Bin) ->
@@ -462,33 +471,33 @@ records_codec_callback(_Tuple, _Records) ->
 
 % Encoders
 
-encode_term(Bin, _Encode, State) when is_binary(Bin) ->
+do_encode(Bin, _Encode, State) when is_binary(Bin) ->
     (State#state.escape)(Bin);
-encode_term(Int, Encode, State) when is_integer(Int) ->
+do_encode(Int, Encode, State) when is_integer(Int) ->
     (State#state.encode_integer)(Int, Encode, State);
-encode_term(Float, Encode, State) when is_float(Float) ->
+do_encode(Float, Encode, State) when is_float(Float) ->
     (State#state.encode_float)(Float, Encode, State);
-encode_term(Atom, Encode, State) when is_atom(Atom) ->
+do_encode(Atom, Encode, State) when is_atom(Atom) ->
     (State#state.encode_atom)(Atom, Encode, State);
-encode_term(List, Encode, State) when is_list(List) ->
+do_encode(List, Encode, State) when is_list(List) ->
     (State#state.encode_list)(List, Encode, State);
-encode_term(Map, Encode, State) when is_map(Map) ->
+do_encode(Map, Encode, State) when is_map(Map) ->
     (State#state.encode_map)(Map, Encode, State);
-encode_term(Tuple, Encode, State) when is_tuple(Tuple) ->
+do_encode(Tuple, Encode, State) when is_tuple(Tuple) ->
     case traverse_codecs(State#state.codecs, Tuple) of
         NewTuple when is_tuple(NewTuple) ->
             (State#state.encode_tuple)(NewTuple, Encode, State);
         NewTerm ->
-            encode_term(NewTerm, Encode, State)
+            do_encode(NewTerm, Encode, State)
     end;
-encode_term(Pid, Encode, State) when is_pid(Pid) ->
+do_encode(Pid, Encode, State) when is_pid(Pid) ->
     (State#state.encode_pid)(Pid, Encode, State);
-encode_term(Port, Encode, State) when is_port(Port) ->
+do_encode(Port, Encode, State) when is_port(Port) ->
     (State#state.encode_port)(Port, Encode, State);
-encode_term(Ref, Encode, State) when is_reference(Ref) ->
+do_encode(Ref, Encode, State) when is_reference(Ref) ->
     (State#state.encode_reference)(Ref, Encode, State);
-encode_term(Term, Encode, State) ->
-    error(unsuported_term, [Term, Encode, State]).
+do_encode(Term, Encode, State) ->
+    (State#state.encode_term)(Term, Encode, State).
 
 encode_integer(Int, _Encode, _State) ->
     erlang:integer_to_binary(Int, 10).
@@ -528,7 +537,7 @@ encode_list(List, Encode, #state{proplists = {true, IsProplist}} = State) ->
     end.
 
 encode_proplist(Proplist, Encode, State) ->
-    encode_term(proplists:to_map(Proplist), Encode, State).
+    do_encode(proplists:to_map(Proplist), Encode, State).
 
 is_proplist([]) ->
     false;
@@ -547,7 +556,7 @@ is_proplist_prop(Key) ->
 -if(?OTP_RELEASE >= 26).
 encode_map(Map, Encode, #state{sort_keys = false, skip_values = ValuesToSkip} = State) ->
     do_encode_map([
-        [$,, escape_map_key(Key, State), $: | encode_term(Value, Encode, State)]
+        [$,, escape_map_key(Key, State), $: | do_encode(Value, Encode, State)]
      || Key := Value <- Map,
         not is_map_key(Value, ValuesToSkip)
     ]);
@@ -567,7 +576,7 @@ encode_map(Map, Encode, #state{sort_keys = false, skip_values = ValuesToSkip} = 
                                 $,,
                                 escape_map_key(Key, State),
                                 $:
-                                | encode_term(Value, Encode, State)
+                                | do_encode(Value, Encode, State)
                             ]
                             | Acc
                         ]
@@ -583,7 +592,7 @@ encode_map(Map, Encode, State) ->
 
 encode_sort_keys_map(Map, Encode, #state{sort_keys = true} = State) ->
     do_encode_map([
-        [$,, escape_map_key(Key, State), $: | encode_term(Value, Encode, State)]
+        [$,, escape_map_key(Key, State), $: | do_encode(Value, Encode, State)]
      || {Key, Value} <- lists:keysort(1, maps:to_list(Map)),
         not is_map_key(Value, State#state.skip_values)
     ]).
@@ -605,3 +614,6 @@ encode_port(Port, Encode, State) ->
 
 encode_reference(Ref, Encode, State) ->
     error(unsuported_reference, [Ref, Encode, State]).
+
+encode_term(Term, Encode, State) ->
+    error(unsuported_term, [Term, Encode, State]).
