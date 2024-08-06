@@ -6,39 +6,40 @@
 %% --------------------------------------------------------------------
 
 -export([encode/2]).
+-export([continue/2]).
 -export([key_to_binary/1]).
 -export([escape/1]).
--export([encode_integer/3]).
--export([encode_float/3]).
--export([encode_atom/3]).
--export([encode_list/3]).
--export([encode_map/3]).
--export([encode_tuple/3]).
--export([encode_pid/3]).
--export([encode_port/3]).
--export([encode_reference/3]).
--export([encode_term/3]).
+-export([encode_integer/2]).
+-export([encode_float/2]).
+-export([encode_atom/2]).
+-export([encode_list/2]).
+-export([encode_map/2]).
+-export([encode_tuple/2]).
+-export([encode_pid/2]).
+-export([encode_port/2]).
+-export([encode_reference/2]).
+-export([encode_term/2]).
 
 %
 
+-ignore_xref([continue/2]).
 -ignore_xref([key_to_binary/1]).
 -ignore_xref([escape/1]).
--ignore_xref([encode_integer/3]).
--ignore_xref([encode_float/3]).
--ignore_xref([encode_atom/3]).
--ignore_xref([encode_list/3]).
--ignore_xref([encode_map/3]).
--ignore_xref([encode_tuple/3]).
--ignore_xref([encode_pid/3]).
--ignore_xref([encode_port/3]).
--ignore_xref([encode_reference/3]).
--ignore_xref([encode_term/3]).
+-ignore_xref([encode_integer/2]).
+-ignore_xref([encode_float/2]).
+-ignore_xref([encode_atom/2]).
+-ignore_xref([encode_list/2]).
+-ignore_xref([encode_map/2]).
+-ignore_xref([encode_tuple/2]).
+-ignore_xref([encode_pid/2]).
+-ignore_xref([encode_port/2]).
+-ignore_xref([encode_reference/2]).
+-ignore_xref([encode_term/2]).
 
 -hank([
     {unnecessary_function_arguments, [
-        encode_atom/3,
-        encode_float/3,
-        encode_integer/3
+        encode_float/2,
+        encode_integer/2
     ]}
 ]).
 
@@ -105,7 +106,7 @@
 
 -type is_proplist() :: fun((list()) -> boolean()).
 
--type encode(Type) :: fun((Type, json:encoder(), state()) -> iodata()).
+-type encode(Type) :: fun((Type, state()) -> iodata()).
 
 -record(state, {
     codecs :: [codec()],
@@ -334,60 +335,98 @@
 %%   <li>
 %%     `encode_integer' - Overrides the default integer encoder.
 %%
-%%     Default is `encode_integer/3'.
+%%     Default is `encode_integer/2'.
 %%   </li>
 %%   <li>
 %%     `encode_float' - Overrides the default float encoder.
 %%
-%%     Default is `encode_float/3'.
+%%     Default is `encode_float/2'.
 %%   </li>
 %%   <li>
 %%     `encode_atom' - Overrides the default atom encoder.
 %%
-%%     Default is `encode_atom/3'.
+%%     Default is `encode_atom/2'.
 %%   </li>
 %%   <li>
 %%     `encode_list' - Overrides the default list encoder.
 %%
-%%     Default is `encode_list/3'.
+%%     Default is `encode_list/2'.
 %%   </li>
 %%   <li>
 %%     `encode_map' - Overrides the default map encoder.
 %%
-%%     Default is `encode_map/3'.
+%%     Default is `encode_map/2'.
 %%   </li>
 %%   <li>
 %%     `encode_tuple'- Overrides the default tuple encoder.
 %%
-%%     Default is `encode_tuple/3', which raises `unsupported_tuple' error.
+%%     Default is `encode_tuple/2', which raises `unsupported_tuple' error.
 %%   </li>
 %%   <li>
 %%     `encode_pid' - Overrides the default pid encoder.
 %%
-%%     Default is `encode_pid/3', which raises `unsupported_pid' error.
+%%     Default is `encode_pid/2', which raises `unsupported_pid' error.
 %%   </li>
 %%   <li>
 %%     `encode_port' - Overrides the default port encoder.
 %%
-%%     Default is `encode_port/3', which raises `unsupported_port' error.
+%%     Default is `encode_port/2', which raises `unsupported_port' error.
 %%   </li>
 %%   <li>
 %%     `encode_reference' - Overrides the default reference encoder.
 %%
-%%     Default is `encode_reference/3', which raises `unsupported_reference' error.
+%%     Default is `encode_reference/2', which raises `unsupported_reference' error.
 %%   </li>
 %%   <li>
 %%     `encode_term' - Overrides the default encoder for unsupported terms,
 %%     like functions.
 %%
-%%     Default is `encode_term/3', which raises `unsupported_term' error.
+%%     Default is `encode_term/2', which raises `unsupported_term' error.
 %%   </li>
 %% </ul>
 encode(Input, Opts) ->
-    State = new_state(Opts),
-    json:encode(Input, fun(Term, Encode) ->
-        do_encode(Term, Encode, State)
-    end).
+    json:encode(Input, encoder(new_state(Opts))).
+
+-spec continue(term(), state()) -> iodata().
+%% @doc Used by encoders to continue encoding.
+%%
+%% <em>Example:</em>
+%%
+%% ```
+%% 1> euneus_encoder:encode({}, #{
+%% ..     encode_tuple => fun(Tuple, State) ->
+%% ..         euneus_encoder:continue(tuple_to_list(Tuple), State)
+%% ..     end
+%% .. }).
+%% <<"[]">>
+%% '''
+continue(Bin, State) when is_binary(Bin) ->
+    (State#state.escape)(Bin);
+continue(Int, State) when is_integer(Int) ->
+    (State#state.encode_integer)(Int, State);
+continue(Float, State) when is_float(Float) ->
+    (State#state.encode_float)(Float, State);
+continue(Atom, State) when is_atom(Atom) ->
+    (State#state.encode_atom)(Atom, State);
+continue(List, State) when is_list(List) ->
+    (State#state.encode_list)(List, State);
+continue(Map, State) when is_map(Map) ->
+    (State#state.encode_map)(Map, State);
+continue(Tuple, State) when is_tuple(Tuple) ->
+    case traverse_codecs(State#state.codecs, Tuple) of
+        NewTuple when is_tuple(NewTuple) ->
+            (State#state.encode_tuple)(NewTuple, State);
+        NewTerm ->
+            continue(NewTerm, State)
+    end;
+continue(Pid, State) when is_pid(Pid) ->
+    (State#state.encode_pid)(Pid, State);
+continue(Port, State) when is_port(Port) ->
+    (State#state.encode_port)(Port, State);
+continue(Ref, State) when is_reference(Ref) ->
+    (State#state.encode_reference)(Ref, State);
+continue(Term, State) ->
+    (State#state.encode_term)(Term, State).
 
 -spec key_to_binary(Term) -> binary() when
     Term :: binary() | string() | atom() | integer().
@@ -404,59 +443,59 @@ key_to_binary(Int) when is_integer(Int) ->
 escape(Bin) ->
     json:encode_binary(Bin).
 
--spec encode_integer(integer(), json:encoder(), state()) -> iodata().
-encode_integer(Int, _Encode, _State) ->
+-spec encode_integer(integer(), state()) -> iodata().
+encode_integer(Int, _State) ->
     erlang:integer_to_binary(Int, 10).
 
--spec encode_float(float(), json:encoder(), state()) -> iodata().
+-spec encode_float(float(), state()) -> iodata().
 -if(?OTP_RELEASE >= 25).
-encode_float(Float, _Encode, _State) ->
+encode_float(Float, _State) ->
     erlang:float_to_binary(Float, [short]).
 -else.
-encode_float(Float, _Encode, _State) ->
+encode_float(Float, _State) ->
     erlang:float_to_binary(Float, [compact, {decimals, 10}]).
 -endif.
 
--spec encode_atom(atom(), json:encoder(), state()) -> iodata().
-encode_atom(true, _Encode, _State) ->
+-spec encode_atom(atom(), state()) -> iodata().
+encode_atom(true, _State) ->
     <<"true">>;
-encode_atom(false, _Encode, _State) ->
+encode_atom(false, _State) ->
     <<"false">>;
-encode_atom(Atom, _Encode, #state{nulls = Nulls}) when is_map_key(Atom, Nulls) ->
+encode_atom(Atom, #state{nulls = Nulls}) when is_map_key(Atom, Nulls) ->
     <<"null">>;
-encode_atom(Atom, _Encode, #state{escape = Escape}) ->
+encode_atom(Atom, #state{escape = Escape}) ->
     Escape(atom_to_binary(Atom, utf8)).
 
--spec encode_list(list(), json:encoder(), state()) -> iodata().
-encode_list(List, Encode, #state{proplists = false}) ->
-    json:encode_list(List, Encode);
-encode_list(List, Encode, #state{proplists = true} = State) ->
+-spec encode_list(list(), state()) -> iodata().
+encode_list(List, #state{proplists = false} = State) ->
+    json:encode_list(List, encoder(State));
+encode_list(List, #state{proplists = true} = State) ->
     case is_proplist(List) of
         true ->
-            encode_proplist(List, Encode, State);
+            encode_proplist(List, State);
         false ->
-            json:encode_list(List, Encode)
+            json:encode_list(List, encoder(State))
     end;
-encode_list(List, Encode, #state{proplists = {true, IsProplist}} = State) ->
+encode_list(List, #state{proplists = {true, IsProplist}} = State) ->
     case IsProplist(List) of
         true ->
-            encode_proplist(List, Encode, State);
+            encode_proplist(List, State);
         false ->
-            json:encode_list(List, Encode)
+            json:encode_list(List, encoder(State))
     end.
 
--spec encode_map(map(), json:encoder(), state()) -> iodata().
+-spec encode_map(map(), state()) -> iodata().
 -if(?OTP_RELEASE >= 26).
-encode_map(Map, Encode, #state{sort_keys = false, skip_values = ValuesToSkip} = State) ->
+encode_map(Map, #state{sort_keys = false, skip_values = ValuesToSkip} = State) ->
     do_encode_map([
-        [$,, escape_map_key(Key, State), $: | do_encode(Value, Encode, State)]
+        [$,, escape_map_key(Key, State), $: | continue(Value, State)]
      || Key := Value <- Map,
         not is_map_key(Value, ValuesToSkip)
     ]);
-encode_map(Map, Encode, State) ->
-    encode_sort_keys_map(Map, Encode, State).
+encode_map(Map, State) ->
+    encode_sort_keys_map(Map, State).
 -else.
-encode_map(Map, Encode, #state{sort_keys = false, skip_values = ValuesToSkip} = State) ->
+encode_map(Map, #state{sort_keys = false, skip_values = ValuesToSkip} = State) ->
     do_encode_map(
         maps:fold(
             fun(Key, Value, Acc) ->
@@ -469,7 +508,7 @@ encode_map(Map, Encode, #state{sort_keys = false, skip_values = ValuesToSkip} = 
                                 $,,
                                 escape_map_key(Key, State),
                                 $:
-                                | do_encode(Value, Encode, State)
+                                | continue(Value, State)
                             ]
                             | Acc
                         ]
@@ -479,29 +518,29 @@ encode_map(Map, Encode, #state{sort_keys = false, skip_values = ValuesToSkip} = 
             Map
         )
     );
-encode_map(Map, Encode, State) ->
-    encode_sort_keys_map(Map, Encode, State).
+encode_map(Map, State) ->
+    encode_sort_keys_map(Map, State).
 -endif.
 
--spec encode_tuple(tuple(), json:encoder(), state()) -> no_return().
-encode_tuple(Tuple, Encode, State) ->
-    error(unsupported_tuple, [Tuple, Encode, State]).
+-spec encode_tuple(tuple(), state()) -> no_return().
+encode_tuple(Tuple, State) ->
+    error(unsupported_tuple, [Tuple, State]).
 
--spec encode_pid(pid(), json:encoder(), state()) -> no_return().
-encode_pid(Pid, Encode, State) ->
-    error(unsupported_pid, [Pid, Encode, State]).
+-spec encode_pid(pid(), state()) -> no_return().
+encode_pid(Pid, State) ->
+    error(unsupported_pid, [Pid, State]).
 
--spec encode_port(port(), json:encoder(), state()) -> no_return().
-encode_port(Port, Encode, State) ->
-    error(unsupported_port, [Port, Encode, State]).
+-spec encode_port(port(), state()) -> no_return().
+encode_port(Port, State) ->
+    error(unsupported_port, [Port, State]).
 
--spec encode_reference(reference(), json:encoder(), state()) -> no_return().
-encode_reference(Ref, Encode, State) ->
-    error(unsupported_reference, [Ref, Encode, State]).
+-spec encode_reference(reference(), state()) -> no_return().
+encode_reference(Ref, State) ->
+    error(unsupported_reference, [Ref, State]).
 
--spec encode_term(term(), json:encoder(), state()) -> no_return().
-encode_term(Term, Encode, State) ->
-    error(unsupported_term, [Term, Encode, State]).
+-spec encode_term(term(), state()) -> no_return().
+encode_term(Term, State) ->
+    error(unsupported_term, [Term, State]).
 
 %% --------------------------------------------------------------------
 %% Internal functions
@@ -518,16 +557,16 @@ new_state(Opts) ->
         sort_keys = maps:get(sort_keys, Opts, false),
         proplists = maps:get(proplists, Opts, false),
         escape = maps:get(escape, Opts, fun escape/1),
-        encode_integer = maps:get(encode_integer, Opts, fun encode_integer/3),
-        encode_float = maps:get(encode_float, Opts, fun encode_float/3),
-        encode_atom = maps:get(encode_atom, Opts, fun encode_atom/3),
-        encode_list = maps:get(encode_list, Opts, fun encode_list/3),
-        encode_map = maps:get(encode_map, Opts, fun encode_map/3),
-        encode_tuple = maps:get(encode_tuple, Opts, fun encode_tuple/3),
-        encode_pid = maps:get(encode_pid, Opts, fun encode_pid/3),
-        encode_port = maps:get(encode_port, Opts, fun encode_port/3),
-        encode_reference = maps:get(encode_reference, Opts, fun encode_reference/3),
-        encode_term = maps:get(encode_term, Opts, fun encode_term/3)
+        encode_integer = maps:get(encode_integer, Opts, fun encode_integer/2),
+        encode_float = maps:get(encode_float, Opts, fun encode_float/2),
+        encode_atom = maps:get(encode_atom, Opts, fun encode_atom/2),
+        encode_list = maps:get(encode_list, Opts, fun encode_list/2),
+        encode_map = maps:get(encode_map, Opts, fun encode_map/2),
+        encode_tuple = maps:get(encode_tuple, Opts, fun encode_tuple/2),
+        encode_pid = maps:get(encode_pid, Opts, fun encode_pid/2),
+        encode_port = maps:get(encode_port, Opts, fun encode_port/2),
+        encode_reference = maps:get(encode_reference, Opts, fun encode_reference/2),
+        encode_term = maps:get(encode_term, Opts, fun encode_term/2)
     }.
 
 % Codecs
@@ -623,36 +662,13 @@ records_codec_callback(_Tuple, _Records) ->
 
 % Encoders
 
-do_encode(Bin, _Encode, State) when is_binary(Bin) ->
-    (State#state.escape)(Bin);
-do_encode(Int, Encode, State) when is_integer(Int) ->
-    (State#state.encode_integer)(Int, Encode, State);
-do_encode(Float, Encode, State) when is_float(Float) ->
-    (State#state.encode_float)(Float, Encode, State);
-do_encode(Atom, Encode, State) when is_atom(Atom) ->
-    (State#state.encode_atom)(Atom, Encode, State);
-do_encode(List, Encode, State) when is_list(List) ->
-    (State#state.encode_list)(List, Encode, State);
-do_encode(Map, Encode, State) when is_map(Map) ->
-    (State#state.encode_map)(Map, Encode, State);
-do_encode(Tuple, Encode, State) when is_tuple(Tuple) ->
-    case traverse_codecs(State#state.codecs, Tuple) of
-        NewTuple when is_tuple(NewTuple) ->
-            (State#state.encode_tuple)(NewTuple, Encode, State);
-        NewTerm ->
-            do_encode(NewTerm, Encode, State)
-    end;
-do_encode(Pid, Encode, State) when is_pid(Pid) ->
-    (State#state.encode_pid)(Pid, Encode, State);
-do_encode(Port, Encode, State) when is_port(Port) ->
-    (State#state.encode_port)(Port, Encode, State);
-do_encode(Ref, Encode, State) when is_reference(Ref) ->
-    (State#state.encode_reference)(Ref, Encode, State);
-do_encode(Term, Encode, State) ->
-    (State#state.encode_term)(Term, Encode, State).
+encoder(State) ->
+    fun(Term, _Encode) ->
+        continue(Term, State)
+    end.
 
-encode_proplist(Proplist, Encode, State) ->
-    do_encode(proplists:to_map(Proplist), Encode, State).
+encode_proplist(Proplist, State) ->
+    continue(proplists:to_map(Proplist), State).
 
 is_proplist([]) ->
     false;
@@ -668,9 +684,9 @@ is_proplist_prop({Key, _}) ->
 is_proplist_prop(Key) ->
     is_atom(Key).
 
-encode_sort_keys_map(Map, Encode, #state{sort_keys = true} = State) ->
+encode_sort_keys_map(Map, #state{sort_keys = true} = State) ->
     do_encode_map([
-        [$,, escape_map_key(Key, State), $: | do_encode(Value, Encode, State)]
+        [$,, escape_map_key(Key, State), $: | continue(Value, State)]
      || {Key, Value} <- lists:keysort(1, maps:to_list(Map)),
         not is_map_key(Value, State#state.skip_values)
     ]).
