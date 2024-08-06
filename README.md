@@ -73,6 +73,17 @@ for more examples and detailed explanation.
 
 The data mapping and error reasons can be found in the OTP json decode function [documentation](https://erlang.org/documentation/doc-15.0-rc3/lib/stdlib-6.0/doc/html/json.html#decode/1).
 
+### Decode stream
+
+Three functions provide JSON decoding stream:
+
+- `euneus:decode_stream_start/1` - Equivalent to `euneus:decode_stream_start(JSON, #{})`;
+- `euneus:decode_stream_start/2` - Begin parsing a stream of bytes of a JSON value;
+- `euneus:decode_stream_continue/2` - Continue parsing a stream of bytes of a JSON value.
+
+Please see the `m:euneus_decoder` [documentation](https://hexdocs.pm/euneus/euneus_decoder.html)
+for more examples and detailed explanation.
+
 ## Format
 
 Two functions provide JSON formatting:
