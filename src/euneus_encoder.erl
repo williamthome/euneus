@@ -1,5 +1,4 @@
 -module(euneus_encoder).
--compile({no_auto_import, [float/1]}).
 
 %% --------------------------------------------------------------------
 %% API function exports
