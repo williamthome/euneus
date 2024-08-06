@@ -389,6 +389,17 @@ encode(Input, Opts) ->
 
 -spec continue(term(), state()) -> iodata().
 %% @doc Used by encoders to continue encoding.
+%%
+%% <em>Example:</em>
+%%
+%% ```
+%% 1> euneus_encoder:encode({}, #{
+%% ..     encode_tuple => fun(Tuple, State) ->
+%% ..         euneus_encoder:continue(tuple_to_list(Tuple), State)
+%% ..     end
+%% .. }).
+%% <<"[]">>
+%% '''
 continue(Bin, State) when is_binary(Bin) ->
     (State#state.escape)(Bin);
 continue(Int, State) when is_integer(Int) ->
