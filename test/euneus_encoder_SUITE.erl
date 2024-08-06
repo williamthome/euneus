@@ -284,8 +284,8 @@ encode_map_test(Config) when is_list(Config) ->
         ?assertEqual(
             <<"[]">>,
             encode(#{}, #{
-                encode_map => fun(Map, Encode, _State) ->
-                    Encode(maps:to_list(Map), Encode)
+                encode_map => fun(Map, State) ->
+                    euneus_encoder:continue(maps:to_list(Map), State)
                 end
             })
         )
@@ -297,8 +297,8 @@ encode_tuple_test(Config) when is_list(Config) ->
         ?assertEqual(
             <<"[]">>,
             encode({}, #{
-                encode_tuple => fun(Tuple, Encode, _State) ->
-                    Encode(tuple_to_list(Tuple), Encode)
+                encode_tuple => fun(Tuple, State) ->
+                    euneus_encoder:continue(tuple_to_list(Tuple), State)
                 end
             })
         )
@@ -310,8 +310,8 @@ encode_pid_test(Config) when is_list(Config) ->
         ?assertEqual(
             <<"\"<0.66.6>\"">>,
             encode(list_to_pid("<0.66.6>"), #{
-                encode_pid => fun(Pid, Encode, _State) ->
-                    Encode(iolist_to_binary(pid_to_list(Pid)), Encode)
+                encode_pid => fun(Pid, State) ->
+                    euneus_encoder:continue(iolist_to_binary(pid_to_list(Pid)), State)
                 end
             })
         )
@@ -323,8 +323,8 @@ encode_port_test(Config) when is_list(Config) ->
         ?assertEqual(
             <<"\"#Port<0.1>\"">>,
             encode(list_to_port("#Port<0.1>"), #{
-                encode_port => fun(Port, Encode, _State) ->
-                    Encode(iolist_to_binary(port_to_list(Port)), Encode)
+                encode_port => fun(Port, State) ->
+                    euneus_encoder:continue(iolist_to_binary(port_to_list(Port)), State)
                 end
             })
         )
@@ -339,8 +339,8 @@ encode_reference_test(Config) when is_list(Config) ->
             <<"\"#Ref<0.314572725.1088159747.110918>\"">>,
             encode(
                 list_to_ref("#Ref<0.314572725.1088159747.110918>"), #{
-                    encode_reference => fun(Ref, Encode, _State) ->
-                        Encode(iolist_to_binary(ref_to_list(Ref)), Encode)
+                    encode_reference => fun(Ref, State) ->
+                        euneus_encoder:continue(iolist_to_binary(ref_to_list(Ref)), State)
                     end
                 }
             )
@@ -357,8 +357,10 @@ encode_term_test(Config) when is_list(Config) ->
                 fun() -> ok end,
                 #{
                     encode_term =>
-                        fun(Fun, Encode, _State) when is_function(Fun) ->
-                            Encode(iolist_to_binary(erlang:fun_to_list(Fun)), Encode)
+                        fun(Fun, State) when is_function(Fun) ->
+                            euneus_encoder:continue(
+                                iolist_to_binary(erlang:fun_to_list(Fun)), State
+                            )
                         end
                 }
             )
