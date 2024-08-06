@@ -5,6 +5,8 @@
 %% --------------------------------------------------------------------
 
 -export([decode/2]).
+-export([stream_start/2]).
+-export([stream_continue/2]).
 
 %% --------------------------------------------------------------------
 %% Macros
@@ -29,6 +31,8 @@
 -export_type([options/0]).
 -export_type([codec/0]).
 -export_type([codec_callback/0]).
+-export_type([stream_state/0]).
+-export_type([stream_result/0]).
 
 %% --------------------------------------------------------------------
 %% Types
@@ -72,6 +76,13 @@
     | codec_callback().
 
 -type codec_callback() :: fun((binary()) -> next | {halt, term()}).
+
+% The correct type is 'json:continuation_state()', but dialyzer says it is wrong.
+-type stream_state() :: term().
+
+-type stream_result() ::
+    {continue, json:continuation_state()}
+    | {end_of_input, term()}.
 
 %% --------------------------------------------------------------------
 %% DocTest
@@ -363,6 +374,42 @@ decode(JSON, Opts) when is_binary(JSON), is_map(Opts) ->
     Decoders = decoders(Codecs, Opts),
     decode(Codecs, JSON, Decoders).
 
+-spec stream_start(JSON, Options) -> stream_result() when
+    JSON :: binary(),
+    Options :: options().
+%% @doc Begin parsing a stream of bytes of a JSON value.
+%%
+%% Similar to `decode/2' but returns `{end_of_input, Term}' when a complete
+%% JSON value is parsed or returns `{continue, State}' for incomplete data.
+%%
+%% The State can be fed to the `stream_continue/2' function when more data is available.
+stream_start(JSON, Opts) ->
+    Codecs = maps:get(codecs, Opts, []),
+    Decoders = decoders(Codecs, Opts),
+    stream_result(json:decode_start(JSON, Codecs, Decoders)).
+
+-spec stream_continue(JSON, State) -> stream_result() when
+    JSON :: binary() | end_of_input,
+    State :: stream_state().
+%% @doc Continue parsing a stream of bytes of a JSON value.
+%%
+%% Similar to `stream_start/2', if the function returns `{continue, State}'
+%% and there is no more data, use `end_of_input' instead of a binary.
+%%
+%% <em>Example:</em>
+%%
+%% ```
+%% 1> begin
+%% .. {continue, State} = euneus_decoder:stream_start(<<"{\"foo\":">>, #{}),
+%% .. euneus_decoder:stream_continue(<<"1}">>, State)
+%% .. end.
+%% {end_of_input,#{<<"foo">> => 1}}
+%% '''
+stream_continue(<<>>, State) ->
+    stream_result(json:decode_continue(end_of_input, State));
+stream_continue(JSON, State) ->
+    stream_result(json:decode_continue(JSON, State)).
+
 %% --------------------------------------------------------------------
 %% Internal functions
 %% --------------------------------------------------------------------
@@ -374,6 +421,11 @@ decode(Codecs, JSON, Decoders) ->
         {_Result, [], Rest} ->
             invalid_byte(Rest, 0)
     end.
+
+stream_result({continue, State}) ->
+    {continue, State};
+stream_result({Result, Codecs, <<>>}) ->
+    {end_of_input, traverse_codecs(Codecs, Result)}.
 
 % This is a copy of json:invalid_byte/2, since it is not exported.
 invalid_byte(Bin, Skip) ->

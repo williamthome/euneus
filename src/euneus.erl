@@ -12,6 +12,9 @@
 -export([decode/2]).
 -export([decode_iodata/1]).
 -export([decode_iodata/2]).
+-export([decode_stream_start/1]).
+-export([decode_stream_start/2]).
+-export([decode_stream_continue/2]).
 -export([minify/1]).
 -export([format/2]).
 
@@ -25,6 +28,9 @@
 -ignore_xref([decode/2]).
 -ignore_xref([decode_iodata/1]).
 -ignore_xref([decode_iodata/2]).
+-ignore_xref([decode_stream_start/1]).
+-ignore_xref([decode_stream_start/2]).
+-ignore_xref([decode_stream_continue/2]).
 -ignore_xref([minify/1]).
 -ignore_xref([format/2]).
 
@@ -149,6 +155,43 @@ decode_iodata(JSON) ->
 %% '''
 decode_iodata(JSON, Opts) ->
     euneus_decoder:decode(iolist_to_binary(JSON), Opts).
+
+-spec decode_stream_start(JSON) -> Result when
+    JSON :: binary(),
+    Result :: euneus_decoder:stream_result().
+%% @equiv decode_stream_start(JSON, #{})
+decode_stream_start(JSON) ->
+    decode_stream_start(JSON, #{}).
+
+-spec decode_stream_start(JSON, Options) -> Result when
+    JSON :: binary(),
+    Options :: euneus_decoder:options(),
+    Result :: euneus_decoder:stream_result().
+%% @equiv euneus_decoder:stream_start(JSON, Options)
+%%
+%% @doc Begin parsing a stream of bytes of a JSON value.
+decode_stream_start(JSON, Opts) ->
+    euneus_decoder:stream_start(JSON, Opts).
+
+-spec decode_stream_continue(JSON, State) -> Result when
+    JSON :: binary() | end_of_input,
+    State :: euneus_decoder:stream_state(),
+    Result :: euneus_decoder:stream_result().
+%% @equiv euneus_decoder:stream_continue(JSON, State)
+%%
+%% @doc Continue parsing a stream of bytes of a JSON value.
+%%
+%% <em>Example:</em>
+%%
+%% ```
+%% 1> begin
+%% .. {continue, State} = euneus:decode_stream_start(<<"{\"foo\":">>),
+%% .. euneus:decode_stream_continue(<<"1}">>, State)
+%% .. end.
+%% {end_of_input,#{<<"foo">> => 1}}
+%% '''
+decode_stream_continue(JSON, State) ->
+    euneus_decoder:stream_continue(JSON, State).
 
 -spec minify(JSON) -> binary() when
     JSON :: binary().
