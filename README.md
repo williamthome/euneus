@@ -116,9 +116,9 @@ $ rebar3 as benchmark shell
 
 1> euneus_benchmarker:encode_benchmark().
 Code      ||   Samples       Avg   StdDev    Median      P99  Iteration    Rel
-jiffy      1         3        37    2.70%        37       38   27036 us   100%
-euneus     1         3        24    6.28%        24       26   41110 us    66%
-thoas      1         3        14    4.22%        14       14   73195 us    37%
+jiffy      1         3        26   36.69%        25       36   38474 us   100%
+euneus     1         3        20   38.20%        18       29   49197 us    78%
+thoas      1         3        10   36.06%         9       14     100 ms    38%
 
 2> euneus_benchmarker:decode_benchmark().
 Code       ||   Samples       Avg   StdDev    Median      P99  Iteration    Rel
