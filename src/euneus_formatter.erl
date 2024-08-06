@@ -36,7 +36,9 @@
 %% API functions
 %% --------------------------------------------------------------------
 
--spec format(binary(), options()) -> iodata().
+-spec format(JSON, Options) -> iodata() when
+    JSON :: binary(),
+    Options :: options().
 %% @doc Formats a binary JSON.
 %%
 %% Option details:
