@@ -42,7 +42,8 @@
 %% API functions
 %% --------------------------------------------------------------------
 
--spec encode(term()) -> binary().
+-spec encode(Term) -> binary() when
+    Term :: term().
 %% @doc Encodes a term into a binary JSON.
 %%
 %% <em>Example:</em>
@@ -54,7 +55,9 @@
 encode(Term) ->
     encode(Term, #{}).
 
--spec encode(term(), euneus_encoder:options()) -> binary().
+-spec encode(Term, Options) -> binary() when
+    Term :: term(),
+    Options :: euneus_encoder:options().
 %% @doc Encodes a term into a binary JSON.
 %%
 %% <em>Example:</em>
@@ -66,7 +69,8 @@ encode(Term) ->
 encode(Term, Opts) ->
     iolist_to_binary(euneus_encoder:encode(Term, Opts)).
 
--spec encode_to_iodata(term()) -> iodata().
+-spec encode_to_iodata(Term) -> iodata() when
+    Term :: term().
 %% @doc Encodes a term into an iodata JSON.
 %%
 %% <em>Example:</em>
@@ -78,7 +82,9 @@ encode(Term, Opts) ->
 encode_to_iodata(Term) ->
     encode_to_iodata(Term, #{}).
 
--spec encode_to_iodata(term(), euneus_encoder:options()) -> iodata().
+-spec encode_to_iodata(Term, Options) -> iodata() when
+    Term :: term(),
+    Options :: euneus_encoder:options().
 %% @doc Encodes a term into an iodata JSON.
 %%
 %% <em>Example:</em>
@@ -90,7 +96,8 @@ encode_to_iodata(Term) ->
 encode_to_iodata(Term, Opts) ->
     euneus_encoder:encode(Term, Opts).
 
--spec decode(binary()) -> term().
+-spec decode(JSON) -> term() when
+    JSON :: binary().
 %% @doc Decodes a binary JSON into a term.
 %%
 %% <em>Example:</em>
@@ -102,7 +109,9 @@ encode_to_iodata(Term, Opts) ->
 decode(JSON) ->
     decode(JSON, #{}).
 
--spec decode(binary(), euneus_decoder:options()) -> term().
+-spec decode(JSON, Options) -> term() when
+    JSON :: binary(),
+    Options :: euneus_decoder:options().
 %% @doc Decodes a binary JSON into a term.
 %%
 %% <em>Example:</em>
@@ -114,7 +123,8 @@ decode(JSON) ->
 decode(JSON, Opts) ->
     euneus_decoder:decode(JSON, Opts).
 
--spec decode_iodata(iodata()) -> term().
+-spec decode_iodata(JSON) -> term() when
+    JSON :: iodata().
 %% @doc Decodes an iodata JSON into a term.
 %%
 %% <em>Example:</em>
@@ -126,7 +136,9 @@ decode(JSON, Opts) ->
 decode_iodata(JSON) ->
     decode_iodata(JSON, #{}).
 
--spec decode_iodata(iodata(), euneus_decoder:options()) -> term().
+-spec decode_iodata(JSON, Options) -> term() when
+    JSON :: iodata(),
+    Options :: euneus_decoder:options().
 %% @doc Decodes an iodata JSON into a term.
 %%
 %% <em>Example:</em>
@@ -138,7 +150,8 @@ decode_iodata(JSON) ->
 decode_iodata(JSON, Opts) ->
     euneus_decoder:decode(iolist_to_binary(JSON), Opts).
 
--spec minify(binary()) -> binary().
+-spec minify(JSON) -> binary() when
+    JSON :: binary().
 %% @doc Minifies a binary JSON.
 %%
 %% <em>Example:</em>
@@ -155,7 +168,9 @@ minify(JSON) ->
         crlf => none
     }).
 
--spec format(binary(), euneus_formatter:options()) -> binary().
+-spec format(JSON, Options) -> binary() when
+    JSON :: binary(),
+    Options :: euneus_formatter:options().
 %% @doc Formats a binary JSON.
 %%
 %% <em>Example:</em>

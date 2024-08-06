@@ -87,7 +87,9 @@
 %% API functions
 %% --------------------------------------------------------------------
 
--spec decode(binary(), options()) -> term().
+-spec decode(JSON, Options) -> term() when
+    JSON :: binary(),
+    Options :: options().
 %% @doc Decodes a binary JSON into a term.
 %%
 %% <em>Example:</em>

@@ -156,7 +156,9 @@
 %% API functions
 %% --------------------------------------------------------------------
 
--spec encode(term(), options()) -> iodata().
+-spec encode(Term, Options) -> iodata() when
+    Term :: term(),
+    Options :: options().
 %% @doc Encode a term into an iodata JSON.
 %%
 %% <em>Example:</em>
@@ -402,10 +404,12 @@
 %%     Default is `encode_term/2', which raises `unsupported_term' error.
 %%   </li>
 %% </ul>
-encode(Input, Opts) ->
-    json:encode(Input, encoder(new_state(Opts))).
+encode(Term, Opts) ->
+    json:encode(Term, encoder(new_state(Opts))).
 
--spec continue(term(), state()) -> iodata().
+-spec continue(Term, State) -> iodata() when
+    Term :: term(),
+    State :: state().
 %% @doc Used by encoders to continue encoding.
 %%
 %% <em>Example:</em>
@@ -446,7 +450,9 @@ continue(Ref, State) when is_reference(Ref) ->
 continue(Term, State) ->
     (State#state.encode_term)(Term, State).
 
--spec codec_callback(codec(), tuple()) -> codec_result().
+-spec codec_callback(Codec, Tuple) -> codec_result() when
+    Codec :: codec(),
+    Tuple :: tuple().
 codec_callback(timestamp, Tuple) ->
     timestamp_codec_callback(Tuple);
 codec_callback(datetime, Tuple) ->
@@ -472,12 +478,12 @@ key_to_binary(Int) when is_integer(Int) ->
     integer_to_binary(Int, 10).
 
 -spec escape(binary()) -> iodata().
-escape(Bin) ->
-    json:encode_binary(Bin).
+escape(Binary) ->
+    json:encode_binary(Binary).
 
 -spec encode_integer(integer(), state()) -> iodata().
-encode_integer(Int, _State) ->
-    erlang:integer_to_binary(Int, 10).
+encode_integer(Integer, _State) ->
+    erlang:integer_to_binary(Integer, 10).
 
 -spec encode_float(float(), state()) -> iodata().
 -if(?OTP_RELEASE >= 25).
