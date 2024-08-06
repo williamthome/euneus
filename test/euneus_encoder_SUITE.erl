@@ -64,6 +64,17 @@ codecs_test(Config) when is_list(Config) ->
         )
     ].
 
+codec_callback_test(Config) when is_list(Config) ->
+    ?assertEqual(
+        <<"[\"foo\"]">>,
+        encode({foo}, #{
+            codecs => [tuple_to_list],
+            codec_callback => fun(tuple_to_list, Tuple) ->
+                {halt, erlang:tuple_to_list(Tuple)}
+            end
+        })
+    ).
+
 timestamp_codec_test(Config) when is_list(Config) ->
     ?assertEqual(<<"\"1970-01-01T00:00:00.000Z\"">>, encode({0, 0, 0}, #{codecs => [timestamp]})).
 
