@@ -77,12 +77,13 @@
 
 -type codec_callback() :: fun((binary()) -> next | {halt, term()}).
 
-% The correct type is 'json:continuation_state()', but dialyzer says it is wrong.
--type stream_state() :: term().
-
 -type stream_result() ::
-    {continue, json:continuation_state()}
+    {continue, stream_state()}
     | {end_of_input, term()}.
+
+-type stream_state() ::
+    json:continuation_state()
+    | tuple().
 
 %% --------------------------------------------------------------------
 %% DocTest

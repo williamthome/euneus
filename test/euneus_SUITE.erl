@@ -47,15 +47,10 @@ decode_iodata_test(Config) when is_list(Config) ->
     ].
 
 decode_stream_test(Config) when is_list(Config) ->
-    State = stream_continue_state(euneus:decode_stream_start(<<"{\"foo\":">>)),
+    {continue, State} = euneus:decode_stream_start(<<"{\"foo\":">>),
     ?assertEqual(
         {end_of_input, #{<<"foo">> => 1}}, euneus:decode_stream_continue(<<"1}">>, State)
     ).
-
-% Wrapper to suppress dialyzer errors.
-% See notes in euneus_decoder_SUITE:stream_continue_state/1.
-stream_continue_state({continue, State}) ->
-    State.
 
 minify_test(Config) when is_list(Config) ->
     ?assertEqual(
