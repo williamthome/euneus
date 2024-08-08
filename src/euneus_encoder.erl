@@ -377,7 +377,7 @@
 %%     Default is `encode_map/2'.
 %%   </li>
 %%   <li>
-%%     `encode_tuple'- Overrides the default tuple encoder.
+%%     `encode_tuple' - Overrides the default tuple encoder.
 %%
 %%     Default is `encode_tuple/2', which raises `unsupported_tuple' error.
 %%   </li>
