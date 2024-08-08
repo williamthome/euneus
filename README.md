@@ -138,18 +138,6 @@ jiffy       1         3        19    3.09%        19       19   53589 us    79%
 thoas       1         3        14    0.00%        14       14   71452 us    59%
 ```
 
-> [!NOTE]
-> Since `erlperf` currently does not accept labels, `Code` returns something like:
->
-> - euneus_benchmarker:encode_benchmark/0:
->   - #Fun<euneus_benchmarker.0.129271664> = euneus
->   - #Fun<euneus_benchmarker.1.129271664> = jiffy
->   - #Fun<euneus_benchmarker.2.129271664> = thoas
-> - euneus_benchmarker:decode_benchmark/0:
->   - #Fun<euneus_benchmarker.3.129271664> = euneus
->   - #Fun<euneus_benchmarker.4.129271664> = jiffy
->   - #Fun<euneus_benchmarker.5.129271664> = thoas
-
 ## Sponsors
 
 If you like this tool, please consider [sponsoring me](https://github.com/sponsors/williamthome).
