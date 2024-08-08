@@ -197,7 +197,7 @@ decode_stream_continue(JSON, State) ->
 
 -spec decode_stream_end(State) -> Result when
     State :: euneus_decoder:stream_state(),
-    Result :: euneus_decoder:stream_result().
+    Result :: {end_of_input, term()}.
 %% @equiv euneus_decoder:stream_continue(end_of_input, State)
 %%
 %% @doc Ends parsing a stream of bytes of a JSON value.
@@ -212,7 +212,8 @@ decode_stream_continue(JSON, State) ->
 %% {end_of_input,123}
 %% '''
 decode_stream_end(State) ->
-    euneus_decoder:stream_continue(end_of_input, State).
+    {end_of_input, Term} = euneus_decoder:stream_continue(end_of_input, State),
+    {end_of_input, Term}.
 
 -spec minify(JSON) -> binary() when
     JSON :: binary().
