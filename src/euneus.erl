@@ -17,7 +17,9 @@
 -export([decode_stream_continue/2]).
 -export([decode_stream_end/1]).
 -export([minify/1]).
+-export([minify_to_iodata/1]).
 -export([format/2]).
+-export([format_to_iodata/2]).
 
 %
 
@@ -34,7 +36,9 @@
 -ignore_xref([decode_stream_continue/2]).
 -ignore_xref([decode_stream_end/1]).
 -ignore_xref([minify/1]).
+-ignore_xref([minify_to_iodata/1]).
 -ignore_xref([format/2]).
+-ignore_xref([format_to_iodata/2]).
 
 %% --------------------------------------------------------------------
 %% DocTest
@@ -217,6 +221,8 @@ decode_stream_end(State) ->
 
 -spec minify(JSON) -> binary() when
     JSON :: binary().
+%% @equiv iolist_to_binary(minify_to_iodata(JSON))
+%%
 %% @doc Minifies a binary JSON.
 %%
 %% <em>Example:</em>
@@ -226,7 +232,13 @@ decode_stream_end(State) ->
 %% <<"{\"foo\":[true,null]}">>
 %% '''
 minify(JSON) ->
-    format(JSON, #{
+    iolist_to_binary(minify_to_iodata(JSON)).
+
+-spec minify_to_iodata(JSON) -> iodata() when
+    JSON :: binary().
+%% @doc Minifies a binary JSON.
+minify_to_iodata(JSON) ->
+    euneus_formatter:format(JSON, #{
         indent_type => spaces,
         indent_width => 0,
         spaced_values => false,
@@ -236,6 +248,8 @@ minify(JSON) ->
 -spec format(JSON, Options) -> binary() when
     JSON :: binary(),
     Options :: euneus_formatter:options().
+%% @equiv iolist_to_binary(format(JSON, Options))
+%%
 %% @doc Formats a binary JSON.
 %%
 %% <em>Example:</em>
@@ -252,4 +266,11 @@ minify(JSON) ->
 %% <<"{\n\t\"foo\": [\n\t\ttrue,\n\t\tnull\n\t]\n}">>
 %% '''
 format(JSON, Opts) ->
-    iolist_to_binary(euneus_formatter:format(JSON, Opts)).
+    iolist_to_binary(format_to_iodata(JSON, Opts)).
+
+-spec format_to_iodata(JSON, Options) -> iodata() when
+    JSON :: binary(),
+    Options :: euneus_formatter:options().
+%% @doc Formats a binary JSON.
+format_to_iodata(JSON, Opts) ->
+    euneus_formatter:format(JSON, Opts).
