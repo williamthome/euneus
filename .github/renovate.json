@@ -9,8 +9,7 @@
   "packageRules": [
     {
       "matchFileNames": [
-        ".github/**/*.yml",
-        ".tool-versions"
+        ".github/**/*.yml"
       ],
       "groupName": "dev tools"
     },
