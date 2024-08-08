@@ -15,6 +15,7 @@
 -export([decode_stream_start/1]).
 -export([decode_stream_start/2]).
 -export([decode_stream_continue/2]).
+-export([decode_stream_end/1]).
 -export([minify/1]).
 -export([format/2]).
 
@@ -31,6 +32,7 @@
 -ignore_xref([decode_stream_start/1]).
 -ignore_xref([decode_stream_start/2]).
 -ignore_xref([decode_stream_continue/2]).
+-ignore_xref([decode_stream_end/1]).
 -ignore_xref([minify/1]).
 -ignore_xref([format/2]).
 
@@ -192,6 +194,25 @@ decode_stream_start(JSON, Opts) ->
 %% '''
 decode_stream_continue(JSON, State) ->
     euneus_decoder:stream_continue(JSON, State).
+
+-spec decode_stream_end(State) -> Result when
+    State :: euneus_decoder:stream_state(),
+    Result :: euneus_decoder:stream_result().
+%% @equiv euneus_decoder:stream_continue(end_of_input, State)
+%%
+%% @doc Ends parsing a stream of bytes of a JSON value.
+%%
+%% <em>Example:</em>
+%%
+%% ```
+%% 1> begin
+%% .. {continue, State} = euneus:decode_stream_start(<<"123">>),
+%% .. euneus:decode_stream_end(State)
+%% .. end.
+%% {end_of_input,123}
+%% '''
+decode_stream_end(State) ->
+    euneus_decoder:stream_continue(end_of_input, State).
 
 -spec minify(JSON) -> binary() when
     JSON :: binary().
