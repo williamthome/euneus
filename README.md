@@ -28,7 +28,7 @@ Detailed examples and further explanation can be found at [hexdocs](https://hexd
 % rebar.config
 {deps, [
     {json_polyfill, "0.1.3"}, % Required only for OTP < 27
-    {euneus, "2.2.0"}
+    {euneus, "2.3.0"}
 ]}.
 ```
 
@@ -39,7 +39,7 @@ Detailed examples and further explanation can be found at [hexdocs](https://hexd
 defp deps do
   [
     {:json_polyfill, "~> 0.1"}, # Required only for OTP < 27
-    {:euneus, "~> 2.2"}
+    {:euneus, "~> 2.3"}
   ]
 end
 ```
