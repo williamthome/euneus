@@ -27,7 +27,7 @@ Detailed examples and further explanation can be found at [hexdocs](https://hexd
 ```erlang
 % rebar.config
 {deps, [
-    {json_polyfill, "0.1.3"}, % Required only for OTP < 27
+    json_polyfill, % Required only for OTP < 27
     {euneus, "2.3.0"}
 ]}.
 ```
@@ -43,6 +43,20 @@ defp deps do
   ]
 end
 ```
+
+Or consider using [Exneus](https://github.com/williamthome/exneus):
+
+```elixir
+# mix.exs
+defp deps do
+  [
+    {:json_polyfill, "~> 0.1"}, # Required only for OTP < 27
+    {:exneus, "~> 0.1"}
+  ]
+end
+```
+
+> Exneus is a wrapper of Euneus for Elixir.
 
 ## Basic usage
 
