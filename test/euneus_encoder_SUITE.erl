@@ -225,45 +225,20 @@ sort_keys_test(Config) when is_list(Config) ->
         )
     ].
 
--if(?OTP_RELEASE >= 26).
 proplists_test(Config) when is_list(Config) ->
     [
         ?assertEqual(<<"[]">>, encode([], #{proplists => true})),
+        ?assertEqual(<<"[\"foo\",\"bar\"]">>, encode([foo, bar], #{proplists => true})),
+        ?assertEqual(<<"{\"foo\":\"bar\"}">>, encode([{<<"foo">>, bar}], #{proplists => true})),
+        ?assertEqual(<<"{\"foo\":\"bar\"}">>, encode([{"foo", bar}], #{proplists => true})),
+        ?assertEqual(<<"{\"foo\":\"bar\"}">>, encode([{foo, bar}], #{proplists => true})),
+        ?assertEqual(<<"{\"0\":0}">>, encode([{0, 0}], #{proplists => true})),
+        ?assertEqual(<<"[]">>, encode([], #{proplists => {true, fun(_) -> false end}})),
         ?assertEqual(
-            <<"[null,{\"0\":0,\"foo\":\"bar\",\"baz\":true}]">>,
-            encode([null, [{foo, bar}, baz, {0, 0}]], #{proplists => true})
-        ),
-        ?assertEqual(
-            <<"[null,{\"foo\":\"bar\"}]">>,
-            encode([null, [{foo, bar}]], #{
-                proplists =>
-                    {true, fun
-                        ([{_, _}]) -> true;
-                        (_) -> false
-                    end}
-            })
+            <<"{\"foo\":\"bar\"}">>,
+            encode([{foo, bar}], #{proplists => {true, fun([{_, _}]) -> true end}})
         )
     ].
--else.
-proplists_test(Config) when is_list(Config) ->
-    [
-        ?assertEqual(<<"[]">>, encode([], #{proplists => true})),
-        ?assertEqual(
-            <<"[null,{\"foo\":\"bar\",\"baz\":true,\"0\":0}]">>,
-            encode([null, [{foo, bar}, baz, {0, 0}]], #{proplists => true})
-        ),
-        ?assertEqual(
-            <<"[null,{\"foo\":\"bar\"}]">>,
-            encode([null, [{foo, bar}]], #{
-                proplists =>
-                    {true, fun
-                        ([{_, _}]) -> true;
-                        (_) -> false
-                    end}
-            })
-        )
-    ].
--endif.
 
 escape_test(Config) when is_list(Config) ->
     ?assertEqual(<<"bar">>, encode(foo, #{escape => fun(_) -> <<"bar">> end})).
