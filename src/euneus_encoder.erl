@@ -695,19 +695,14 @@ encoder(State) ->
 encode_proplist(Proplist, State) ->
     continue(proplists:to_map(Proplist), State).
 
-is_proplist([]) ->
-    false;
-is_proplist(List) ->
-    lists:all(fun is_proplist_prop/1, List).
-
-% Must be the same types handled by key_to_binary/1.
-is_proplist_prop({Key, _}) ->
+% The key must be of the same type that is handled by key_to_binary/1.
+is_proplist([{Key, _} | _]) ->
     is_binary(Key) orelse
         is_list(Key) orelse
         is_atom(Key) orelse
         is_integer(Key);
-is_proplist_prop(Key) ->
-    is_atom(Key).
+is_proplist(_List) ->
+    false.
 
 encode_sort_keys_map(Map, #state{sort_keys = true} = State) ->
     do_encode_map([
