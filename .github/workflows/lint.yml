@@ -22,7 +22,7 @@ jobs:
     runs-on: ubuntu-24.04
 
     steps:
-      - uses: actions/checkout@d632683dd7b4114ad314bca15554477dd762a938 # v4.2.0
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
       # uses .markdownlint.yml for configuration
       - name: markdownlint
@@ -42,6 +42,6 @@ jobs:
           config_file: .yamllint.yml
 
       - name: actionlint
-        uses: reviewdog/action-actionlint@7eeec1dd160c2301eb28e1568721837d084558ad # v1.57.0
+        uses: reviewdog/action-actionlint@abd537417cf4991e1ba8e21a67b1119f4f53b8e0 # v1.64.1
         env:
           SHELLCHECK_OPTS: -o all
