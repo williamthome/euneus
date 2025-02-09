@@ -20,6 +20,10 @@ and are tested using [JSONTestSuite](https://github.com/nst/JSONTestSuite).
 
 Detailed examples and further explanation can be found at [hexdocs](https://hexdocs.pm/euneus).
 
+## Requirements
+
+OTP >= 24.
+
 ## Installation
 
 ### Erlang
@@ -27,8 +31,8 @@ Detailed examples and further explanation can be found at [hexdocs](https://hexd
 ```erlang
 % rebar.config
 {deps, [
-    json_polyfill, % Required only for OTP < 27
-    {euneus, "2.4.0"}
+    {json_polyfill, "~> 0.2"}, % Required only for OTP < 27
+    {euneus, "~> 2.4"}
 ]}.
 ```
 
@@ -38,25 +42,11 @@ Detailed examples and further explanation can be found at [hexdocs](https://hexd
 # mix.exs
 defp deps do
   [
-    {:json_polyfill, "~> 0.1"}, # Required only for OTP < 27
+    {:json_polyfill, "~> 0.2"}, # Required only for OTP < 27
     {:euneus, "~> 2.4"}
   ]
 end
 ```
-
-Or consider using [Exneus](https://github.com/williamthome/exneus):
-
-```elixir
-# mix.exs
-defp deps do
-  [
-    {:json_polyfill, "~> 0.1"}, # Required only for OTP < 27
-    {:exneus, "~> 0.1"}
-  ]
-end
-```
-
-> Exneus is a wrapper of Euneus for Elixir.
 
 ## Basic usage
 
