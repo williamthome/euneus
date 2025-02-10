@@ -24,6 +24,217 @@ Detailed examples and further explanation can be found at [hexdocs](https://hexd
 
 OTP >= 24.
 
+## Why should you use Euneus over the OTP json module?
+
+The new OTP `json` module is incredible and blazing fast!
+
+Unfortunately, it is only available for OTP >= 27. Euneus is available from OTP >= 24.
+
+Also, Euneus simplifies a lot of overheads with the new OTP `json` module without
+losing any option provided by the json module and keeping its performance.
+
+A simple example comparing the OTP `json` module with Euneus decoding object keys:
+
+```erlang
+> json:decode(<<"{\"foo\":\"bar\"}">>, [], #{object_push => fun(K, V, Acc) -> [{binary_to_atom(K), V} | Acc] end}).
+{#{foo => <<"bar">>},[],<<>>}
+> euneus:decode(<<"{\"foo\":\"bar\"}">>, #{object_keys => atom}).
+#{foo => <<"bar">>}
+```
+
+### Encode Features
+
+Some reasons to use Euneus for JSON encoding:
+
+- Possibility to skip values
+- Encoding proplists (proplists are not encoded by the OTP json module)
+- Sort object keys
+- Simple custom encoding via codecs:
+
+  ```erlang
+  -type codec() ::
+      timestamp
+      | datetime
+      | ipv4
+      | ipv6
+      | {records, #{Name :: atom() := {Fields :: [atom()], Size :: pos_integer()}}}
+      | codec_fun()
+      | custom_codec().
+  ```
+
+#### Encode Codecs
+
+##### Encode timestamp
+
+```erlang
+> euneus:encode({0, 0, 0}, #{codecs => [timestamp]}).
+<<"\"1970-01-01T00:00:00.000Z\"">>
+```
+
+##### Encode datetime
+
+```erlang
+> euneus:encode({{1970, 01, 01}, {00, 00, 00}}, #{codecs => [datetime]}).
+<<"\"1970-01-01T00:00:00Z\"">>
+```
+
+##### Encode ipv4
+
+```erlang
+> euneus:encode({0, 0, 0, 0}, #{codecs => [ipv4]}).
+<<"\"0.0.0.0\"">>
+```
+
+##### Encode ipv6
+
+```erlang
+> euneus:encode({16#fe80, 0, 0, 0, 16#204, 16#acff, 16#fe17, 16#bf38}, #{codecs => [ipv6]}).
+<<"\"fe80::204:acff:fe17:bf38\"">>
+```
+
+##### Encode record
+
+```erlang
+% -record(foo, {foo, bar}).
+> euneus:encode(#foo{foo = 1, bar = 2}, #{
+    codecs => [
+      {records, #{
+        foo => {record_info(fields, foo), record_info(size, foo)}
+      }}
+    ]
+  }).
+<<"{\"foo\":1,\"bar\":2}">>
+```
+
+### Decode Features
+
+Some reasons to use Euneus for JSON decoding:
+
+- Faster decoding than the OTP `json` module via some options:
+
+  ```erlang
+  #{
+    array_finish => reversed,
+    object_finish => reversed_proplist % or proplist
+  }
+  ```
+
+- The overhead of transforming binary keys to, e.g., atoms
+- Simple custom decoding via codecs:
+
+  ```erlang
+  -type codec() ::
+    copy
+    | timestamp
+    | datetime
+    | ipv4
+    | ipv6
+    | pid
+    | port
+    | reference
+    | codec_callback().
+  ```
+
+#### Decode Object keys
+
+##### Keys to binary (default)
+
+```erlang
+> euneus:decode(<<"{\"foo\":\"bar\"}">>).
+#{<<"foo">> => <<"bar">>}
+```
+
+##### Keys copy
+
+Just do a binary copy of the key.
+
+```erlang
+> euneus:decode(<<"{\"foo\":\"bar\"}">>, #{object_keys => copy}).
+#{<<"foo">> => <<"bar">>}
+```
+
+##### Keys to atom
+
+```erlang
+> euneus:decode(<<"{\"foo\":\"bar\"}">>, #{object_keys => atom}).
+#{foo => <<"bar">>}
+```
+
+##### Keys to existing atom
+
+```erlang
+> euneus:decode(<<"{\"foo\":\"bar\"}">>, #{object_keys => existing_atom}).
+#{foo => <<"bar">>}
+```
+
+#### Decode Codecs
+
+##### Decode copy
+
+Just do a binary copy of the value.
+
+```erlang
+> euneus:decode(<<"\"foo\"">>, #{codecs => [copy]}).
+<<"foo">>
+```
+
+##### Decode timestamp
+
+```erlang
+> euneus:decode(<<"\"1970-01-01T00:00:00.000Z\"">>, #{codecs => [timestamp]}).
+{0,0,0}
+```
+
+##### Decode datetime
+
+```erlang
+> euneus:decode(<<"\"1970-01-01T00:00:00Z\"">>, #{codecs => [datetime]}).
+{{1970,1,1},{0,0,0}}
+```
+
+##### Decode ipv4
+
+```erlang
+> euneus:decode(<<"\"0.0.0.0\"">>, #{codecs => [ipv4]}).
+{0,0,0,0}
+```
+
+##### Decode ipv6
+
+```erlang
+> euneus:decode(<<"\"0.0.0.0\"">>, #{codecs => [ipv4]}).
+{0,0,0,0}
+> euneus:decode(<<"\"::\"">>, #{codecs => [ipv6]}).
+{0,0,0,0,0,0,0,0}
+> euneus:decode(<<"\"::1\"">>, #{codecs => [ipv6]}).
+{0,0,0,0,0,0,0,1}
+> euneus:decode(<<"\"::192.168.42.2\"">>, #{codecs => [ipv6]}).
+{0,0,0,0,0,0,49320,10754}
+> euneus:decode(<<"\"fe80::204:acff:fe17:bf38\"">>, #{codecs => [ipv6]}).
+{65152,0,0,0,516,44287,65047,48952}
+```
+
+##### Decode pid
+
+```erlang
+> euneus:decode(<<"\"<0.92.0>\"">>, #{codecs => [pid]}).
+<0.92.0>
+```
+
+##### Decode port
+
+```erlang
+> euneus:decode(<<"\"#Port<0.1>\"">>, #{codecs => [port]}).
+#Port<0.1>
+```
+
+##### Decode reference
+
+```erlang
+> euneus:decode(<<"\"#Ref<0.314572725.1088159747.110918>\"">>, #{codecs => [reference]}).
+#Ref<0.314572725.1088159747.110918>
+```
+
 ## Installation
 
 ### Erlang
