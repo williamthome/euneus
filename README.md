@@ -202,8 +202,6 @@ Just do a binary copy of the value.
 ##### Decode ipv6
 
 ```erlang
-> euneus:decode(<<"\"0.0.0.0\"">>, #{codecs => [ipv4]}).
-{0,0,0,0}
 > euneus:decode(<<"\"::\"">>, #{codecs => [ipv6]}).
 {0,0,0,0,0,0,0,0}
 > euneus:decode(<<"\"::1\"">>, #{codecs => [ipv6]}).
