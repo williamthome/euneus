@@ -41,12 +41,13 @@
 -ignore_xref([format_to_iodata/2]).
 
 %% --------------------------------------------------------------------
-%% DocTest
+%% Doctest
 %% --------------------------------------------------------------------
 
 -if(?OTP_RELEASE >= 27).
 -ifdef(TEST).
--include_lib("doctest/include/doctest.hrl").
+-include_lib("eunit/include/eunit.hrl").
+doctest_test() -> doctest:module(?MODULE).
 -endif.
 -endif.
 
